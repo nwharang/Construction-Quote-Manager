@@ -1,0 +1,38 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Database files
+*.db binary
+*.db-journal binary
+
+# Documentation
+*.md text diff=markdown
+*.txt text
+
+# Graphics
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+
+# Scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Source code
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+*.json text
+*.css text
+*.scss text
+*.html text
+*.xml text
+*.yaml text
+*.yml text
+*.toml text
+*.ini text
+*.conf text
+*.config text 
