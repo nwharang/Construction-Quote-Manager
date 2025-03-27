@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableHeader,
@@ -10,11 +11,24 @@ import {
   Button,
   Chip,
 } from "@nextui-org/react";
-import { type RouterOutputs } from "~/utils/api";
-import Link from "next/link";
+import { api } from "~/utils/api";
 
-type Quote = RouterOutputs["quotes"]["list"][number];
+// Define the Quote type based on the structure from the API
+interface Quote {
+  id: string;
+  projectName: string;
+  customerName: string;
+  status: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
+  complexityCharge: string | number;
+  markupPercentage: string | number;
+  createdAt: Date;
+  updatedAt: Date;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  notes?: string | null;
+}
 
+// Status color mapping
 const statusColors = {
   DRAFT: "default",
   SENT: "primary",
@@ -22,16 +36,29 @@ const statusColors = {
   REJECTED: "danger",
 } as const;
 
-export function QuoteList({ quotes }: { quotes: Quote[] }) {
+export default function QuoteList({ quotes }: { quotes: Quote[] }) {
+  const router = useRouter();
+
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString();
+  };
+
+  const formatCurrency = (amount: number | string) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(Number(amount));
+  };
+
   return (
-    <Table aria-label="Quotes table">
+    <Table aria-label="Quotes list">
       <TableHeader>
-        <TableColumn>Project</TableColumn>
-        <TableColumn>Customer</TableColumn>
-        <TableColumn>Status</TableColumn>
-        <TableColumn>Total</TableColumn>
-        <TableColumn>Created</TableColumn>
-        <TableColumn>Actions</TableColumn>
+        <TableColumn>PROJECT</TableColumn>
+        <TableColumn>CUSTOMER</TableColumn>
+        <TableColumn>STATUS</TableColumn>
+        <TableColumn>TOTAL</TableColumn>
+        <TableColumn>CREATED</TableColumn>
+        <TableColumn>ACTIONS</TableColumn>
       </TableHeader>
       <TableBody>
         {quotes.map((quote) => (
@@ -39,25 +66,25 @@ export function QuoteList({ quotes }: { quotes: Quote[] }) {
             <TableCell>{quote.projectName}</TableCell>
             <TableCell>{quote.customerName}</TableCell>
             <TableCell>
-              <Chip color={statusColors[quote.status]}>
+              <Chip
+                color={statusColors[quote.status as keyof typeof statusColors]}
+                variant="flat"
+              >
                 {quote.status}
               </Chip>
             </TableCell>
-            <TableCell>${quote.grandTotal.toFixed(2)}</TableCell>
             <TableCell>
-              {new Date(quote.createdAt).toLocaleDateString()}
+              {formatCurrency(Number(quote.complexityCharge))}
             </TableCell>
+            <TableCell>{formatDate(quote.createdAt)}</TableCell>
             <TableCell>
-              <div className="flex gap-2">
-                <Button
-                  as={Link}
-                  href={`/quotes/${quote.id}`}
-                  size="sm"
-                  variant="flat"
-                >
-                  View
-                </Button>
-              </div>
+              <Button
+                color="primary"
+                variant="light"
+                onPress={() => router.push(`/quotes/${quote.id}`)}
+              >
+                View
+              </Button>
             </TableCell>
           </TableRow>
         ))}

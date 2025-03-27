@@ -77,6 +77,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             variant="light"
             onPress={onClose}
             className="data-[hover]:bg-default-100"
+            aria-label="Close menu"
           >
             <X className="h-5 w-5" />
           </Button>

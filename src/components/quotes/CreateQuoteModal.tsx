@@ -33,6 +33,8 @@ interface CreateQuoteModalProps {
 
 export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
   const router = useRouter();
+  const utils = api.useContext();
+  
   const {
     register,
     handleSubmit,
@@ -42,7 +44,7 @@ export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
     resolver: zodResolver(createQuoteSchema),
   });
 
-  const createQuote = api.quotes.create.useMutation({
+  const createQuote = api.quote.create.useMutation({
     onSuccess: () => {
       reset();
       onClose();

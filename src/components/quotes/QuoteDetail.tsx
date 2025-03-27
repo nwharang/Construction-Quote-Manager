@@ -1,214 +1,311 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
-  CardBody,
   CardHeader,
+  CardBody,
+  CardFooter,
   Divider,
   Button,
   Chip,
   Input,
+  Spinner,
 } from "@nextui-org/react";
-import { type RouterOutputs } from "~/utils/api";
-import { useState } from "react";
 import { api } from "~/utils/api";
-import { useRouter } from "next/navigation";
 
-type Quote = RouterOutputs["quotes"]["getById"];
-
-interface QuoteDetailProps {
-  quote: Quote;
+// Define the Quote type structure
+interface Task {
+  id: string;
+  description: string;
+  price: string | number;
+  estimatedMaterialsCost: string | number;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+  quote_id?: string;
 }
 
-export function QuoteDetail({ quote }: QuoteDetailProps) {
+interface Material {
+  id: string;
+  name: string;
+  cost: string | number;
+  quantity: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Quote {
+  id: string;
+  projectName: string;
+  customerName: string;
+  status: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
+  complexityCharge: string | number;
+  markupPercentage: string | number;
+  createdAt: Date;
+  updatedAt: Date;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  notes?: string | null;
+  tasks: Task[];
+}
+
+// Status color mapping
+const statusColors = {
+  DRAFT: "default",
+  SENT: "primary",
+  ACCEPTED: "success",
+  REJECTED: "danger",
+} as const;
+
+export default function QuoteDetail({ quote }: { quote: Quote }) {
   const router = useRouter();
-  const [complexityCharge, setComplexityCharge] = useState(quote.complexityCharge);
-  const [markupCharge, setMarkupCharge] = useState(quote.markupCharge);
-
-  const updateStatus = api.quotes.updateStatus.useMutation({
+  const utils = api.useContext();
+  
+  const [complexityCharge, setComplexityCharge] = useState(Number(quote.complexityCharge));
+  const [markupPercentage, setMarkupPercentage] = useState(Number(quote.markupPercentage));
+  
+  const updateCharges = api.quote.updateCharges.useMutation({
     onSuccess: () => {
-      router.refresh();
+      utils.quote.getById.invalidate({ id: quote.id });
     },
   });
 
-  const updateCharges = api.quotes.updateCharges.useMutation({
+  const updateStatus = api.quote.updateStatus.useMutation({
     onSuccess: () => {
-      router.refresh();
+      utils.quote.getById.invalidate({ id: quote.id });
     },
   });
 
-  const handleStatusChange = (status: Quote["status"]) => {
-    updateStatus.mutate({
-      quoteId: quote.id,
-      status,
-    });
+  const deleteQuote = api.quote.delete.useMutation({
+    onSuccess: () => {
+      router.push("/quotes");
+    },
+  });
+
+  const formatCurrency = (amount: number | string) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(Number(amount));
   };
 
-  const handleChargesUpdate = () => {
+  // Calculate totals
+  const taskTotal = quote.tasks.reduce((sum, task) => sum + Number(task.price), 0);
+  const materialsTotal = quote.tasks.reduce(
+    (sum, task) => sum + Number(task.estimatedMaterialsCost),
+    0
+  );
+  const subtotal = taskTotal + materialsTotal;
+  const complexity = complexityCharge;
+  const markup = (subtotal + complexity) * (markupPercentage / 100);
+  const grandTotal = subtotal + complexity + markup;
+
+  const handleSaveCharges = () => {
     updateCharges.mutate({
-      quoteId: quote.id,
+      id: quote.id,
       complexityCharge,
-      markupCharge,
+      markupPercentage,
     });
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex justify-between">
-          <div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Project Info */}
+        <Card className="md:col-span-2">
+          <CardHeader className="flex justify-between">
             <h2 className="text-xl font-bold">{quote.projectName}</h2>
-            <p className="text-sm text-default-500">
-              Created on {new Date(quote.createdAt).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
             <Chip
-              color={
-                quote.status === "DRAFT"
-                  ? "default"
-                  : quote.status === "SENT"
-                  ? "primary"
-                  : quote.status === "ACCEPTED"
-                  ? "success"
-                  : "danger"
-              }
+              color={statusColors[quote.status as keyof typeof statusColors]}
+              variant="flat"
             >
               {quote.status}
             </Chip>
-            {quote.status === "DRAFT" && (
-              <Button
-                color="primary"
-                onClick={() => handleStatusChange("SENT")}
-              >
-                Send Quote
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardBody>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <h3 className="font-semibold">Customer Information</h3>
-              <p>{quote.customerName}</p>
-              {quote.customerEmail && <p>{quote.customerEmail}</p>}
-              {quote.customerPhone && <p>{quote.customerPhone}</p>}
-            </div>
-            {quote.notes && (
+          </CardHeader>
+          <Divider />
+          <CardBody>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h3 className="font-semibold">Notes</h3>
-                <p>{quote.notes}</p>
+                <p className="text-small text-default-500">Customer</p>
+                <p className="font-medium">{quote.customerName}</p>
               </div>
-            )}
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h2 className="text-xl font-bold">Tasks</h2>
-        </CardHeader>
-        <CardBody>
-          <div className="space-y-4">
-            {quote.tasks.map((task) => (
-              <div key={task.id} className="rounded-lg border p-4">
-                <div className="flex justify-between">
-                  <h3 className="font-semibold">{task.description}</h3>
-                  <p className="font-semibold">${task.taskPrice.toFixed(2)}</p>
+              {quote.customerEmail && (
+                <div>
+                  <p className="text-small text-default-500">Email</p>
+                  <p className="font-medium">{quote.customerEmail}</p>
                 </div>
-                {task.estimatedMaterialsCostLumpSum && (
-                  <p className="text-sm text-default-500">
-                    Materials: ${task.estimatedMaterialsCostLumpSum.toFixed(2)}
-                  </p>
-                )}
-                {task.materials.length > 0 && (
-                  <div className="mt-2">
-                    <h4 className="text-sm font-semibold">Materials:</h4>
-                    <ul className="list-inside list-disc text-sm">
-                      {task.materials.map((material) => (
-                        <li key={material.id}>
-                          {material.product?.name ?? "Custom"} -{" "}
-                          {material.quantity} x ${material.unitPrice.toFixed(2)} ={" "}
-                          ${material.totalPrice.toFixed(2)}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              )}
+              {quote.customerPhone && (
+                <div>
+                  <p className="text-small text-default-500">Phone</p>
+                  <p className="font-medium">{quote.customerPhone}</p>
+                </div>
+              )}
+              {quote.notes && (
+                <div className="md:col-span-2">
+                  <p className="text-small text-default-500">Notes</p>
+                  <p className="font-medium">{quote.notes}</p>
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Status and Actions */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-bold">Actions</h2>
+          </CardHeader>
+          <Divider />
+          <CardBody className="space-y-4">
+            <div className="flex flex-col gap-2">
+              <p className="text-small text-default-500">Change Status</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.keys(statusColors).map((status) => (
+                  <Button
+                    key={status}
+                    size="sm"
+                    color={statusColors[status as keyof typeof statusColors]}
+                    variant={quote.status === status ? "solid" : "flat"}
+                    onPress={() =>
+                      updateStatus.mutate({
+                        id: quote.id,
+                        status: status as any,
+                      })
+                    }
+                    isLoading={updateStatus.isPending}
+                  >
+                    {status}
+                  </Button>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+            <Divider />
+            <Button
+              color="danger"
+              variant="light"
+              onPress={() => {
+                if (window.confirm("Are you sure you want to delete this quote?")) {
+                  deleteQuote.mutate({ id: quote.id });
+                }
+              }}
+              isLoading={deleteQuote.isPending}
+            >
+              Delete Quote
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Tasks */}
+      <Card>
+        <CardHeader>
+          <h2 className="text-lg font-bold">Tasks</h2>
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          {quote.tasks.length === 0 ? (
+            <p className="text-center py-4">No tasks added yet</p>
+          ) : (
+            <div className="space-y-4">
+              {quote.tasks.map((task) => (
+                <Card key={task.id} className="border-1">
+                  <CardBody>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-2">
+                        <p className="font-medium">{task.description}</p>
+                        <p className="text-small text-default-500">
+                          Materials Estimate: {formatCurrency(Number(task.estimatedMaterialsCost))}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-large">
+                          {formatCurrency(Number(task.price))}
+                        </p>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-xl font-bold">Adjustments</h2>
-        </CardHeader>
-        <CardBody>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
+      {/* Adjustments and Totals */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <h2 className="text-lg font-bold">Adjustments</h2>
+          </CardHeader>
+          <Divider />
+          <CardBody className="space-y-4">
+            <div className="flex flex-wrap gap-4 items-end">
               <Input
-                label="Complexity Charge (%)"
                 type="number"
+                label="Complexity Charge"
                 value={complexityCharge.toString()}
-                onChange={(e) =>
-                  setComplexityCharge(Number(e.target.value))
+                onChange={(e) => setComplexityCharge(Number(e.target.value))}
+                startContent={
+                  <div className="pointer-events-none">$</div>
                 }
+                className="max-w-xs"
               />
-            </div>
-            <div>
               <Input
-                label="Markup Charge (%)"
                 type="number"
-                value={markupCharge.toString()}
-                onChange={(e) => setMarkupCharge(Number(e.target.value))}
+                label="Markup Percentage"
+                value={markupPercentage.toString()}
+                onChange={(e) => setMarkupPercentage(Number(e.target.value))}
+                endContent={
+                  <div className="pointer-events-none">%</div>
+                }
+                min={0}
+                max={100}
+                className="max-w-xs"
               />
-            </div>
-            <div className="md:col-span-2">
               <Button
                 color="primary"
-                onClick={handleChargesUpdate}
-                className="w-full"
+                onPress={handleSaveCharges}
+                isLoading={updateCharges.isPending}
               >
-                Update Charges
+                Save Changes
               </Button>
             </div>
-          </div>
-        </CardBody>
-      </Card>
+          </CardBody>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-xl font-bold">Totals</h2>
-        </CardHeader>
-        <CardBody>
-          <div className="space-y-2">
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-bold">Totals</h2>
+          </CardHeader>
+          <Divider />
+          <CardBody className="space-y-2">
             <div className="flex justify-between">
-              <span>Subtotal (Tasks)</span>
-              <span>${quote.subtotalTasks.toFixed(2)}</span>
+              <span>Tasks Subtotal:</span>
+              <span>{formatCurrency(taskTotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Subtotal (Materials)</span>
-              <span>${quote.subtotalMaterials.toFixed(2)}</span>
+              <span>Materials Subtotal:</span>
+              <span>{formatCurrency(materialsTotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Complexity Charge:</span>
+              <span>{formatCurrency(complexity)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Markup ({markupPercentage}%):</span>
+              <span>{formatCurrency(markup)}</span>
             </div>
             <Divider />
-            <div className="flex justify-between">
-              <span>Complexity Charge</span>
-              <span>${quote.complexityCharge.toFixed(2)}</span>
+            <div className="flex justify-between font-bold text-lg">
+              <span>Grand Total:</span>
+              <span>{formatCurrency(grandTotal)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Markup Charge</span>
-              <span>${quote.markupCharge.toFixed(2)}</span>
-            </div>
-            <Divider />
-            <div className="flex justify-between font-bold">
-              <span>Grand Total</span>
-              <span>${quote.grandTotal.toFixed(2)}</span>
-            </div>
-          </div>
-        </CardBody>
-      </Card>
+          </CardBody>
+        </Card>
+      </div>
     </div>
   );
 } 

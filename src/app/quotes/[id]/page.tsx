@@ -1,48 +1,46 @@
 "use client";
 
+import { useState } from "react";
 import { notFound } from "next/navigation";
 import { api } from "~/utils/api";
-import { QuoteDetail } from "~/components/quotes/QuoteDetail";
-import { AddTaskModal } from "~/components/quotes/AddTaskModal";
-import { Button } from "@nextui-org/react";
-import { useState } from "react";
+import { Button, Spinner } from "@nextui-org/react";
+import QuoteDetail from "~/components/quotes/QuoteDetail";
+import AddTaskModal from "~/components/quotes/AddTaskModal";
 
-interface QuotePageProps {
-  params: {
-    id: string;
-  };
-}
+export default function QuotePage({ params }: { params: { id: string } }) {
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const quoteQuery = api.quote.getById.useQuery({ id: params.id });
 
-export default function QuotePage({ params }: QuotePageProps) {
-  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
-  const { data: quote, isLoading } = api.quotes.getById.useQuery(params.id);
-
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (quoteQuery.isPending) {
+    return (
+      <div className="flex justify-center items-center h-[70vh]">
+        <Spinner size="lg" />
+      </div>
+    );
   }
 
-  if (!quote) {
-    notFound();
+  if (!quoteQuery.data) {
+    return notFound();
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Quote Details</h1>
-        <Button
-          color="primary"
-          onClick={() => setIsAddTaskModalOpen(true)}
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Quote Details</h1>
+        <Button 
+          color="primary" 
+          onPress={() => setIsTaskModalOpen(true)}
         >
           Add Task
         </Button>
       </div>
 
-      <QuoteDetail quote={quote} />
+      <QuoteDetail quote={quoteQuery.data} />
 
-      <AddTaskModal
-        quoteId={quote.id}
-        isOpen={isAddTaskModalOpen}
-        onClose={() => setIsAddTaskModalOpen(false)}
+      <AddTaskModal 
+        quoteId={params.id} 
+        isOpen={isTaskModalOpen} 
+        onClose={() => setIsTaskModalOpen(false)} 
       />
     </div>
   );

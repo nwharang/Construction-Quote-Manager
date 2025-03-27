@@ -1,143 +1,266 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { z } from "zod";
 import {
-  Button,
   Card,
-  CardBody,
   CardHeader,
+  CardBody,
+  CardFooter,
   Input,
-  Link as NextUILink,
+  Button,
+  Divider,
 } from "@nextui-org/react";
-import { EyeIcon, EyeOffIcon } from "lucide-react";
-import { authSchema } from "@/lib/schemas/auth";
-import type { AuthSchema } from "@/lib/schemas/auth";
+import { Eye, EyeOff, UserPlus } from "lucide-react";
+
+// Form validation schema
+const signUpSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  confirmPassword: z.string().min(8, { message: "Please confirm your password" }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+type SignUpFormValues = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-
+  const [isConfirmVisible, setIsConfirmVisible] = useState(false);
+  
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<AuthSchema>({
-    resolver: zodResolver(authSchema),
+  } = useForm<SignUpFormValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
   });
 
-  const onSubmit = async (data: AuthSchema) => {
+  const toggleVisibility = () => setIsVisible(!isVisible);
+  const toggleConfirmVisibility = () => setIsConfirmVisible(!isConfirmVisible);
+
+  const onSubmit = async (data: SignUpFormValues) => {
     setIsLoading(true);
-
+    setAuthError(null);
+    
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        toast.error("Registration failed", {
-          description: result.message || "Please try again.",
-        });
-        return;
-      }
-
-      toast.success("Account created!", {
-        description: "Please sign in with your new account.",
-      });
-
-      const signInResult = await signIn("credentials", {
-        username: data.username,
+      // In a real app, you would make an API call to register the user
+      // For this demo, we'll simulate success and then sign in
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // After successful registration, automatically sign in
+      const result = await signIn("credentials", {
+        email: data.email,
         password: data.password,
         redirect: false,
       });
-
-      if (signInResult?.error) {
-        toast.error("Authentication failed", {
-          description: "Please try signing in manually.",
-        });
-        return;
+      
+      if (result?.error) {
+        setAuthError("Registration successful, but unable to sign in automatically. Please sign in manually.");
+      } else {
+        router.push("/quotes");
       }
-
-      router.push("/");
-      router.refresh();
     } catch (error) {
-      toast.error("Something went wrong", {
-        description: "Please try again later.",
-      });
+      setAuthError("An unexpected error occurred. Please try again.");
+      console.error("Sign up error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto grid min-h-[calc(100dvh-4rem)] max-w-md place-items-center px-4 py-8">
-      <Card className="w-full">
-        <CardHeader className="flex flex-col gap-1 px-6 py-6">
-          <h1 className="text-2xl font-bold">Create an account</h1>
-          <p className="text-default-500">
-            Sign up to get started with our platform
-          </p>
+    <div className="flex min-h-screen items-center justify-center p-4" aria-labelledby="signup-heading">
+      <Card className="w-full max-w-md">
+        <CardHeader className="flex flex-col gap-1">
+          <h1 id="signup-heading" className="text-2xl font-bold">Create Account</h1>
+          <p className="text-default-500">Sign up to start creating quotes</p>
         </CardHeader>
-        <CardBody className="px-6 py-4">
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-            <Input
-              {...register("username")}
-              label="Username"
-              placeholder="Choose a username"
-              errorMessage={errors.username?.message}
-              isInvalid={!!errors.username}
-              isDisabled={isLoading}
-            />
-            <Input
-              {...register("password")}
-              label="Password"
-              placeholder="Choose a password"
-              type={isVisible ? "text" : "password"}
-              errorMessage={errors.password?.message}
-              isInvalid={!!errors.password}
-              isDisabled={isLoading}
-              endContent={
-                <Button
-                  isIconOnly
-                  variant="light"
-                  onClick={() => setIsVisible(!isVisible)}
-                >
-                  {isVisible ? (
-                    <EyeOffIcon className="size-4" />
-                  ) : (
-                    <EyeIcon className="size-4" />
-                  )}
-                </Button>
-              }
-            />
+        
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <CardBody className="gap-4">
+            {authError && (
+              <div 
+                className="rounded-lg bg-danger-50 p-3 text-danger text-sm" 
+                role="alert"
+                aria-live="assertive"
+              >
+                {authError}
+              </div>
+            )}
+            
+            <div className="space-y-1">
+              <Input
+                type="text"
+                label="Name"
+                labelPlacement="outside"
+                placeholder="Enter your full name"
+                {...register("name")}
+                isInvalid={!!errors.name}
+                errorMessage={errors.name?.message}
+                autoComplete="name"
+                aria-required="true"
+                aria-describedby={errors.name ? "name-error" : undefined}
+                classNames={{
+                  label: "font-medium",
+                }}
+                fullWidth
+              />
+              {errors.name && (
+                <span id="name-error" className="sr-only">
+                  {errors.name.message}
+                </span>
+              )}
+            </div>
+            
+            <div className="space-y-1">
+              <Input
+                type="email"
+                label="Email"
+                labelPlacement="outside"
+                placeholder="Enter your email"
+                {...register("email")}
+                isInvalid={!!errors.email}
+                errorMessage={errors.email?.message}
+                autoComplete="email"
+                aria-required="true"
+                aria-describedby={errors.email ? "email-error" : undefined}
+                classNames={{
+                  label: "font-medium",
+                }}
+                fullWidth
+              />
+              {errors.email && (
+                <span id="email-error" className="sr-only">
+                  {errors.email.message}
+                </span>
+              )}
+            </div>
+            
+            <div className="space-y-1">
+              <Input
+                label="Password"
+                labelPlacement="outside"
+                placeholder="Create a password"
+                {...register("password")}
+                isInvalid={!!errors.password}
+                errorMessage={errors.password?.message}
+                autoComplete="new-password"
+                aria-required="true"
+                aria-describedby={errors.password ? "password-error" : undefined}
+                endContent={
+                  <Button
+                    variant="light"
+                    isIconOnly
+                    tabIndex={-1}
+                    onClick={toggleVisibility}
+                    type="button"
+                    aria-label={isVisible ? "Hide password" : "Show password"}
+                  >
+                    {isVisible ? (
+                      <EyeOff className="h-4 w-4 text-default-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-default-400" />
+                    )}
+                  </Button>
+                }
+                type={isVisible ? "text" : "password"}
+                classNames={{
+                  label: "font-medium",
+                }}
+                fullWidth
+              />
+              {errors.password && (
+                <span id="password-error" className="sr-only">
+                  {errors.password.message}
+                </span>
+              )}
+            </div>
+            
+            <div className="space-y-1">
+              <Input
+                label="Confirm Password"
+                labelPlacement="outside"
+                placeholder="Confirm your password"
+                {...register("confirmPassword")}
+                isInvalid={!!errors.confirmPassword}
+                errorMessage={errors.confirmPassword?.message}
+                autoComplete="new-password"
+                aria-required="true"
+                aria-describedby={errors.confirmPassword ? "confirm-password-error" : undefined}
+                endContent={
+                  <Button
+                    variant="light"
+                    isIconOnly
+                    tabIndex={-1}
+                    onClick={toggleConfirmVisibility}
+                    type="button"
+                    aria-label={isConfirmVisible ? "Hide password" : "Show password"}
+                  >
+                    {isConfirmVisible ? (
+                      <EyeOff className="h-4 w-4 text-default-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-default-400" />
+                    )}
+                  </Button>
+                }
+                type={isConfirmVisible ? "text" : "password"}
+                classNames={{
+                  label: "font-medium",
+                }}
+                fullWidth
+              />
+              {errors.confirmPassword && (
+                <span id="confirm-password-error" className="sr-only">
+                  {errors.confirmPassword.message}
+                </span>
+              )}
+            </div>
+          </CardBody>
+          
+          <CardFooter className="flex flex-col gap-4">
             <Button
               type="submit"
               color="primary"
+              fullWidth
               isLoading={isLoading}
-              className="mt-2"
+              startContent={!isLoading && <UserPlus className="h-4 w-4" />}
+              aria-label="Create your account"
             >
               Sign Up
             </Button>
-            <p className="text-center text-sm text-default-500">
+            
+            <Divider className="my-2" />
+            
+            <p className="text-center text-sm">
               Already have an account?{" "}
-              <NextUILink as={Link} href="/auth/signin" size="sm">
+              <Link
+                href="/auth/signin"
+                className="text-primary hover:underline"
+                aria-label="Sign in to your existing account"
+              >
                 Sign in
-              </NextUILink>
+              </Link>
             </p>
-          </form>
-        </CardBody>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   );

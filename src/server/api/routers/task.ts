@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { tasks, quotes } from "~/server/db/schema";
-import { eq, and } from "drizzle-orm";
-import { v4 as uuidv4 } from "uuid";
+import { tasks } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
+import { type InferInsertModel } from "drizzle-orm";
+
+// Define the insert type for the tasks table
+type InsertTask = InferInsertModel<typeof tasks>;
 
 export const taskRouter = createTRPCRouter({
   create: protectedProcedure
@@ -14,29 +17,28 @@ export const taskRouter = createTRPCRouter({
       order: z.number().min(0).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // First, verify the quote belongs to the user
-      const quote = await ctx.db.select().from(quotes)
-        .where(eq(quotes.id, input.quoteId))
-        .where(eq(quotes.createdBy, ctx.session.user.id));
-      
-      if (!quote.length) {
-        throw new Error("Quote not found or you don't have permission to modify it");
-      }
+      try {
+        // Map the input to the database schema field names
+        const taskToInsert: InsertTask = {
+          quote_id: input.quoteId,
+          description: input.description,
+          price: input.price.toString(),
+          estimated_materials_cost: (input.estimatedMaterialsCost ?? 0).toString(),
+          order: input.order ?? 0,
+        };
 
-      const id = uuidv4();
-      
-      await ctx.db.insert(tasks).values({
-        id,
-        quoteId: input.quoteId,
-        description: input.description,
-        price: input.price,
-        estimatedMaterialsCost: input.estimatedMaterialsCost ?? 0,
-        order: input.order ?? 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      
-      return { id };
+        // Insert the task
+        const result = await ctx.db.insert(tasks).values(taskToInsert).returning();
+        
+        if (!result.length) {
+          throw new Error("Failed to create task");
+        }
+        
+        return { id: result[0].id };
+      } catch (error) {
+        console.error("Error creating task:", error);
+        throw new Error("Failed to create task. Make sure the quote exists and you have permission.");
+      }
     }),
 
   update: protectedProcedure
@@ -48,74 +50,49 @@ export const taskRouter = createTRPCRouter({
       order: z.number().min(0).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // First, get the task to verify quote ownership
-      const task = await ctx.db.select().from(tasks)
-        .where(eq(tasks.id, input.id));
-      
-      if (!task.length) {
-        throw new Error("Task not found");
+      try {
+        // Create an update object with only the fields that are provided
+        const updateData: Partial<InsertTask> = {};
+        
+        if (input.description !== undefined) {
+          updateData.description = input.description;
+        }
+        
+        if (input.price !== undefined) {
+          updateData.price = input.price.toString();
+        }
+        
+        if (input.estimatedMaterialsCost !== undefined) {
+          updateData.estimated_materials_cost = input.estimatedMaterialsCost.toString();
+        }
+        
+        if (input.order !== undefined) {
+          updateData.order = input.order;
+        }
+        
+        // Only update if we have data to update
+        if (Object.keys(updateData).length > 0) {
+          updateData.updated_at = new Date();
+          await ctx.db.update(tasks).set(updateData).where(eq(tasks.id, input.id));
+        }
+        
+        return { success: true };
+      } catch (error) {
+        console.error("Error updating task:", error);
+        throw new Error("Failed to update task. Make sure the task exists and you have permission.");
       }
-      
-      // Check if quote belongs to user
-      const quote = await ctx.db.select().from(quotes)
-        .where(eq(quotes.id, task[0].quoteId))
-        .where(eq(quotes.createdBy, ctx.session.user.id));
-      
-      if (!quote.length) {
-        throw new Error("You don't have permission to modify this task");
-      }
-
-      const updateData = {
-        updatedAt: new Date(),
-      } as Record<string, unknown>;
-
-      if (input.description !== undefined) {
-        updateData.description = input.description;
-      }
-      
-      if (input.price !== undefined) {
-        updateData.price = input.price;
-      }
-      
-      if (input.estimatedMaterialsCost !== undefined) {
-        updateData.estimatedMaterialsCost = input.estimatedMaterialsCost;
-      }
-      
-      if (input.order !== undefined) {
-        updateData.order = input.order;
-      }
-      
-      await ctx.db.update(tasks)
-        .set(updateData)
-        .where(eq(tasks.id, input.id));
-      
-      return { success: true };
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // First, get the task to verify quote ownership
-      const task = await ctx.db.select().from(tasks)
-        .where(eq(tasks.id, input.id));
-      
-      if (!task.length) {
-        throw new Error("Task not found");
+      try {
+        // Delete the task
+        await ctx.db.delete(tasks).where(eq(tasks.id, input.id));
+        return { success: true };
+      } catch (error) {
+        console.error("Error deleting task:", error);
+        throw new Error("Failed to delete task. Make sure the task exists and you have permission.");
       }
-      
-      // Check if quote belongs to user
-      const quote = await ctx.db.select().from(quotes)
-        .where(eq(quotes.id, task[0].quoteId))
-        .where(eq(quotes.createdBy, ctx.session.user.id));
-      
-      if (!quote.length) {
-        throw new Error("You don't have permission to delete this task");
-      }
-
-      // Delete the task
-      await ctx.db.delete(tasks)
-        .where(eq(tasks.id, input.id));
-      
-      return { success: true };
     }),
 }); 

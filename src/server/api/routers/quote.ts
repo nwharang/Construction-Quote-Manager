@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 
 export const quoteRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db.select().from(quotes).where(eq(quotes.userId, ctx.session.user.id));
+    return ctx.db.select().from(quotes).where(eq(quotes.createdBy, ctx.session.user.id));
   }),
 
   getById: protectedProcedure
@@ -14,7 +14,7 @@ export const quoteRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const quote = await ctx.db.select().from(quotes)
         .where(eq(quotes.id, input.id))
-        .where(eq(quotes.userId, ctx.session.user.id));
+        .where(eq(quotes.createdBy, ctx.session.user.id));
       
       if (!quote.length) return null;
 
@@ -49,17 +49,17 @@ export const quoteRouter = createTRPCRouter({
       const id = uuidv4();
       await ctx.db.insert(quotes).values({
         id,
-        userId: ctx.session.user.id,
+        createdBy: ctx.session.user.id,
         projectName: input.projectName,
         customerName: input.customerName,
         customerEmail: input.customerEmail || null,
         customerPhone: input.customerPhone || null,
         notes: input.notes || null,
         status: "DRAFT",
-        createdAt: new Date(),
-        updatedAt: new Date(),
         complexityCharge: 0,
         markupPercentage: 20, // Default 20% markup
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
       
       return { id };
@@ -77,7 +77,7 @@ export const quoteRouter = createTRPCRouter({
           updatedAt: new Date(),
         })
         .where(eq(quotes.id, input.id))
-        .where(eq(quotes.userId, ctx.session.user.id));
+        .where(eq(quotes.createdBy, ctx.session.user.id));
       
       return { success: true };
     }),
@@ -96,7 +96,7 @@ export const quoteRouter = createTRPCRouter({
           updatedAt: new Date(),
         })
         .where(eq(quotes.id, input.id))
-        .where(eq(quotes.userId, ctx.session.user.id));
+        .where(eq(quotes.createdBy, ctx.session.user.id));
       
       return { success: true };
     }),
@@ -118,7 +118,7 @@ export const quoteRouter = createTRPCRouter({
       
       await ctx.db.delete(quotes)
         .where(eq(quotes.id, input.id))
-        .where(eq(quotes.userId, ctx.session.user.id));
+        .where(eq(quotes.createdBy, ctx.session.user.id));
       
       return { success: true };
     }),
