@@ -11,8 +11,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "~/server/db";
-import { getServerAuthSession } from "~/server/mock-auth";
-import { type NextRequest } from "next/server";
+import { getServerAuthSession } from "~/server/auth/session";
 
 /**
  * 1. CONTEXT
@@ -37,11 +36,8 @@ interface CreateContextOptions {
  * @see https://create.t3.gg/en/usage/trpc#-serverapitrpcts
  */
 export const createInnerTRPCContext = async (opts: CreateContextOptions) => {
-  // For server-side calls, we need to manually pass the request object
-  const session = await getServerAuthSession({ 
-    req: { headers: opts.headers } as any, 
-    res: {} as any 
-  });
+  // Get the session using NextAuth with Next.js 15
+  const session = await getServerAuthSession();
 
   return {
     session,

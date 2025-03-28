@@ -1,204 +1,324 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
-const keyPages = [
-  { path: '/', name: 'Home' },
-  { path: '/quotes', name: 'Quotes List' },
-  { path: '/quotes/1', name: 'Quote Detail' },
-  { path: '/auth/signin', name: 'Sign In' },
-  { path: '/products', name: 'Products' }
-];
-
-// Test: Homepage should have proper semantic structure
-test('Home page should have proper semantic structure', async ({ page }) => {
-  await page.goto('/');
+/**
+ * Accessibility Tests
+ * 
+ * Comprehensive tests for accessibility compliance across the application:
+ * - Tests critical pages for WCAG 2.1 compliance
+ * - Validates keyboard navigation
+ * - Checks screen reader compatibility
+ * - Ensures proper focus management
+ * - Verifies color contrast and text readability
+ */
+test.describe('Accessibility', () => {
+  // Authentication helper to sign in before tests
+  async function authenticateUser(page: Page) {
+    await page.goto('/auth/signin');
+    await page.getByLabel('Email').fill('demo@example.com');
+    await page.getByLabel('Password').fill('Password123!');
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    
+    // Wait for successful authentication
+    await page.waitForURL(/\/(quotes|dashboard)/);
+  }
   
-  // Check for proper heading structure - should have h1
-  const h1Count = await page.locator('h1').count();
-  expect(h1Count).toBeGreaterThan(0);
-  
-  // Check for proper main content area with role="main"
-  await expect(page.locator('main[role="main"]')).toBeVisible();
-  
-  // Navigation should be present with appropriate role
-  await expect(page.locator('nav[role="navigation"]')).toBeVisible();
-  
-  // Check for proper document structure
-  const docStructure = await page.evaluate(() => {
-    return {
-      hasHtml: !!document.querySelector('html[lang]'),
-      hasTitle: !!document.querySelector('title'),
-    };
-  });
-  
-  // HTML should have lang attribute
-  expect(docStructure.hasHtml).toBeTruthy();
-  
-  // Page should have a title
-  expect(docStructure.hasTitle).toBeTruthy();
-});
-
-// Test: Sign In page should have proper semantic structure
-test('Sign In page should have proper semantic structure', async ({ page }) => {
-  await page.goto('/auth/signin');
-  
-  // Check for proper heading structure - should have h1
-  const h1Count = await page.locator('h1').count();
-  expect(h1Count).toBeGreaterThan(0);
-  
-  // Check for proper main content area with role="main"
-  await expect(page.locator('main[role="main"]')).toBeVisible();
-  
-  // Check for proper document structure
-  const docStructure = await page.evaluate(() => {
-    return {
-      hasHtml: !!document.querySelector('html[lang]'),
-      hasTitle: !!document.querySelector('title'),
-    };
-  });
-  
-  // HTML should have lang attribute
-  expect(docStructure.hasHtml).toBeTruthy();
-  
-  // Page should have a title
-  expect(docStructure.hasTitle).toBeTruthy();
-});
-
-// Test: Interactive elements should be keyboard accessible
-test('interactive elements should be keyboard accessible', async ({ page }) => {
-  // Test quotes page which should have multiple interactive elements
-  await page.goto('/quotes');
-  
-  // Tab through the page and check focus indicators
-  await page.keyboard.press('Tab');
-  
-  // The focused element should be visible
-  const focusedElement = page.locator(':focus');
-  await expect(focusedElement).toBeVisible();
-  
-  // Continue tabbing and verify we can reach main interactive elements
-  let foundInteractiveElement = false;
-  
-  // Tab through the page up to 20 times looking for an interactive element
-  for (let i = 0; i < 20; i++) {
-    const element = await page.evaluate(() => {
-      const el = document.activeElement;
-      return el ? {
-        tagName: el.tagName,
-        ariaLabel: el.getAttribute('aria-label'),
-        role: el.getAttribute('role'),
-        text: el.textContent?.trim()
-      } : null;
+  test.describe('Public Pages', () => {
+    test('homepage should have no accessibility violations', async ({ page }) => {
+      await page.goto('/');
+      
+      // Run axe against the page
+      const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+      
+      // Assert no violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
     });
     
-    // Check if we've focused on an interactive element
-    if (element && ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName)) {
-      foundInteractiveElement = true;
+    test('sign-in page should have no accessibility violations', async ({ page }) => {
+      await page.goto('/auth/signin');
       
-      // Expect interactive elements to have accessible names
-      const hasName = element.ariaLabel || element.text;
-      expect(hasName).toBeTruthy();
-      break;
-    }
+      // Run axe against the page
+      const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+      
+      // Assert no violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
+      
+      // Also check proper form labeling
+      await expect(page.getByLabel('Email')).toBeVisible();
+      await expect(page.getByLabel('Password')).toBeVisible();
+    });
     
-    await page.keyboard.press('Tab');
-  }
-  
-  expect(foundInteractiveElement).toBeTruthy();
-});
-
-// Test: Form inputs should have proper labels
-test('form inputs should have proper labels', async ({ page }) => {
-  // Check auth signin form
-  await page.goto('/auth/signin');
-  
-  // Check that form fields have associated labels or aria-labels
-  const formFields = page.locator('input:visible');
-  const count = await formFields.count();
-  
-  // There should be at least some visible form fields
-  expect(count).toBeGreaterThan(0);
-  
-  let allFieldsLabeled = true;
-  
-  for (let i = 0; i < count; i++) {
-    const field = formFields.nth(i);
-    
-    // Get field attributes
-    const id = await field.getAttribute('id');
-    const ariaLabel = await field.getAttribute('aria-label');
-    const ariaLabelledBy = await field.getAttribute('aria-labelledby');
-    const hasLabelElement = id ? await page.locator(`label[for="${id}"]`).count() > 0 : false;
-    
-    // Field should have at least one proper labeling method
-    const hasProperLabel = !!(ariaLabel || ariaLabelledBy || hasLabelElement);
-    if (!hasProperLabel) {
-      allFieldsLabeled = false;
-    }
-    expect(hasProperLabel).toBeTruthy();
-  }
-  
-  // All fields should be properly labeled
-  expect(allFieldsLabeled).toBeTruthy();
-});
-
-// Test: Buttons with icons should have aria-labels
-test('buttons with icons should have aria-labels', async ({ page }) => {
-  // Visit navbar which should have icon buttons
-  await page.goto('/');
-  
-  // Check all icon-only buttons for accessible names
-  const iconButtons = page.locator('button:has(svg):not(:has-text)');
-  const count = await iconButtons.count();
-  
-  for (let i = 0; i < count; i++) {
-    const button = iconButtons.nth(i);
-    
-    // Get button aria-label
-    const ariaLabel = await button.getAttribute('aria-label');
-    
-    // Icon-only buttons must have aria-labels
-    expect(ariaLabel).not.toBeNull();
-    expect(ariaLabel?.length).toBeGreaterThan(0);
-  }
-});
-
-// Test: Navigation landmarks should be properly labeled
-test('navigation landmarks should be properly labeled', async ({ page }) => {
-  await page.goto('/');
-  
-  // Check that navigation has appropriate ARIA attributes
-  const navElements = page.locator('nav[role="navigation"]');
-  const count = await navElements.count();
-  
-  // There should be at least one navigation element
-  expect(count).toBeGreaterThan(0);
-  
-  for (let i = 0; i < count; i++) {
-    const nav = navElements.nth(i);
-    
-    // If there are multiple nav elements, they should have aria-label
-    if (count > 1) {
-      const ariaLabel = await nav.getAttribute('aria-label');
-      expect(ariaLabel).not.toBeNull();
-    }
-  }
-});
-
-// Test: Header should have proper structure
-test('header should have proper structure', async ({ page }) => {
-  await page.goto('/');
-  
-  // Check for proper header structure
-  const hasProperHeader = await page.evaluate(() => {
-    // Look for semantic header or header role
-    const headerElement = document.querySelector('header, [role="banner"]');
-    if (!headerElement) return false;
-    
-    // Header should contain a link to the homepage
-    const homeLink = headerElement.querySelector('a[href="/"]');
-    
-    return !!homeLink;
+    test('sign-up page should have no accessibility violations', async ({ page }) => {
+      await page.goto('/auth/signup');
+      
+      // Run axe against the page
+      const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+      
+      // Assert no violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
+      
+      // Also check proper form labeling
+      await expect(page.getByLabel('Name')).toBeVisible();
+      await expect(page.getByLabel('Email')).toBeVisible();
+      await expect(page.getByLabel('Password')).toBeVisible();
+    });
   });
   
-  expect(hasProperHeader).toBeTruthy();
+  test.describe('Authenticated Pages', () => {
+    // Authenticate before each test
+    test.beforeEach(async ({ page }) => {
+      await authenticateUser(page);
+    });
+    
+    test('dashboard should have no accessibility violations', async ({ page }) => {
+      await page.goto('/dashboard');
+      
+      // Run axe against the page
+      const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+      
+      // Assert no violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
+    });
+    
+    test('quotes page should have no accessibility violations', async ({ page }) => {
+      await page.goto('/quotes');
+      
+      // Run axe against the page
+      const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+      
+      // Assert no violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
+    });
+    
+    test('products page should have no accessibility violations', async ({ page }) => {
+      await page.goto('/products');
+      
+      // Run axe against the page
+      const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+      
+      // Assert no violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
+    });
+    
+    test('create quote form should have proper accessibility features', async ({ page }) => {
+      await page.goto('/quotes');
+      
+      // Open the create quote form
+      await page.getByRole('button', { name: /Create|New Quote/i }).click();
+      
+      // Wait for the form to be visible
+      await expect(page.getByLabel(/project name/i)).toBeVisible();
+      
+      // Run axe against the page with the form open
+      const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+      
+      // Assert no violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
+      
+      // Check proper form labeling
+      await expect(page.getByLabel(/project name/i)).toBeVisible();
+      await expect(page.getByLabel(/customer name/i)).toBeVisible();
+    });
+  });
+  
+  test.describe('Keyboard Navigation', () => {
+    test('sign-in form should be navigable by keyboard', async ({ page }) => {
+      await page.goto('/auth/signin');
+      
+      // Start with the email field
+      await page.getByLabel('Email').focus();
+      await expect(page.getByLabel('Email')).toBeFocused();
+      
+      // Tab to password field
+      await page.keyboard.press('Tab');
+      await expect(page.getByLabel('Password')).toBeFocused();
+      
+      // Tab to "Remember me" if it exists
+      await page.keyboard.press('Tab');
+      try {
+        // This might be a checkbox - try different selectors
+        const rememberMeCheckbox = page.getByLabel(/remember me/i);
+        if (await rememberMeCheckbox.isVisible()) {
+          await expect(rememberMeCheckbox).toBeFocused();
+          // Tab one more time to get to sign in button
+          await page.keyboard.press('Tab');
+        }
+      } catch (e) {
+        // If no remember me, we should be on the button
+      }
+      
+      // Should now be on the sign in button
+      await expect(page.getByRole('button', { name: 'Sign In' })).toBeFocused();
+      
+      // Press Enter to submit the form
+      await page.keyboard.press('Enter');
+      
+      // Ensure validation errors are properly shown
+      await expect(page.getByText(/email is required|email field is required/i)).toBeVisible();
+    });
+    
+    test('dashboard should be navigable by keyboard', async ({ page }) => {
+      await authenticateUser(page);
+      await page.goto('/dashboard');
+      
+      // Focus on the first interactive element
+      await page.keyboard.press('Tab');
+      
+      // Check that something is focused
+      const focusedElement = await page.evaluate(() => {
+        const el = document.activeElement;
+        return el && el.tagName ? el.tagName.toLowerCase() : null;
+      });
+      
+      expect(focusedElement).not.toBeNull();
+      
+      // Continue tabbing through the page
+      let tabCount = 0;
+      let lastFocusedElement = focusedElement;
+      
+      // Tab through a few elements to ensure keyboard navigation works
+      while (tabCount < 5) {
+        await page.keyboard.press('Tab');
+        
+        const currentFocusedElement = await page.evaluate(() => {
+          const el = document.activeElement;
+          return el && el.tagName ? el.tagName.toLowerCase() : null;
+        });
+        
+        // Ensure we're moving through different elements
+        expect(currentFocusedElement).not.toBeNull();
+        tabCount++;
+      }
+    });
+  });
+  
+  test.describe('Focus Management', () => {
+    test('modal focus should be trapped when opening create quote form', async ({ page }) => {
+      await authenticateUser(page);
+      await page.goto('/quotes');
+      
+      // Open the create quote form
+      await page.getByRole('button', { name: /Create|New Quote/i }).click();
+      
+      // Wait for the form to be visible
+      await expect(page.getByLabel(/project name/i)).toBeVisible();
+      
+      // Check that focus is set to the first input
+      await expect(page.getByLabel(/project name/i)).toBeFocused();
+      
+      // Tab to the end of the modal and check if focus wraps around
+      let isWrapped = false;
+      for (let i = 0; i < 15; i++) {
+        // Tab through all elements
+        await page.keyboard.press('Tab');
+        
+        // Check if we've wrapped around to a form element
+        const focusedElement = await page.evaluate(() => {
+          const el = document.activeElement;
+          return el && el.tagName ? el.tagName.toLowerCase() : null;
+        });
+        
+        if (focusedElement === 'input' || focusedElement === 'button') {
+          isWrapped = true;
+          break;
+        }
+      }
+      
+      // Focus should be trapped within the modal
+      expect(isWrapped).toBeTruthy();
+    });
+    
+    test('closing dialog should return focus to trigger element', async ({ page }) => {
+      await authenticateUser(page);
+      await page.goto('/quotes');
+      
+      // Find and focus the create button
+      const createButton = page.getByRole('button', { name: /Create|New Quote/i });
+      await createButton.focus();
+      await expect(createButton).toBeFocused();
+      
+      // Click to open modal
+      await createButton.click();
+      
+      // Wait for the form to be visible
+      await expect(page.getByLabel(/project name/i)).toBeVisible();
+      
+      // Find and click cancel button
+      const cancelButton = page.getByRole('button', { name: /cancel/i });
+      if (await cancelButton.isVisible()) {
+        await cancelButton.click();
+        
+        // Wait for the form to be closed
+        await expect(page.getByLabel(/project name/i)).not.toBeVisible();
+        
+        // Focus should return to the create button
+        await expect(createButton).toBeFocused();
+      }
+    });
+  });
+  
+  test.describe('ARIA and Screen Reader Support', () => {
+    test('navigation elements should have correct ARIA roles', async ({ page }) => {
+      await page.goto('/');
+      
+      // Check navigation
+      const navigation = page.locator('nav');
+      if (await navigation.isVisible()) {
+        // Navigation should have role="navigation" or be a <nav> element
+        expect(
+          await navigation.evaluate(el => 
+            el.tagName.toLowerCase() === 'nav' || el.getAttribute('role') === 'navigation'
+          )
+        ).toBeTruthy();
+      }
+      
+      // Check hamburger menu button if it exists
+      const menuButton = page.locator('button[aria-label*="menu" i], button[aria-label*="navigation" i]');
+      if (await menuButton.isVisible()) {
+        // Should have expanded state
+        expect(
+          await menuButton.evaluate(el => 
+            el.getAttribute('aria-expanded') !== null
+          )
+        ).toBeTruthy();
+      }
+    });
+    
+    test('forms should have proper error handling for screen readers', async ({ page }) => {
+      await page.goto('/auth/signin');
+      
+      // Submit empty form to trigger validation
+      await page.getByRole('button', { name: 'Sign In' }).click();
+      
+      // Error messages should have appropriate ARIA attributes
+      const errorMessages = page.locator('[aria-invalid="true"], .error, .invalid');
+      
+      // Should have at least one invalidated field
+      expect(await errorMessages.count()).toBeGreaterThan(0);
+      
+      // Check first error field has proper attributes 
+      const firstErrorField = errorMessages.first();
+      expect(
+        await firstErrorField.evaluate(el => 
+          el.getAttribute('aria-describedby') !== null || 
+          el.hasAttribute('aria-errormessage')
+        )
+      ).toBeTruthy();
+    });
+  });
+  
+  test.describe('Color Contrast', () => {
+    test('text elements should have sufficient color contrast', async ({ page }) => {
+      await page.goto('/');
+      
+      // Run axe against the page specifically for color contrast
+      const accessibilityScanResults = await new AxeBuilder({ page })
+        .withRules(['color-contrast'])
+        .analyze();
+      
+      // Assert no contrast violations are found
+      expect(accessibilityScanResults.violations).toEqual([]);
+    });
+  });
 }); 

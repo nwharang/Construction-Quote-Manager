@@ -1,38 +1,42 @@
 import "server-only";
 
-import { createHydrationHelpers } from "@trpc/react-query/rsc";
-import { headers } from "next/headers";
-import { cache } from "react";
-
-import { type AppRouter } from "@/server/api/root";
+import { appRouter, type AppRouter } from "@/server/api/root";
 import { createTRPCContext } from "@/server/api/trpc";
-import { createQueryClient } from "./query-client";
-import { appRouter } from "@/server/api/root";
 
 /**
- * This wraps the `createTRPCContext` helper and provides the required context for the tRPC API when
- * handling a tRPC call from a React Server Component.
+ * Creates a server-side tRPC caller with properly constructed context
+ * This is async to support Next.js 15's API changes
  */
-const createContext = cache(async () => {
-  const headersData = headers();
+export async function createCaller() {
+  // Create a new Headers object manually without using the Next.js headers API
+  // This avoids the async headers issue in Next.js 15
   const heads = new Headers();
+  heads.set("x-trpc-source", "server");
   
-  // Copy headers from the headers() result
-  for (const [key, value] of headersData.entries()) {
-    heads.set(key, value);
-  }
-  
-  heads.set("x-trpc-source", "rsc");
-
-  return createTRPCContext({
+  // Create context with our manually created headers
+  const context = await createTRPCContext({
     headers: heads,
   });
-});
+  
+  // Return a caller with the context
+  return appRouter.createCaller(context);
+}
 
-const getQueryClient = cache(createQueryClient);
-const caller = appRouter.createCaller(await createContext());
+/**
+ * Export methods for server-side tRPC calls
+ */
+export const serverTRPC = {
+  quote: {
+    getAll: async () => {
+      const caller = await createCaller();
+      return caller.quote.getAll();
+    },
+    // Add other procedures as needed
+  },
+  // Add other routers as needed
+};
 
-export const { trpc: api, HydrateClient } = createHydrationHelpers<AppRouter>(
-  { router: appRouter, createContext: createContext },
-  getQueryClient,
-);
+/**
+ * Re-export the appRouter for use in other files
+ */
+export { appRouter, type AppRouter };

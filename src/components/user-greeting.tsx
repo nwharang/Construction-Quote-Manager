@@ -1,12 +1,13 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { Skeleton } from "@nextui-org/react";
 
-export function UserGreeting() {
-  const { data: session, status } = useSession();
-  
-  if (status === "loading") {
+interface UserGreetingProps {
+  userName: string | null;
+}
+
+export function UserGreeting({ userName }: UserGreetingProps) {
+  if (userName === undefined) {
     return (
       <div className="flex items-center gap-2">
         <span>Welcome,</span>
@@ -15,9 +16,9 @@ export function UserGreeting() {
     );
   }
   
-  if (!session) {
+  if (!userName) {
     return <span>Welcome, Guest</span>;
   }
   
-  return <span>Welcome, {session.user.name || "User"}</span>;
+  return <span>Welcome, {userName}</span>;
 } 

@@ -36,7 +36,7 @@
 ## 3. UI/Tech Requirements
 
 - **Stack:**
-  - **Next.js (App Router)**, React, TS
+  - **Next.js (Page Router)**, TS
   - **tRPC** (API)
   - **NextUI V2** (UI Components)
   - **Tailwind CSS v4 (Required - Alpha/Beta)**
@@ -64,7 +64,7 @@
 
 ## 5. AI Instructions
 
-Generate **Next.js (App Router)**, **tRPC**, **Playwright**, and **TypeScript** code for the app.
+Generate **Next.js (Page Router)**, **tRPC**, **Playwright**, and **TypeScript** code for the app.
 
 1.  Implement the **Core Workflow** accurately.
 2.  Use **Required Tech Stack** (NextUI v2, tRPC, Drizzle).
@@ -76,7 +76,8 @@ Generate **Next.js (App Router)**, **tRPC**, **Playwright**, and **TypeScript** 
 8.  **Add Code Comments** for readability.
 9.  Ensure **Vercel Compatibility**, including Tailwind v4 build steps.
 10. Generate **Playwright Tests** covering key scenarios (referencing prior detailed list).
-11. **Ensure Build Success:** The final generated codebase **must be buildable** (`npm run build` or equivalent). Iteratively fix any build errors, including those potentially arising from Tailwind v4 integration or configuration.
+11. **Ensure Build Success:** The final generated codebase **must be buildable** (`pnpm run build` or equivalent). Iteratively fix any build errors, including those potentially arising from Tailwind v4 integration or configuration.
 12. **For all the packages that we think we need, please add them to the package.json, also search for all of them in latest version, read their documentation before changing anything, also use pnpm instead of npm.**
+13. Ui need to implement darkmode and lightmode.
 
 ---

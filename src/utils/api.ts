@@ -1,7 +1,11 @@
-import { createTRPCReact } from "@trpc/react-query";
+/**
+ * This file re-exports the tRPC API from the client implementation
+ * for backward compatibility with existing code.
+ */
+import { api } from "~/trpc/client";
 import { type AppRouter } from "~/server/api/root";
 
-export const api = createTRPCReact<AppRouter>();
+export { api };
 
 /**
  * Inference helper for inputs.

@@ -1,138 +1,332 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, devices } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { authenticateUser } from './utils';
 
-// Define screen sizes to test
-const screenSizes = [
-  { width: 1920, height: 1080, name: 'Desktop' },
-  { width: 1024, height: 768, name: 'Tablet Landscape' },
-  { width: 768, height: 1024, name: 'Tablet Portrait' },
-  { width: 414, height: 896, name: 'Mobile' },
-];
-
-// Key pages to test responsiveness
-const keyPages = [
-  { path: '/', name: 'Home' },
-  { path: '/quotes', name: 'Quotes List' },
-  { path: '/quotes/1', name: 'Quote Detail' },
-  { path: '/auth/signin', name: 'Sign In' },
-  { path: '/products', name: 'Products' }
-];
-
+/**
+ * Responsive Design Tests
+ * 
+ * Tests the application's responsiveness across different viewport sizes:
+ * - Mobile view (small screens)
+ * - Tablet view (medium screens)
+ * - Desktop view (large screens)
+ * 
+ * Verifies that:
+ * - Layout adapts properly to different screen sizes
+ * - Navigation is accessible on mobile devices
+ * - Forms and interactive elements are usable across devices
+ * - Critical content remains visible and functional
+ */
 test.describe('Responsive Design', () => {
-  // Test each key page at each screen size
-  for (const size of screenSizes) {
-    test.describe(`At ${size.name} (${size.width}x${size.height})`, () => {
-      // Set viewport size before each test
-      test.use({ viewport: { width: size.width, height: size.height } });
-      
-      for (const page of keyPages) {
-        test(`${page.name} page should be responsive`, async ({ page: pageObj }) => {
-          await pageObj.goto(page.path);
-          
-          // Take a screenshot for visual verification
-          // Note: In real scenarios, you might want to use visual comparison tools
-          await pageObj.screenshot({ path: `screenshots/${page.name}-${size.name}.png` });
-          
-          // Check for specific responsive elements depending on page
-          if (page.path === '/quotes') {
-            // On mobile, verify table switches to cards or responsive layout
-            if (size.width <= 768) {
-              // Expect quotes to be displayed appropriately for mobile
-              // This might mean checking that a responsive table exists or cards are used
-              const quoteItems = await pageObj.locator('div[role="listitem"], .card, .mobile-friendly-item').count();
-              expect(quoteItems).toBeGreaterThanOrEqual(0);
-            } else {
-              // On larger screens, expect a proper table
-              const quoteTable = pageObj.locator('table');
-              if (await quoteTable.isVisible()) {
-                await expect(quoteTable).toBeVisible();
-              }
-            }
-          }
-          
-          // Check for hamburger menu on small screens
-          if (size.width <= 768) {
-            const menuButton = pageObj.getByRole('button', { name: /menu|hamburger/i });
-            if (await menuButton.isVisible()) {
-              // If there's a hamburger menu, it should be visible on mobile
-              await expect(menuButton).toBeVisible();
-              
-              // Click and verify menu opens
-              await menuButton.click();
-              
-              // Check that menu items are now visible
-              const menuItems = pageObj.locator('nav a, .menu-item');
-              expect(await menuItems.count()).toBeGreaterThan(0);
-            }
-          }
-          
-          // On quote details page, check that tasks display correctly on different screens
-          if (page.path === '/quotes/1') {
-            const tasksList = pageObj.locator('.tasks-list, table, div[role="list"]');
-            await expect(tasksList).toBeVisible();
-            
-            // On smaller screens, adjustment controls might stack
-            if (size.width <= 768) {
-              // Check if adjustment fields are stacked by verifying they take up more vertical space
-              const adjustmentSection = pageObj.locator('.adjustments, form, fieldset').first();
-              if (await adjustmentSection.isVisible()) {
-                const boundingBox = await adjustmentSection.boundingBox();
-                // If stacked, height should be relatively larger
-                if (boundingBox) {
-                  expect(boundingBox.height).toBeGreaterThan(50);
-                }
-              }
-            }
-          }
-        });
-      }
-    });
+  // Authentication helper to sign in before tests
+  async function loginUser(page: Page) {
+    await authenticateUser(page);
   }
 
-  // Test specific responsive interactions
-  test('Mobile navigation should work correctly', async ({ page }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 414, height: 896 });
-    await page.goto('/');
+  test.describe('Mobile View', () => {
+    // Use iPhone 12 as a mobile device
+    test.use({ viewport: devices['iPhone 12'].viewport });
     
-    // Find and click hamburger menu if it exists
-    const menuButton = page.getByRole('button', { name: /menu|hamburger/i });
-    if (await menuButton.isVisible()) {
-      await menuButton.click();
+    test.beforeEach(async ({ page }) => {
+      // Set viewport to mobile size
+      await page.setViewportSize({ width: 390, height: 844 });
+    });
+    
+    test('homepage should be usable on mobile', async ({ page }) => {
+      await page.goto('/');
       
-      // Look for quotes link in the menu
-      const quotesLink = page.getByRole('link', { name: /quotes/i });
-      if (await quotesLink.isVisible()) {
-        await quotesLink.click();
-        
-        // Verify navigation worked
-        await expect(page).toHaveURL(/\/quotes/);
+      // Check if hamburger menu or mobile navigation is present
+      const mobileNav = page.getByRole('button', { name: /menu|navigation/i });
+      await expect(mobileNav).toBeVisible();
+      
+      // Test opening mobile navigation
+      await mobileNav.click();
+      
+      // Navigation links should be accessible
+      await expect(page.getByRole('link', { name: /sign in/i })).toBeVisible();
+    });
+    
+    test('sign-in form should be properly laid out on mobile', async ({ page }) => {
+      await page.goto('/auth/signin');
+      
+      // Form should be properly visible and centered
+      await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
+      
+      // Form fields should be properly sized for mobile
+      const emailInput = page.getByLabel('Email');
+      await expect(emailInput).toBeVisible();
+      
+      // Input width should adapt to viewport
+      const inputBounds = await emailInput.boundingBox();
+      if (inputBounds) {
+        // Input should not overflow viewport and have reasonable width
+        expect(inputBounds.width).toBeLessThan(page.viewportSize()!.width);
+        expect(inputBounds.width).toBeGreaterThan(page.viewportSize()!.width * 0.5);
       }
-    }
+    });
+    
+    test('authenticated dashboard should adapt to mobile view', async ({ page }) => {
+      await loginUser(page);
+      await page.goto('/dashboard');
+      
+      // Check if hamburger menu is present in authenticated view
+      const mobileNav = page.getByRole('button', { name: /menu|navigation/i });
+      await expect(mobileNav).toBeVisible();
+      
+      // Open hamburger menu
+      await mobileNav.click();
+      
+      // Wait for menu to open
+      await page.waitForTimeout(300);
+      
+      // User's name or profile link should be visible
+      await expect(page.getByText(/dashboard|quotes|products/i)).toBeVisible();
+    });
+    
+    test('quotes list should adapt to mobile view', async ({ page }) => {
+      await loginUser(page);
+      await page.goto('/quotes');
+      
+      // Check for mobile-optimized table or list view
+      // Tables often transform to cards in responsive designs
+      
+      // Check for presence of quotes data
+      // We're looking for either a table that's resized or a card-based layout
+      const quoteElements = page.locator('table, [role="table"], [data-testid="quote-item"], .quote-card');
+      await expect(quoteElements.first()).toBeVisible();
+      
+      // Create quote button should be visible and accessible
+      await expect(page.getByRole('button', { name: /create|new quote/i })).toBeVisible();
+    });
   });
-
-  test('Forms should be usable on mobile devices', async ({ page }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 414, height: 896 });
+  
+  test.describe('Tablet View', () => {
+    // Use iPad as a tablet device
+    test.use({ viewport: devices['iPad (gen 7)'].viewport });
     
-    // Test a form page - signin is a good candidate
-    await page.goto('/auth/signin');
+    test.beforeEach(async ({ page }) => {
+      // Set viewport to tablet size
+      await page.setViewportSize({ width: 768, height: 1024 });
+    });
     
-    // Verify form fields are accessible and properly sized
-    const usernameInput = page.getByLabel(/username/i);
-    const passwordInput = page.getByLabel(/password/i);
-    const signinButton = page.getByRole('button', { name: /sign in/i });
+    test('homepage should adapt to tablet layout', async ({ page }) => {
+      await page.goto('/');
+      
+      // Navigation might be directly visible or in a menu
+      try {
+        // Try to find direct navigation first
+        const navLinks = page.getByRole('link', { name: /sign in|sign up|home/i });
+        await expect(navLinks.first()).toBeVisible();
+      } catch (e) {
+        // If not directly visible, look for a menu button
+        const menuButton = page.getByRole('button', { name: /menu|navigation/i });
+        await expect(menuButton).toBeVisible();
+        
+        // Test menu functionality
+        await menuButton.click();
+        await expect(page.getByRole('link', { name: /sign in/i })).toBeVisible();
+      }
+    });
     
-    // All elements should be visible and accessible
-    await expect(usernameInput).toBeVisible();
-    await expect(passwordInput).toBeVisible();
-    await expect(signinButton).toBeVisible();
+    test('authenticated dashboard should have appropriate tablet layout', async ({ page }) => {
+      await loginUser(page);
+      await page.goto('/dashboard');
+      
+      // On tablets, sidebar might be visible or collapsed
+      // Try both options
+      const sidebarOrNav = page.locator('nav, aside, [role="navigation"]');
+      
+      if (await sidebarOrNav.isVisible()) {
+        // If sidebar is visible, check it has appropriate content
+        await expect(sidebarOrNav.getByText(/dashboard|quotes|products/i)).toBeVisible();
+      } else {
+        // If not visible by default, check for a toggle
+        const menuToggle = page.getByRole('button', { name: /menu|navigation|sidebar/i });
+        
+        if (await menuToggle.isVisible()) {
+          await menuToggle.click();
+          await expect(page.getByText(/dashboard|quotes|products/i)).toBeVisible();
+        }
+      }
+    });
     
-    // Verify input fields have appropriate width for the screen
-    const usernameBox = await usernameInput.boundingBox();
-    if (usernameBox) {
-      // Input should take up most of the screen width on mobile
-      expect(usernameBox.width).toBeGreaterThan(200);
-      expect(usernameBox.width).toBeLessThanOrEqual(414);
-    }
+    test('create quote form should be properly laid out on tablet', async ({ page }) => {
+      await loginUser(page);
+      await page.goto('/quotes');
+      
+      // Open create quote form
+      await page.getByRole('button', { name: /create|new quote/i }).click();
+      
+      // Form should be properly sized for tablet
+      const formElements = page.locator('form, [role="dialog"]');
+      await expect(formElements.first()).toBeVisible();
+      
+      // Form should have appropriate width for tablet
+      const formBounds = await formElements.first().boundingBox();
+      if (formBounds) {
+        // Form should have reasonable width relative to viewport
+        expect(formBounds.width).toBeLessThan(page.viewportSize()!.width * 0.9);
+        expect(formBounds.width).toBeGreaterThan(page.viewportSize()!.width * 0.5);
+      }
+    });
+  });
+  
+  test.describe('Desktop View', () => {
+    // Use a standard desktop size
+    test.use({ viewport: { width: 1280, height: 800 } });
+    
+    test.beforeEach(async ({ page }) => {
+      // Set viewport to desktop size
+      await page.setViewportSize({ width: 1280, height: 800 });
+    });
+    
+    test('homepage should show full desktop navigation', async ({ page }) => {
+      await page.goto('/');
+      
+      // On desktop, navigation should be fully visible
+      const navLinks = page.getByRole('link', { name: /sign in|sign up|home/i });
+      await expect(navLinks.first()).toBeVisible();
+      
+      // Hamburger menu should not be visible on desktop
+      const mobileNav = page.getByRole('button', { name: /menu|navigation/i });
+      expect(await mobileNav.isVisible()).toBeFalsy();
+    });
+    
+    test('dashboard should show full sidebar on desktop', async ({ page }) => {
+      await loginUser(page);
+      await page.goto('/dashboard');
+      
+      // Sidebar should be visible by default on desktop
+      const sidebar = page.locator('nav, aside, [role="navigation"]');
+      await expect(sidebar).toBeVisible();
+      
+      // Check for main content area with appropriate layout
+      const mainContent = page.locator('main, [role="main"]');
+      await expect(mainContent).toBeVisible();
+      
+      // Desktop layout should have sidebar and main content side by side
+      // Get the position of sidebar and main content
+      const sidebarBounds = await sidebar.boundingBox();
+      const mainContentBounds = await mainContent.boundingBox();
+      
+      if (sidebarBounds && mainContentBounds) {
+        // Check if layout is side-by-side (sidebar left of main content)
+        // or if sidebar is at least visible and not taking full width
+        expect(
+          (sidebarBounds.x < mainContentBounds.x) || // Side by side
+          (sidebarBounds.width < page.viewportSize()!.width * 0.3) // Or compact sidebar
+        ).toBeTruthy();
+      }
+    });
+    
+    test('quotes list should show full table layout on desktop', async ({ page }) => {
+      await loginUser(page);
+      await page.goto('/quotes');
+      
+      // On desktop, quotes should be displayed in a table layout
+      const table = page.locator('table, [role="table"]');
+      await expect(table).toBeVisible();
+      
+      // Table headers should be visible
+      const headers = table.locator('th, [role="columnheader"]');
+      expect(await headers.count()).toBeGreaterThan(1);
+    });
+    
+    test('create quote form should utilize desktop space effectively', async ({ page }) => {
+      await loginUser(page);
+      await page.goto('/quotes');
+      
+      // Open create quote form
+      await page.getByRole('button', { name: /create|new quote/i }).click();
+      
+      // Form should have appropriate desktop layout - not too wide, not too narrow
+      const formElement = page.locator('form, [role="dialog"]');
+      await expect(formElement).toBeVisible();
+      
+      const formBounds = await formElement.boundingBox();
+      if (formBounds) {
+        // Form shouldn't take the full width on desktop
+        expect(formBounds.width).toBeLessThan(page.viewportSize()!.width * 0.9);
+        // But it should be wide enough to be usable
+        expect(formBounds.width).toBeGreaterThan(400);
+      }
+    });
+  });
+  
+  test.describe('Responsive Behavior', () => {
+    test('should adapt layout when resizing viewport', async ({ page }) => {
+      // Start with mobile viewport
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.goto('/');
+      
+      // Check for mobile navigation (hamburger menu)
+      const mobileNav = page.getByRole('button', { name: /menu|navigation/i });
+      const isMobileNavVisible = await mobileNav.isVisible();
+      
+      // Resize to desktop viewport
+      await page.setViewportSize({ width: 1280, height: 800 });
+      
+      // Allow time for responsive layout to adjust
+      await page.waitForTimeout(500);
+      
+      // Check if layout changed
+      if (isMobileNavVisible) {
+        // If mobile nav was visible before, it might be hidden now
+        // or normal navigation links might be visible
+        const desktopNavLinks = page.getByRole('link', { name: /sign in|sign up|home/i });
+        await expect(desktopNavLinks.first()).toBeVisible();
+      }
+    });
+    
+    test('should maintain functionality when switching between device sizes', async ({ page }) => {
+      // Start on mobile
+      await page.setViewportSize({ width: 390, height: 844 });
+      await loginUser(page);
+      
+      // Navigate to quotes
+      await page.goto('/quotes');
+      
+      // Verify functionality in mobile mode
+      await expect(page.getByRole('button', { name: /create|new quote/i })).toBeVisible();
+      
+      // Resize to desktop viewport
+      await page.setViewportSize({ width: 1280, height: 800 });
+      
+      // Allow time for responsive layout to adjust
+      await page.waitForTimeout(500);
+      
+      // Verify same core functionality works in desktop mode
+      await expect(page.getByRole('button', { name: /create|new quote/i })).toBeVisible();
+      
+      // Try to access a core feature
+      await page.getByRole('button', { name: /create|new quote/i }).click();
+      
+      // Verify the feature works regardless of viewport size
+      await expect(page.getByLabel(/project name/i)).toBeVisible();
+    });
+    
+    test('should correctly handle orientation changes', async ({ page }) => {
+      // Start with mobile portrait viewport
+      await page.setViewportSize({ width: 375, height: 667 });
+      await loginUser(page);
+      await page.goto('/quotes');
+      
+      // Check layout in portrait mode
+      const portraitElements = await page.locator('header').count();
+      
+      // Switch to landscape orientation
+      await page.setViewportSize({ width: 667, height: 375 });
+      
+      // Allow time for responsive layout to adjust
+      await page.waitForTimeout(500);
+      
+      // Verify the app still functions in landscape
+      await expect(page.getByRole('button', { name: /create|new quote/i })).toBeVisible();
+      
+      // Core content should still be accessible
+      const landscapeElements = await page.locator('header').count();
+      
+      // App should maintain its structure
+      expect(landscapeElements).toEqual(portraitElements);
+    });
   });
 }); 

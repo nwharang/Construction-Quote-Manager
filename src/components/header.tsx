@@ -12,14 +12,14 @@ import {
   DropdownMenu,
   Avatar,
 } from "@nextui-org/react";
-import { Menu, LogOut, Moon, Sun, Monitor } from "lucide-react";
+import { Menu, LogOut, Moon, Sun, Monitor, LogIn } from "lucide-react";
 
 interface HeaderProps {
   onSidebarOpen?: () => void;
 }
 
 export function Header({ onSidebarOpen }: HeaderProps) {
-  const { data: session } = useSession({ required: true });
+  const { data: session, status: sessionStatus } = useSession();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
@@ -109,31 +109,43 @@ export function Header({ onSidebarOpen }: HeaderProps) {
               </Dropdown>
             )}
             
-            <Dropdown>
-              <DropdownTrigger>
-                <Button isIconOnly variant="light" aria-label="User account menu">
-                  <Avatar 
-                    name={session?.user?.name || "User"} 
-                    size="sm" 
-                    src={session?.user?.image || undefined} 
-                    alt={`${session?.user?.name || 'User'}'s profile picture`} 
-                  />
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu aria-label="User account actions">
-                <DropdownItem key="profile" textValue="Profile">
-                  Profile
-                </DropdownItem>
-                <DropdownItem 
-                  key="logout" 
-                  textValue="Logout"
-                  onClick={() => signOut()}
-                  startContent={<LogOut className="h-4 w-4" />}
-                >
-                  Logout
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
+            {sessionStatus === "authenticated" && session ? (
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button isIconOnly variant="light" aria-label="User account menu">
+                    <Avatar 
+                      name={session.user?.name || "User"} 
+                      size="sm" 
+                      src={session.user?.image || undefined} 
+                      alt={`${session.user?.name || 'User'}'s profile picture`} 
+                    />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu aria-label="User account actions">
+                  <DropdownItem key="profile" textValue="Profile">
+                    Profile
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="logout" 
+                    textValue="Logout"
+                    onClick={() => signOut()}
+                    startContent={<LogOut className="h-4 w-4" />}
+                  >
+                    Logout
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            ) : (
+              <Button 
+                as={Link} 
+                href="/auth/signin" 
+                variant="light"
+                startContent={<LogIn className="h-4 w-4" />}
+                aria-label="Sign in"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </div>

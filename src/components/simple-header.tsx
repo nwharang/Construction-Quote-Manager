@@ -11,7 +11,6 @@ import {
   DropdownMenu,
 } from "@nextui-org/react";
 import { Menu, Moon, Sun, Monitor } from "lucide-react";
-import { UserGreeting } from "./user-greeting";
 
 interface SimpleHeaderProps {
   onSidebarOpen?: () => void;
@@ -26,7 +25,7 @@ export function SimpleHeader({ onSidebarOpen }: SimpleHeaderProps) {
   }, []);
 
   return (
-    <header className="border-b border-divider bg-background/70 backdrop-blur-lg" role="banner">
+    <header className="fixed top-0 z-50 w-full border-b border-divider bg-background/90 backdrop-blur-lg shadow-sm" role="banner">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <Button 
@@ -44,10 +43,6 @@ export function SimpleHeader({ onSidebarOpen }: SimpleHeaderProps) {
         </div>
         
         <div className="flex items-center gap-4">
-          <div className="hidden md:block">
-            <UserGreeting />
-          </div>
-          
           <nav className="hidden md:flex" aria-label="Main navigation">
             <ul className="flex gap-4">
               <li>
@@ -72,48 +67,55 @@ export function SimpleHeader({ onSidebarOpen }: SimpleHeaderProps) {
             {mounted && (
               <Dropdown>
                 <DropdownTrigger>
-                  <Button isIconOnly variant="light" aria-label="Change theme">
+                  <Button 
+                    isIconOnly 
+                    variant="light" 
+                    aria-label="Change theme"
+                    className="rounded-full bg-default-100 hover:bg-default-200 dark:bg-default-800 dark:hover:bg-default-700 transition-all focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
                     {theme === "light" ? (
-                      <Sun className="h-5 w-5" />
+                      <Sun className="h-5 w-5 text-yellow-500" />
                     ) : theme === "dark" ? (
-                      <Moon className="h-5 w-5" />
+                      <Moon className="h-5 w-5 text-blue-400" />
                     ) : (
                       <Monitor className="h-5 w-5" />
                     )}
                   </Button>
                 </DropdownTrigger>
-                <DropdownMenu aria-label="Theme options">
+                <DropdownMenu 
+                  aria-label="Theme options"
+                  className="p-1"
+                >
                   <DropdownItem 
                     key="light" 
                     textValue="Light theme"
-                    startContent={<Sun className="h-4 w-4" />}
+                    startContent={<Sun className="h-4 w-4 text-yellow-500" />}
                     onClick={() => setTheme("light")}
+                    className="hover:bg-default-100 data-[hover=true]:bg-default-100 transition-colors"
                   >
-                    Light
+                    <span className="font-medium">Light</span>
                   </DropdownItem>
                   <DropdownItem 
                     key="dark" 
                     textValue="Dark theme"
-                    startContent={<Moon className="h-4 w-4" />}
+                    startContent={<Moon className="h-4 w-4 text-blue-400" />}
                     onClick={() => setTheme("dark")}
+                    className="hover:bg-default-100 data-[hover=true]:bg-default-100 transition-colors"
                   >
-                    Dark
+                    <span className="font-medium">Dark</span>
                   </DropdownItem>
                   <DropdownItem 
                     key="system" 
                     textValue="System theme"
                     startContent={<Monitor className="h-4 w-4" />}
                     onClick={() => setTheme("system")}
+                    className="hover:bg-default-100 data-[hover=true]:bg-default-100 transition-colors"
                   >
-                    System
+                    <span className="font-medium">System</span>
                   </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
             )}
-            
-            <Button as={Link} href="/auth/signin" variant="light" aria-label="Sign in to your account">
-              Sign In
-            </Button>
           </div>
         </div>
       </div>
