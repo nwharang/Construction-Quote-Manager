@@ -12,7 +12,7 @@ import {
   Button,
   Input,
   Textarea,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { api } from "~/utils/api";
 
 // Form validation schema
@@ -165,7 +165,7 @@ export default function AddTaskModal({
             <ModalFooter>
               <Button
                 color="danger"
-                variant="light"
+                
                 onPress={() => {
                   reset();
                   onClose();

@@ -2,25 +2,25 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Plus, X, Save } from 'lucide-react';
-import { 
-  Button, 
-  Card, 
-  CardBody, 
-  CardHeader, 
-  Input, 
-  Textarea, 
-  Select, 
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Input,
+  Textarea,
+  Select,
   SelectItem,
   Divider,
   Spinner,
-  Modal, 
-  ModalContent, 
-  ModalHeader, 
-  ModalBody, 
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
   ModalFooter,
   Breadcrumbs,
-  BreadcrumbItem
-} from '@nextui-org/react';
+  BreadcrumbItem,
+} from '@heroui/react';
 import { toast } from 'sonner';
 
 export default function NewQuotePage() {
@@ -209,7 +209,7 @@ export default function NewQuotePage() {
       const materials = tasks[taskIndex]?.materials || [];
       const material = materials[materialIndex];
       if (material) {
-        setCurrentMaterial({...material});
+        setCurrentMaterial({ ...material });
       }
     } else {
       setEditingMaterialIndex(null);
@@ -302,7 +302,6 @@ export default function NewQuotePage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
         <h1 className="text-2xl font-bold">Create New Quote</h1>
         <Button
-          variant="light"
           color="default"
           startContent={<ArrowLeft size={16} />}
           onPress={() => router.push('/quotes')}
@@ -325,14 +324,11 @@ export default function NewQuotePage() {
                 id="title"
                 name="title"
                 label="Quote Title"
+                labelPlacement="outside"
                 value={formData.title}
                 onChange={handleInputChange}
-                variant="bordered"
                 isRequired
                 placeholder="Kitchen Remodel, Bathroom Renovation, etc."
-                classNames={{
-                  inputWrapper: "bg-transparent"
-                }}
               />
             </div>
           </CardBody>
@@ -352,12 +348,8 @@ export default function NewQuotePage() {
                 label="Name"
                 value={formData.customerName}
                 onChange={handleInputChange}
-                variant="bordered"
                 isRequired
                 placeholder="John Smith"
-                classNames={{
-                  inputWrapper: "bg-transparent"
-                }}
               />
               <Input
                 type="email"
@@ -366,11 +358,7 @@ export default function NewQuotePage() {
                 label="Email"
                 value={formData.customerEmail}
                 onChange={handleInputChange}
-                variant="bordered"
                 placeholder="john@example.com"
-                classNames={{
-                  inputWrapper: "bg-transparent"
-                }}
               />
               <Input
                 type="tel"
@@ -379,11 +367,7 @@ export default function NewQuotePage() {
                 label="Phone"
                 value={formData.customerPhone}
                 onChange={handleInputChange}
-                variant="bordered"
                 placeholder="(555) 123-4567"
-                classNames={{
-                  inputWrapper: "bg-transparent"
-                }}
               />
             </div>
           </CardBody>
@@ -393,23 +377,21 @@ export default function NewQuotePage() {
         <Card className="bg-content1 shadow-sm">
           <CardHeader className="flex justify-between items-center pb-0">
             <h2 className="text-lg font-medium">Tasks and Materials</h2>
-            <Button
-              color="primary"
-              startContent={<Plus size={18} />}
-              onPress={addTask}
-            >
+            <Button color="primary" startContent={<Plus size={18} />} onPress={addTask}>
               Add Task
             </Button>
           </CardHeader>
           <CardBody className="space-y-6">
             {tasks.map((task, taskIndex) => (
-              <Card key={task.id} className="border border-default-200 dark:border-default-700 shadow-none">
+              <Card
+                key={task.id}
+                className="border border-default-200 dark:border-default-700 shadow-none"
+              >
                 <CardHeader className="flex justify-between items-center bg-default-50 dark:bg-default-100/10 py-2">
                   <h3 className="text-base font-medium">Task {taskIndex + 1}</h3>
                   <Button
                     isIconOnly
                     size="sm"
-                    variant="light"
                     color="danger"
                     onPress={() => removeTask(taskIndex)}
                     aria-label="Remove task"
@@ -426,11 +408,10 @@ export default function NewQuotePage() {
                     label="Description"
                     value={task.description}
                     onChange={(e) => handleTaskChange(taskIndex, e)}
-                    variant="bordered"
                     isRequired
                     placeholder="What work needs to be done?"
                     classNames={{
-                      inputWrapper: "bg-transparent"
+                      inputWrapper: 'bg-transparent',
                     }}
                   />
 
@@ -442,7 +423,6 @@ export default function NewQuotePage() {
                     label="Task Price (Labor/Skill)"
                     value={task.price}
                     onChange={(e) => handleTaskChange(taskIndex, e)}
-                    variant="bordered"
                     startContent={
                       <div className="pointer-events-none flex items-center">
                         <span className="text-default-400 text-small">$</span>
@@ -450,7 +430,7 @@ export default function NewQuotePage() {
                     }
                     isRequired
                     classNames={{
-                      inputWrapper: "bg-transparent"
+                      inputWrapper: 'bg-transparent',
                     }}
                   />
 
@@ -461,13 +441,16 @@ export default function NewQuotePage() {
                     label="Materials Cost Type"
                     value={task.materialType}
                     onChange={(e) => handleTaskChange(taskIndex, e)}
-                    variant="bordered"
                     classNames={{
-                      trigger: "bg-transparent"
+                      trigger: 'bg-transparent',
                     }}
                   >
-                    <SelectItem key="lumpsum" value="lumpsum">Lump Sum</SelectItem>
-                    <SelectItem key="itemized" value="itemized">Itemized</SelectItem>
+                    <SelectItem key="lumpsum" textValue="lumpsum">
+                      Lump Sum
+                    </SelectItem>
+                    <SelectItem key="itemized" textValue="itemized">
+                      Itemized
+                    </SelectItem>
                   </Select>
 
                   {/* Materials Cost */}
@@ -479,14 +462,13 @@ export default function NewQuotePage() {
                       label="Estimated Materials Cost (Lump Sum)"
                       value={task.estimatedMaterialsCostLumpSum}
                       onChange={(e) => handleTaskChange(taskIndex, e)}
-                      variant="bordered"
                       startContent={
                         <div className="pointer-events-none flex items-center">
                           <span className="text-default-400 text-small">$</span>
                         </div>
                       }
                       classNames={{
-                        inputWrapper: "bg-transparent"
+                        inputWrapper: 'bg-transparent',
                       }}
                     />
                   ) : (
@@ -553,7 +535,6 @@ export default function NewQuotePage() {
                                     <Button
                                       size="sm"
                                       isIconOnly
-                                      variant="light"
                                       onPress={() => openMaterialModal(taskIndex, materialIndex)}
                                       aria-label="Edit material"
                                     >
@@ -562,7 +543,6 @@ export default function NewQuotePage() {
                                     <Button
                                       size="sm"
                                       isIconOnly
-                                      variant="light"
                                       color="danger"
                                       onPress={() => removeMaterial(taskIndex, materialIndex)}
                                       aria-label="Remove material"
@@ -596,7 +576,6 @@ export default function NewQuotePage() {
               label="Add any notes or special instructions here..."
               value={formData.notes}
               onChange={handleInputChange}
-              variant="bordered"
               rows={4}
               className="bg-transparent"
             />
@@ -618,14 +597,13 @@ export default function NewQuotePage() {
                   label="Complexity/Contingency Charge"
                   value={formData.complexityCharge}
                   onChange={handleInputChange}
-                  variant="bordered"
                   startContent={
                     <div className="pointer-events-none flex items-center">
                       <span className="text-default-400 text-small">$</span>
                     </div>
                   }
                   classNames={{
-                    inputWrapper: "bg-transparent"
+                    inputWrapper: 'bg-transparent',
                   }}
                 />
               </div>
@@ -637,14 +615,13 @@ export default function NewQuotePage() {
                   label="Markup/Profit Charge"
                   value={formData.markupCharge}
                   onChange={handleInputChange}
-                  variant="bordered"
                   startContent={
                     <div className="pointer-events-none flex items-center">
                       <span className="text-default-400 text-small">$</span>
                     </div>
                   }
                   classNames={{
-                    inputWrapper: "bg-transparent"
+                    inputWrapper: 'bg-transparent',
                   }}
                 />
               </div>
@@ -680,30 +657,23 @@ export default function NewQuotePage() {
 
         {/* Form Actions */}
         <div className="flex justify-end space-x-3">
-          <Button
-            variant="flat"
-            onPress={() => router.push('/quotes')}
-          >
+          <Button variant="flat" onPress={() => router.push('/quotes')}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            color="primary"
-            startContent={<Save size={18} />}
-          >
+          <Button type="submit" color="primary" startContent={<Save size={18} />}>
             Save Quote
           </Button>
         </div>
       </form>
 
       {/* Material Modal */}
-      <Modal 
-        isOpen={showMaterialModal} 
+      <Modal
+        isOpen={showMaterialModal}
         onClose={() => setShowMaterialModal(false)}
         placement="center"
         classNames={{
-          body: "py-6",
-          base: "bg-content1"
+          body: 'py-6',
+          base: 'bg-content1',
         }}
       >
         <ModalContent>
@@ -721,10 +691,9 @@ export default function NewQuotePage() {
                     label="Description"
                     value={currentMaterial.description}
                     onChange={handleMaterialChange}
-                    variant="bordered"
                     isRequired
                     classNames={{
-                      inputWrapper: "bg-transparent"
+                      inputWrapper: 'bg-transparent',
                     }}
                   />
                   <Input
@@ -735,10 +704,9 @@ export default function NewQuotePage() {
                     label="Quantity"
                     value={currentMaterial.quantity.toString()}
                     onChange={handleMaterialChange}
-                    variant="bordered"
                     isRequired
                     classNames={{
-                      inputWrapper: "bg-transparent"
+                      inputWrapper: 'bg-transparent',
                     }}
                   />
                   <Input
@@ -748,7 +716,6 @@ export default function NewQuotePage() {
                     label="Unit Cost"
                     value={currentMaterial.cost}
                     onChange={handleMaterialChange}
-                    variant="bordered"
                     startContent={
                       <div className="pointer-events-none flex items-center">
                         <span className="text-default-400 text-small">$</span>
@@ -756,7 +723,7 @@ export default function NewQuotePage() {
                     }
                     isRequired
                     classNames={{
-                      inputWrapper: "bg-transparent"
+                      inputWrapper: 'bg-transparent',
                     }}
                   />
                 </div>
@@ -765,10 +732,13 @@ export default function NewQuotePage() {
                 <Button variant="flat" onPress={onClose}>
                   Cancel
                 </Button>
-                <Button color="primary" onPress={() => {
-                  saveMaterial();
-                  onClose();
-                }}>
+                <Button
+                  color="primary"
+                  onPress={() => {
+                    saveMaterial();
+                    onClose();
+                  }}
+                >
                   Save
                 </Button>
               </ModalFooter>

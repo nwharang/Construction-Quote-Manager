@@ -9,7 +9,7 @@ import {
   DropdownTrigger,
   Dropdown,
   DropdownMenu,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { Menu, Moon, Sun, Monitor } from "lucide-react";
 
 interface SimpleHeaderProps {
@@ -30,7 +30,7 @@ export function SimpleHeader({ onSidebarOpen }: SimpleHeaderProps) {
         <div className="flex items-center gap-4">
           <Button 
             isIconOnly 
-            variant="light" 
+             
             className="md:hidden" 
             onClick={onSidebarOpen}
             aria-label="Open navigation menu"
@@ -46,12 +46,12 @@ export function SimpleHeader({ onSidebarOpen }: SimpleHeaderProps) {
           <nav className="hidden md:flex" aria-label="Main navigation">
             <ul className="flex gap-4">
               <li>
-                <Button as={Link} href="/quotes" variant="light" aria-label="View all quotes">
+                <Button as={Link} href="/quotes"  aria-label="View all quotes">
                   Quotes
                 </Button>
               </li>
               <li>
-                <Button as={Link} href="/products" variant="light" aria-label="Manage products">
+                <Button as={Link} href="/products"  aria-label="Manage products">
                   Products
                 </Button>
               </li>
@@ -69,7 +69,7 @@ export function SimpleHeader({ onSidebarOpen }: SimpleHeaderProps) {
                 <DropdownTrigger>
                   <Button 
                     isIconOnly 
-                    variant="light" 
+                     
                     aria-label="Change theme"
                     className="rounded-full bg-default-100 hover:bg-default-200 dark:bg-default-800 dark:hover:bg-default-700 transition-all focus:outline-none focus:ring-2 focus:ring-primary/30"
                   >

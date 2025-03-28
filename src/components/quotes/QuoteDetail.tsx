@@ -12,7 +12,7 @@ import {
   Chip,
   Input,
   Spinner,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { api } from "~/utils/api";
 
 // Define the Quote type structure
@@ -185,7 +185,7 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
             <Divider />
             <Button
               color="danger"
-              variant="light"
+              
               onPress={() => {
                 if (window.confirm("Are you sure you want to delete this quote?")) {
                   deleteQuote.mutate({ id: quote.id });

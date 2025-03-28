@@ -3,7 +3,21 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { Plus, Edit, Eye, Trash2, Filter, Search, ArrowUpDown } from 'lucide-react';
-import { Spinner, Button, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Input, Select, SelectItem, Card, CardBody } from '@nextui-org/react';
+import {
+  Spinner,
+  Button,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  Input,
+  Select,
+  SelectItem,
+  Card,
+  CardBody,
+} from '@heroui/react';
 import { api } from '../../trpc/react';
 import { toast } from 'sonner';
 
@@ -11,7 +25,7 @@ import { toast } from 'sonner';
 const StatusBadge = ({ status }: { status: string }) => {
   let bgColor = '';
   let textColor = '';
-  
+
   switch (status) {
     case 'DRAFT':
       bgColor = 'bg-gray-200';
@@ -33,7 +47,7 @@ const StatusBadge = ({ status }: { status: string }) => {
       bgColor = 'bg-gray-200';
       textColor = 'text-gray-800';
   }
-  
+
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor}`}>
       {status}
@@ -46,11 +60,21 @@ export default function QuotesPage() {
   const { data: session, status: authStatus } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  
+
   // Fetch quotes using tRPC and React Query
-  const { data: quotes, isLoading, isError, error, refetch } = api.quote.getAll.useQuery(undefined, {
+  const {
+    data: quotes,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = api.quote.getAll.useQuery(undefined, {
     // Only run the query if the user is authenticated
     enabled: authStatus === 'authenticated',
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: false,
   });
 
   // Delete quote mutation
@@ -62,7 +86,7 @@ export default function QuotesPage() {
     },
     onError: (err) => {
       toast.error(`Error deleting quote: ${err.message}`);
-    }
+    },
   });
 
   const handleDeleteQuote = (id: string) => {
@@ -70,33 +94,29 @@ export default function QuotesPage() {
       deleteQuoteMutation.mutate({ id });
     }
   };
-  
+
   // Loading state
   if (authStatus === 'loading' || isLoading) {
     return (
-      <div className="flex min-h-screen justify-center items-center">
+      <div className="flex justify-center items-center">
         <Spinner size="lg" color="primary" />
       </div>
     );
   }
-  
+
   // Not authenticated
   if (authStatus === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
-  
+
   // Error state
   if (isError) {
     return (
-      <div className="flex min-h-screen flex-col justify-center items-center">
+      <div className="flex flex-col justify-center items-center">
         <h1 className="text-2xl font-bold text-red-600 mb-4">Error loading quotes</h1>
         <p className="text-gray-600">{error?.message || 'Something went wrong'}</p>
-        <Button 
-          color="primary" 
-          className="mt-4" 
-          onClick={() => refetch()}
-        >
+        <Button color="primary" className="mt-4" onClick={() => refetch()}>
           Retry
         </Button>
       </div>
@@ -104,46 +124,47 @@ export default function QuotesPage() {
   }
 
   // Filter quotes based on search query and status filter
-  const filteredQuotes = quotes?.filter(quote => {
-    const matchesSearch = 
-      quote.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      quote.customerName.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'ALL' || quote.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  }) || [];
-  
+  const filteredQuotes =
+    quotes?.filter((quote) => {
+      const matchesSearch =
+        quote.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        quote.customerName.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus = statusFilter === 'ALL' || quote.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    }) || [];
+
   const formatDate = (dateString: string | Date) => {
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     }).format(date);
   };
-  
+
   const formatCurrency = (value: string | number) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'USD',
     }).format(numValue);
   };
-  
+
   return (
     <>
       <Head>
         <title>Quotes | Construction Quote Manager</title>
       </Head>
-      
+
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quotes</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your construction quotes</p>
           </div>
-          
+
           <Button
             onClick={() => router.push('/quotes/new')}
             color="primary"
@@ -153,7 +174,7 @@ export default function QuotesPage() {
             New Quote
           </Button>
         </div>
-        
+
         {/* Filters and Search */}
         <Card className="mb-6">
           <CardBody>
@@ -166,36 +187,46 @@ export default function QuotesPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 startContent={<Search className="text-gray-400" />}
               />
-              
+
               <Select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 startContent={<Filter className="text-gray-400" />}
                 className="w-full md:w-64"
               >
-                <SelectItem key="ALL" value="ALL">All Statuses</SelectItem>
-                <SelectItem key="DRAFT" value="DRAFT">Draft</SelectItem>
-                <SelectItem key="SENT" value="SENT">Sent</SelectItem>
-                <SelectItem key="ACCEPTED" value="ACCEPTED">Accepted</SelectItem>
-                <SelectItem key="REJECTED" value="REJECTED">Rejected</SelectItem>
+                <SelectItem key="ALL" value="ALL">
+                  All Statuses
+                </SelectItem>
+                <SelectItem key="DRAFT" value="DRAFT">
+                  Draft
+                </SelectItem>
+                <SelectItem key="SENT" value="SENT">
+                  Sent
+                </SelectItem>
+                <SelectItem key="ACCEPTED" value="ACCEPTED">
+                  Accepted
+                </SelectItem>
+                <SelectItem key="REJECTED" value="REJECTED">
+                  Rejected
+                </SelectItem>
               </Select>
             </div>
           </CardBody>
         </Card>
-        
+
         {/* Quotes List */}
         {filteredQuotes.length === 0 ? (
           <Card>
             <CardBody className="py-10 text-center">
               <p className="text-gray-500 dark:text-gray-400">
-                {searchQuery || statusFilter !== 'ALL' 
-                  ? 'No quotes match your filters' 
+                {searchQuery || statusFilter !== 'ALL'
+                  ? 'No quotes match your filters'
                   : 'No quotes found. Create your first quote!'}
               </p>
-              <Button 
-                color="primary" 
-                className="mx-auto mt-4" 
-                onClick={() => router.push('/quotes/new')}
+              <Button
+                color="primary"
+                className="mx-auto mt-4"
+                onPress={() => router.push('/quotes/new')}
                 startContent={<Plus size={20} />}
               >
                 New Quote
@@ -220,7 +251,9 @@ export default function QuotesPage() {
                     <TableRow key={quote.id}>
                       <TableCell>{quote.title}</TableCell>
                       <TableCell>{quote.customerName}</TableCell>
-                      <TableCell><StatusBadge status={quote.status} /></TableCell>
+                      <TableCell>
+                        <StatusBadge status={quote.status} />
+                      </TableCell>
                       <TableCell>{formatCurrency(quote.grandTotal)}</TableCell>
                       <TableCell>{formatDate(quote.createdAt)}</TableCell>
                       <TableCell>
@@ -228,7 +261,7 @@ export default function QuotesPage() {
                           <Button
                             size="sm"
                             isIconOnly
-                            onClick={() => router.push(`/quotes/${quote.id}`)}
+                            onPress={() => router.push(`/quotes/${quote.id}`)}
                             aria-label="View Quote"
                           >
                             <Eye size={18} />
@@ -236,7 +269,7 @@ export default function QuotesPage() {
                           <Button
                             size="sm"
                             isIconOnly
-                            onClick={() => router.push(`/quotes/${quote.id}/edit`)}
+                            onPress={() => router.push(`/quotes/${quote.id}/edit`)}
                             aria-label="Edit Quote"
                           >
                             <Edit size={18} />
@@ -245,7 +278,7 @@ export default function QuotesPage() {
                             size="sm"
                             isIconOnly
                             color="danger"
-                            onClick={() => handleDeleteQuote(quote.id)}
+                            onPress={() => handleDeleteQuote(quote.id)}
                             aria-label="Delete Quote"
                           >
                             <Trash2 size={18} />
@@ -257,7 +290,7 @@ export default function QuotesPage() {
                 </TableBody>
               </Table>
             </div>
-            
+
             {/* Cards for mobile screens */}
             <div className="md:hidden space-y-4">
               {filteredQuotes.map((quote) => (
@@ -273,15 +306,13 @@ export default function QuotesPage() {
                         <span className="text-gray-600 dark:text-gray-400">
                           {formatDate(quote.createdAt)}
                         </span>
-                        <span className="font-semibold">
-                          {formatCurrency(quote.grandTotal)}
-                        </span>
+                        <span className="font-semibold">{formatCurrency(quote.grandTotal)}</span>
                       </div>
                       <div className="flex justify-end space-x-2 pt-2">
                         <Button
                           size="sm"
                           isIconOnly
-                          onClick={() => router.push(`/quotes/${quote.id}`)}
+                          onPress={() => router.push(`/quotes/${quote.id}`)}
                           aria-label="View Quote"
                         >
                           <Eye size={18} />
@@ -289,7 +320,7 @@ export default function QuotesPage() {
                         <Button
                           size="sm"
                           isIconOnly
-                          onClick={() => router.push(`/quotes/${quote.id}/edit`)}
+                          onPress={() => router.push(`/quotes/${quote.id}/edit`)}
                           aria-label="Edit Quote"
                         >
                           <Edit size={18} />
@@ -298,7 +329,7 @@ export default function QuotesPage() {
                           size="sm"
                           isIconOnly
                           color="danger"
-                          onClick={() => handleDeleteQuote(quote.id)}
+                          onPress={() => handleDeleteQuote(quote.id)}
                           aria-label="Delete Quote"
                         >
                           <Trash2 size={18} />
@@ -314,4 +345,4 @@ export default function QuotesPage() {
       </div>
     </>
   );
-} 
+}

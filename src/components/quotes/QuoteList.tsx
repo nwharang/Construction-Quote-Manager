@@ -10,7 +10,7 @@ import {
   TableCell,
   Button,
   Chip,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { api } from "~/utils/api";
 
 // Define the Quote type based on the structure from the API
@@ -80,7 +80,7 @@ export default function QuoteList({ quotes }: { quotes: Quote[] }) {
             <TableCell>
               <Button
                 color="primary"
-                variant="light"
+                
                 onPress={() => router.push(`/quotes/${quote.id}`)}
               >
                 View

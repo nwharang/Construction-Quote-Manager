@@ -1,17 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * NextUI and Tailwind v4 Compatibility Tests
+ * @heroui/react and Tailwind v4 Compatibility Tests
  * 
- * These tests specifically verify that NextUI components render correctly with Tailwind v4,
+ * These tests specifically verify that @heroui/react components render correctly with Tailwind v4,
  * and that there are no visual issues caused by compatibility problems.
  */
 
-// Test: NextUI Button component
-test('NextUI Button component should have proper styling', async ({ page }) => {
+// Test: @heroui/react Button component
+test('@heroui/react Button component should have proper styling', async ({ page }) => {
   await page.goto('/auth/signin');
   
-  // Find sign-in button (a NextUI Button component)
+  // Find sign-in button (a @heroui/react Button component)
   const button = page.locator('button[type="submit"]');
   await expect(button).toBeVisible();
   
@@ -31,7 +31,7 @@ test('NextUI Button component should have proper styling', async ({ page }) => {
   });
   
   // Button should have some styling applied - either backgroundColor or border
-  // Some NextUI buttons may use border instead of background
+  // Some @heroui/react buttons may use border instead of background
   expect(
     buttonStyles.backgroundColor !== 'rgba(0, 0, 0, 0)' || 
     buttonStyles.border !== 'none'
@@ -42,14 +42,14 @@ test('NextUI Button component should have proper styling', async ({ page }) => {
   expect(parseFloat(buttonStyles.borderRadius)).toBeGreaterThanOrEqual(0);
   
   // Take a screenshot for visual verification
-  await page.screenshot({ path: 'test-results/nextui-button.png' });
+  await page.screenshot({ path: 'test-results/@heroui/react-button.png' });
 });
 
-// Test: NextUI Input component
-test('NextUI Input component should have proper styling', async ({ page }) => {
+// Test: @heroui/react Input component
+test('@heroui/react Input component should have proper styling', async ({ page }) => {
   await page.goto('/auth/signin');
   
-  // Find input field (a NextUI Input component)
+  // Find input field (a @heroui/react Input component)
   const input = page.locator('input[name="email"]');
   await expect(input).toBeVisible();
   
@@ -70,11 +70,11 @@ test('NextUI Input component should have proper styling', async ({ page }) => {
   expect(parseFloat(inputStyles.fontSize)).toBeGreaterThan(0);
   
   // Take a screenshot for visual verification
-  await page.screenshot({ path: 'test-results/nextui-input.png' });
+  await page.screenshot({ path: 'test-results/@heroui/react-input.png' });
 });
 
-// Test: NextUI Card component
-test('NextUI Card component should have proper styling', async ({ page }) => {
+// Test: @heroui/react Card component
+test('@heroui/react Card component should have proper styling', async ({ page }) => {
   await page.goto('/auth/signin');
   
   // Find a card or form container 
@@ -96,7 +96,7 @@ test('NextUI Card component should have proper styling', async ({ page }) => {
   expect(parseFloat(cardStyles.borderRadius)).toBeGreaterThanOrEqual(0);
   
   // Take a screenshot for visual verification
-  await page.screenshot({ path: 'test-results/nextui-card.png' });
+  await page.screenshot({ path: 'test-results/@heroui/react-card.png' });
 });
 
 // Test: Look for theme toggle - don't test color change as it might not be implemented

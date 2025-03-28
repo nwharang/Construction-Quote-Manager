@@ -9,7 +9,7 @@ import {
   Button,
   Input,
   Textarea,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -95,7 +95,7 @@ export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
             />
           </ModalBody>
           <ModalFooter>
-            <Button color="danger" variant="light" onPress={onClose}>
+            <Button color="danger"  onPress={onClose}>
               Cancel
             </Button>
             <Button

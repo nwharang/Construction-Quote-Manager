@@ -21,7 +21,7 @@ import {
   Spinner,
   Breadcrumbs,
   BreadcrumbItem
-} from '@nextui-org/react';
+} from '@heroui/react';
 
 // Mock data for products - in a real app, this would come from tRPC
 const DUMMY_PRODUCTS = [
@@ -234,7 +234,7 @@ export default function ProductsPage() {
                         <Button
                           isIconOnly
                           size="sm"
-                          variant="light"
+                          
                           color="primary"
                           onPress={() => openEditModal(product)}
                           aria-label="Edit product"
@@ -244,7 +244,7 @@ export default function ProductsPage() {
                         <Button
                           isIconOnly
                           size="sm"
-                          variant="light"
+                          
                           color="danger"
                           onPress={() => deleteProduct(product.id)}
                           aria-label="Delete product"

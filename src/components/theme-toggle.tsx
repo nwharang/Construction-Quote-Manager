@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from '@nextui-org/react';
+import { Button } from '@heroui/react';
 import { Moon, Sun } from 'lucide-react';
 
 // Simple theme toggle component that works on the client-side only
@@ -38,7 +38,7 @@ export function ThemeToggle() {
   return (
     <Button 
       isIconOnly
-      variant="light"
+      
       className="rounded-full bg-default-100/80 hover:bg-default-200 dark:bg-default-800/80 dark:hover:bg-default-700"
       aria-label="Toggle theme"
       onClick={toggleTheme}

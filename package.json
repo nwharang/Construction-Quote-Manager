@@ -2,6 +2,7 @@
   "name": "construction-quotes",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -25,8 +26,8 @@
   "dependencies": {
     "@auth/core": "^0.38.0",
     "@auth/drizzle-adapter": "^1.8.0",
+    "@heroui/react": "2.7.6-beta.2",
     "@hookform/resolvers": "^4.1.3",
-    "@nextui-org/react": "^2.2.9",
     "@radix-ui/react-label": "^2.1.2",
     "@t3-oss/env-nextjs": "^0.12.0",
     "@tanstack/react-query": "^5.18.1",
@@ -41,7 +42,7 @@
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.41.0",
-    "framer-motion": "^11.0.5",
+    "framer-motion": "^11.18.2",
     "lucide-react": "^0.484.0",
     "next": "15.2.4",
     "next-auth": "4.24.5",
@@ -53,7 +54,7 @@
     "sonner": "^2.0.2",
     "superjson": "^2.2.1",
     "tailwind-merge": "^3.0.2",
-    "tailwindcss": "^4.0.0-alpha.7",
+    "tailwindcss": "^4.0.17",
     "uuid": "^9.0.1",
     "zod": "^3.24.2"
   },
@@ -73,12 +74,13 @@
     "eslint-config-next": "15.2.4",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "postcss": "^8.4.35",
+    "postcss": "^8.5.3",
     "tsx": "^4.19.3",
     "typescript": "^5.3.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@heroui/shared-utils",
       "esbuild"
     ]
   }

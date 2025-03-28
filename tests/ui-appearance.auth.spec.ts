@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
  * 
  * These tests verify that the UI components appear correctly on authenticated pages:
  * - Visual styling and layout
- * - NextUI components rendering properly
+ * - @heroui/react components rendering properly
  * - Tailwind v4 compatibility
  */
 
@@ -66,7 +66,7 @@ test('quotes list should have proper table styling', async ({ page }) => {
   expect(headingStyles.fontSize).toBeGreaterThanOrEqual(20);
   expect(parseInt(headingStyles.fontWeight)).toBeGreaterThanOrEqual(500);
   
-  // Check that buttons are properly styled with NextUI
+  // Check that buttons are properly styled with @heroui/react
   const newQuoteButton = page.getByRole('button', { name: /create|new quote/i });
   await expect(newQuoteButton).toBeVisible();
   

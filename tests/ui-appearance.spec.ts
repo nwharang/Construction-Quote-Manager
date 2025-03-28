@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
  * 
  * These tests verify that the UI components appear correctly:
  * - Visual styling and layout
- * - NextUI components rendering properly
+ * - @heroui/react components rendering properly
  * - Tailwind v4 compatibility
  */
 
@@ -76,7 +76,7 @@ test('dashboard should have proper styling with sidebar and content areas', asyn
   await expect(sidebar).toBeVisible();
   await expect(mainContent).toBeVisible();
   
-  // Check for proper styling of NextUI components like cards
+  // Check for proper styling of @heroui/react components like cards
   const cards = page.locator('.card, [data-card], [class*="Card-"]');
   if (await cards.count() > 0) {
     await expect(cards.first()).toBeVisible();
@@ -125,7 +125,7 @@ test('quotes list should have proper table styling', async ({ page }) => {
     ).toBeTruthy();
   }
   
-  // Check for NextUI Button component styling
+  // Check for @heroui/react Button component styling
   const createButton = page.getByRole('button', { name: /create|new quote/i });
   await expect(createButton).toBeVisible();
   

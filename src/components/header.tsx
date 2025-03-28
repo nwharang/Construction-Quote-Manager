@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
-import { useTheme } from "next-themes";
+import * as React from 'react';
+import Link from 'next/link';
+import { useSession, signOut } from 'next-auth/react';
+import { useTheme } from 'next-themes';
 import {
   Button,
   DropdownItem,
@@ -11,8 +11,8 @@ import {
   Dropdown,
   DropdownMenu,
   Avatar,
-} from "@nextui-org/react";
-import { Menu, LogOut, Moon, Sun, Monitor, LogIn } from "lucide-react";
+} from '@heroui/react';
+import { Menu, LogOut, Moon, Sun, Monitor, LogIn } from 'lucide-react';
 
 interface HeaderProps {
   onSidebarOpen?: () => void;
@@ -31,11 +31,10 @@ export function Header({ onSidebarOpen }: HeaderProps) {
     <header className="border-b border-divider bg-background/70 backdrop-blur-lg" role="banner">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          <Button 
-            isIconOnly 
-            variant="light" 
-            className="md:hidden" 
-            onClick={onSidebarOpen}
+          <Button
+            isIconOnly
+            className="md:hidden"
+            onPress={onSidebarOpen}
             aria-label="Open navigation menu"
           >
             <Menu className="h-5 w-5" />
@@ -44,17 +43,17 @@ export function Header({ onSidebarOpen }: HeaderProps) {
             Construction Quote Manager
           </Link>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <nav className="hidden md:flex" aria-label="Main navigation">
             <ul className="flex gap-4">
               <li>
-                <Button as={Link} href="/quotes" variant="light" aria-label="View all quotes">
+                <Button as={Link} href="/quotes" aria-label="View all quotes">
                   Quotes
                 </Button>
               </li>
               <li>
-                <Button as={Link} href="/products" variant="light" aria-label="Manage products">
+                <Button as={Link} href="/products" aria-label="Manage products">
                   Products
                 </Button>
               </li>
@@ -65,15 +64,15 @@ export function Header({ onSidebarOpen }: HeaderProps) {
               </li>
             </ul>
           </nav>
-          
+
           <div className="flex items-center gap-2">
             {mounted && (
               <Dropdown>
                 <DropdownTrigger>
-                  <Button isIconOnly variant="light" aria-label="Change theme">
-                    {theme === "light" ? (
+                  <Button isIconOnly aria-label="Change theme">
+                    {theme === 'light' ? (
                       <Sun className="h-5 w-5" />
-                    ) : theme === "dark" ? (
+                    ) : theme === 'dark' ? (
                       <Moon className="h-5 w-5" />
                     ) : (
                       <Monitor className="h-5 w-5" />
@@ -81,54 +80,45 @@ export function Header({ onSidebarOpen }: HeaderProps) {
                   </Button>
                 </DropdownTrigger>
                 <DropdownMenu aria-label="Theme options">
-                  <DropdownItem 
-                    key="light" 
+                  <DropdownItem
+                    key="light"
                     textValue="Light theme"
                     startContent={<Sun className="h-4 w-4" />}
-                    onClick={() => setTheme("light")}
+                    onPress={() => setTheme('light')}
                   >
                     Light
                   </DropdownItem>
-                  <DropdownItem 
-                    key="dark" 
+                  <DropdownItem
+                    key="dark"
                     textValue="Dark theme"
                     startContent={<Moon className="h-4 w-4" />}
-                    onClick={() => setTheme("dark")}
+                    onPress={() => setTheme('dark')}
                   >
                     Dark
                   </DropdownItem>
-                  <DropdownItem 
-                    key="system" 
+                  <DropdownItem
+                    key="system"
                     textValue="System theme"
                     startContent={<Monitor className="h-4 w-4" />}
-                    onClick={() => setTheme("system")}
+                    onPress={() => setTheme('system')}
                   >
                     System
                   </DropdownItem>
                 </DropdownMenu>
               </Dropdown>
             )}
-            
-            {sessionStatus === "authenticated" && session ? (
+
+            {sessionStatus === 'authenticated' && session ? (
               <Dropdown>
-                <DropdownTrigger>
-                  <Button isIconOnly variant="light" aria-label="User account menu">
-                    <Avatar 
-                      name={session.user?.name || "User"} 
-                      size="sm" 
-                      src={session.user?.image || undefined} 
-                      alt={`${session.user?.name || 'User'}'s profile picture`} 
-                    />
-                  </Button>
-                </DropdownTrigger>
+                <DropdownTrigger></DropdownTrigger>
                 <DropdownMenu aria-label="User account actions">
                   <DropdownItem key="profile" textValue="Profile">
                     Profile
                   </DropdownItem>
-                  <DropdownItem 
-                    key="logout" 
+                  <DropdownItem
+                    key="logout"
                     textValue="Logout"
-                    onClick={() => signOut()}
+                    onPress={() => signOut()}
                     startContent={<LogOut className="h-4 w-4" />}
                   >
                     Logout
@@ -136,10 +126,9 @@ export function Header({ onSidebarOpen }: HeaderProps) {
                 </DropdownMenu>
               </Dropdown>
             ) : (
-              <Button 
-                as={Link} 
-                href="/auth/signin" 
-                variant="light"
+              <Button
+                as={Link}
+                href="/auth/signin"
                 startContent={<LogIn className="h-4 w-4" />}
                 aria-label="Sign in"
               >
@@ -151,4 +140,4 @@ export function Header({ onSidebarOpen }: HeaderProps) {
       </div>
     </header>
   );
-} 
+}

@@ -12,7 +12,7 @@ import {
   NavbarMenuItem,
   Link,
   Button,
-} from "@nextui-org/react";
+} from "@heroui/react";
 import { useSession, signOut } from "next-auth/react";
 
 const navigationItems = [

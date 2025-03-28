@@ -4,29 +4,25 @@ import type { AppProps } from 'next/app';
 import { SessionProvider } from 'next-auth/react';
 import { ThemeProvider } from 'next-themes';
 import { useRouter } from 'next/router';
-import { NextUIProvider } from '@nextui-org/react';
 import { Toaster } from 'sonner';
 import { Layout } from '../components/layout';
 import { LoadingSpinner } from '../components/loading';
+import { HeroUIProvider } from '@heroui/react';
 
 function SafeHydrate({ children }: { children: React.ReactNode }) {
-  return (
-    <div suppressHydrationWarning>
-      {typeof window === 'undefined' ? null : children}
-    </div>
-  );
+  return <div suppressHydrationWarning>{typeof window === 'undefined' ? null : children}</div>;
 }
 
 // Component to handle client-side only rendering
 function ClientOnly({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   if (!mounted) return null;
-  
+
   return <>{children}</>;
 }
 
@@ -46,16 +42,16 @@ export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const isAuthPage = router.pathname.startsWith('/auth/');
   const [loading, setLoading] = useState(true);
-  
+
   // Initialize theme on client side
   useEffect(() => {
     setLoading(false);
-    
+
     // Initialize theme from localStorage if available
     try {
       const savedTheme = localStorage.getItem('theme');
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      
+
       if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
         document.documentElement.classList.add('dark');
       } else {
@@ -80,11 +76,11 @@ export default function App({ Component, pageProps }: AppProps) {
       <SafeHydrate>
         <TRPCWrapper>
           <ThemeProvider attribute="class">
-            <NextUIProvider>
+            <HeroUIProvider>
               <ClientOnly>
                 <Toaster position="top-right" richColors />
               </ClientOnly>
-              
+
               {isAuthPage ? (
                 <Component {...otherPageProps} />
               ) : (
@@ -92,10 +88,10 @@ export default function App({ Component, pageProps }: AppProps) {
                   <Component {...otherPageProps} />
                 </Layout>
               )}
-            </NextUIProvider>
+            </HeroUIProvider>
           </ThemeProvider>
         </TRPCWrapper>
       </SafeHydrate>
     </SessionProvider>
   );
-} 
+}

@@ -4,12 +4,12 @@ import { test, expect } from '@playwright/test';
  * UI Components Tests
  * 
  * Tests that focus on specific UI components to ensure they render correctly
- * with the combination of NextUI and Tailwind v4.
+ * with the combination of @heroui/react and Tailwind v4.
  * These tests don't require authentication.
  */
 
-// Test: NextUI components on the login page
-test('NextUI components on login page should render correctly', async ({ page }) => {
+// Test: @heroui/react components on the login page
+test('@heroui/react components on login page should render correctly', async ({ page }) => {
   await page.goto('/auth/signin');
   
   // Test container/card component
@@ -27,7 +27,7 @@ test('NextUI components on login page should render correctly', async ({ page })
   await expect(button).toBeVisible();
   
   // Take a screenshot for visual verification
-  await page.screenshot({ path: 'test-results/nextui-login-components.png' });
+  await page.screenshot({ path: 'test-results/@heroui/react-login-components.png' });
 });
 
 // Test: Dark mode toggle if available
@@ -58,7 +58,7 @@ test('theme toggle should change appearance if available', async ({ page }) => {
   }
 });
 
-// Test: NextUI buttons have consistent styling
+// Test: @heroui/react buttons have consistent styling
 test('buttons should have consistent styling', async ({ page }) => {
   await page.goto('/auth/signin');
   
@@ -87,7 +87,7 @@ test('buttons should have consistent styling', async ({ page }) => {
   expect(parseFloat(buttonStyles.borderRadius)).toBeGreaterThanOrEqual(0);
 });
 
-// Test: NextUI inputs have consistent styling
+// Test: @heroui/react inputs have consistent styling
 test('input fields should have consistent styling', async ({ page }) => {
   await page.goto('/auth/signin');
   
@@ -108,7 +108,7 @@ test('input fields should have consistent styling', async ({ page }) => {
   // that may vary across browsers or with different styling approaches
 });
 
-// Test: NextUI form layout
+// Test: @heroui/react form layout
 test('form layout should be properly structured', async ({ page }) => {
   await page.goto('/auth/signin');
   

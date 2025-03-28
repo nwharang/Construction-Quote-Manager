@@ -38,12 +38,12 @@
 - **Stack:**
   - **Next.js (Page Router)**, TS
   - **tRPC** (API)
-  - **NextUI V2** (UI Components)
+  - **@heroui/react V2** (UI Components)
   - **Tailwind CSS v4 (Required - Alpha/Beta)**
-    - **Caveat:** Tailwind v4 is experimental. Ensure configuration follows v4 practices (potentially minimal `tailwind.config.js`, leveraging new engine features). **Crucially, verify compatibility with NextUI v2.** Be prepared for potential styling conflicts or the need for specific compatibility configurations or workarounds between NextUI and Tailwind v4. Prioritize NextUI component functionality if direct conflicts arise.
-- **UI:** Use **NextUI V2** components extensively. **Must be Responsive**.
+    - **Caveat:** Tailwind v4 is experimental. Ensure configuration follows v4 practices (potentially minimal `tailwind.config.js`, leveraging new engine features). **Crucially, verify compatibility with @heroui/react v2.** Be prepared for potential styling conflicts or the need for specific compatibility configurations or workarounds between @heroui/react and Tailwind v4. Prioritize @heroui/react component functionality if direct conflicts arise.
+- **UI:** Use **@heroui/react V2** components extensively. **Must be Responsive**.
 - **Data:** **tRPC hooks** for all data ops. Handle loading (`Spinner`/`Skeleton`) & errors (inline/toast).
-- **Key Views (Summarized - Use NextUI Components):**
+- **Key Views (Summarized - Use @heroui/react Components):**
   - **Auth:** Simple centered login/signup form.
   - **Quote List (`/quotes`):** `Navbar`; `Table`/`Card` list; "Create" button. Responsive.
   - **Quote Create/Edit (`/quotes/...`):** Multi-section form.
@@ -51,7 +51,7 @@
     - **Other:** "Add Task" button; Adjustment inputs; Dynamic totals display; Save/Update button w/ loading state. Client-side validation needed (e.g., `react-hook-form`). Responsive (stacking).
   - **Quote Detail (`/quotes/[id]`):** Read-only display. Edit/Delete/Status actions. Responsive.
   - **Product Mgmt (`/products`, Optional):** CRUD interface for `Product List` using `Table`/`Card`s and `Modal` form. Responsive.
-- **Accessibility:** Use semantic HTML & NextUI's accessible components.
+- **Accessibility:** Use semantic HTML & @heroui/react's accessible components.
 
 ---
 
@@ -67,8 +67,8 @@
 Generate **Next.js (Page Router)**, **tRPC**, **Playwright**, and **TypeScript** code for the app.
 
 1.  Implement the **Core Workflow** accurately.
-2.  Use **Required Tech Stack** (NextUI v2, tRPC, Drizzle).
-3.  Configure and utilize **Tailwind CSS v4**, acknowledging potential **NextUI v2 compatibility issues** and its experimental nature. Prioritize functionality.
+2.  Use **Required Tech Stack** (@heroui/react v2, tRPC, Drizzle).
+3.  Configure and utilize **Tailwind CSS v4**, acknowledging potential **@heroui/react v2 compatibility issues** and its experimental nature. Prioritize functionality.
 4.  Ensure UI is **Responsive**.
 5.  Use **tRPC hooks** correctly (loading/error states).
 6.  Adhere to the **FULL Drizzle Schema** (provided previously).
