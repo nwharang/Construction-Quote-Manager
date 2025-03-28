@@ -3,6 +3,8 @@ import { quoteRouter } from "~/server/api/routers/quote";
 import { taskRouter } from "~/server/api/routers/task";
 import { materialRouter } from "~/server/api/routers/material";
 import { authRouter } from "~/server/api/routers/auth";
+import { productRouter } from "~/server/api/routers/product";
+import { settingsRouter } from "~/server/api/routers/settings";
 
 /**
  * This is the primary router for your server.
@@ -14,6 +16,8 @@ export const appRouter = createTRPCRouter({
   quote: quoteRouter,
   task: taskRouter,
   material: materialRouter,
+  product: productRouter,
+  settings: settingsRouter,
 });
 
 // export type definition of API

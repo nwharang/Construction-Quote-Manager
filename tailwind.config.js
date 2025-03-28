@@ -5,11 +5,11 @@ import { heroui } from '@heroui/react';
  * Note: This is using Tailwind CSS v4 alpha which may have compatibility issues
  */
 const config = {
+  darkMode: 'class',
   content: [
     './src/**/*.{js,ts,jsx,tsx,mdx}',
-    './node_modules/@@heroui/react-org/theme/dist/**/*.{js,ts,jsx,tsx}',
+    './node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}',
   ],
-  darkMode: 'class',
   plugins: [
     // @heroui/react plugin for improved component styling
     heroui(),

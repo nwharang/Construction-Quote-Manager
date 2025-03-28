@@ -32,6 +32,29 @@ export const QuoteStatus = {
 
 export type QuoteStatusType = (typeof QuoteStatus)[keyof typeof QuoteStatus];
 
+// Product categories enum
+export const productCategoryEnum = pgEnum('product_category', [
+  'LUMBER',
+  'PLUMBING',
+  'ELECTRICAL',
+  'PAINT',
+  'HARDWARE',
+  'TOOLS',
+  'OTHER',
+]);
+
+export const ProductCategory = {
+  LUMBER: 'LUMBER',
+  PLUMBING: 'PLUMBING',
+  ELECTRICAL: 'ELECTRICAL',
+  PAINT: 'PAINT',
+  HARDWARE: 'HARDWARE',
+  TOOLS: 'TOOLS',
+  OTHER: 'OTHER',
+} as const;
+
+export type ProductCategoryType = (typeof ProductCategory)[keyof typeof ProductCategory];
+
 // Users table (with authentication fields)
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -40,6 +63,7 @@ export const users = pgTable('users', {
   username: text('username').unique(),
   hashedPassword: text('hashed_password'),
   image: text('image'),
+  role: varchar('role', { length: 50 }).notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   emailVerified: timestamp('email_verified'),
 });
@@ -50,7 +74,7 @@ export const sessions = pgTable(
   (d) => ({
     sessionToken: d.varchar({ length: 255 }).notNull().primaryKey(),
     userId: d
-      .varchar({ length: 255 })
+      .uuid('user_id')
       .notNull()
       .references(() => users.id),
     expires: d.timestamp({ mode: 'date', withTimezone: true }).notNull(),
@@ -62,7 +86,7 @@ export const accounts = pgTable(
   'account',
   (d) => ({
     userId: d
-      .varchar({ length: 255 })
+      .uuid('user_id')
       .notNull()
       .references(() => users.id),
     type: d.varchar({ length: 255 }).$type<AdapterAccount['type']>().notNull(),
@@ -134,15 +158,38 @@ export const tasks = pgTable('tasks', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Materials table
+// Products table
+export const products = pgTable('products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: productCategoryEnum('category').notNull(),
+  unitPrice: text('unit_price').notNull(),
+  unit: text('unit').notNull(),
+  sku: text('sku'),
+  manufacturer: text('manufacturer'),
+  supplier: text('supplier'),
+  location: text('location'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Update materials table to reference products
 export const materials = pgTable('materials', {
   id: uuid('id').primaryKey().defaultRandom(),
   taskId: uuid('task_id')
     .notNull()
     .references(() => tasks.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  cost: decimal('cost', { precision: 10, scale: 2 }).notNull(),
+  productId: uuid('product_id')
+    .notNull()
+    .references(() => products.id),
   quantity: integer('quantity').notNull().default(1),
+  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(), // Price at time of use
+  notes: text('notes'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -161,17 +208,55 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   materials: many(materials),
 }));
 
-// Materials table
+// Products relations
+export const productsRelations = relations(products, ({ one, many }) => ({
+  user: one(users, {
+    fields: [products.userId],
+    references: [users.id],
+  }),
+  materials: many(materials),
+}));
+
+// Update materials relations
 export const materialsRelations = relations(materials, ({ one }) => ({
   task: one(tasks, {
     fields: [materials.taskId],
     references: [tasks.id],
   }),
+  product: one(products, {
+    fields: [materials.productId],
+    references: [products.id],
+  }),
 }));
 
-// Define relationships
-export const usersRelations = relations(users, ({ many }) => ({
+// Settings table
+export const settings = pgTable('settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  currency: text('currency').notNull().default('USD'),
+  locale: text('locale').notNull().default('en-US'),
+  dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),
+  timeFormat: text('time_format').notNull().default('12h'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Settings relations
+export const settingsRelations = relations(settings, ({ one }) => ({
+  user: one(users, {
+    fields: [settings.userId],
+    references: [users.id],
+  }),
+}));
+
+// Update users relations to include settings
+export const usersRelations = relations(users, ({ many, one }) => ({
   accounts: many(accounts),
+  quotes: many(quotes),
+  products: many(products),
+  settings: one(settings),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({

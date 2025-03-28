@@ -5,7 +5,7 @@ import { Home } from 'lucide-react';
 
 export default function NotFoundPage() {
   return (
-    <>
+    <div className="">
       <Head>
         <title>Page Not Found | Construction Quote Manager</title>
       </Head>
@@ -33,6 +33,6 @@ export default function NotFoundPage() {
           </Link>
         </div>
       </div>
-    </>
+    </div>
   );
 } 

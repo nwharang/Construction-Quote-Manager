@@ -1,11 +1,11 @@
-import { randomBytes } from "crypto";
+import { randomBytes } from 'crypto';
 
 /**
  * Generate a random token for session authentication
  * @returns Random token string
  */
 export function generateSessionToken(): string {
-  return randomBytes(32).toString("hex");
+  return randomBytes(32).toString('hex');
 }
 
 /**
@@ -16,4 +16,4 @@ export function generateSessionToken(): string {
 export function fromDate(seconds: number): Date {
   const now = new Date();
   return new Date(now.getTime() + seconds * 1000);
-} 
+}

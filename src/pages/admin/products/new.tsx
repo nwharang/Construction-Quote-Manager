@@ -1,0 +1,209 @@
+import { type NextPage } from 'next';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
+import { api } from '~/utils/api';
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Input,
+  Select,
+  SelectItem,
+  Textarea,
+  Spinner,
+  NumberInput,
+  Divider,
+} from '@heroui/react';
+import { ProductCategory } from '~/server/db/schema';
+import { toast } from 'react-hot-toast';
+import { useState } from 'react';
+
+type ProductFormData = {
+  name: string;
+  description: string;
+  category: typeof ProductCategory[keyof typeof ProductCategory];
+  unitPrice: number;
+  unit: string;
+  sku?: string;
+  manufacturer?: string;
+  supplier?: string;
+  location?: string;
+};
+
+const NewProductPage: NextPage = () => {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<ProductFormData>({
+    name: '',
+    description: '',
+    category: ProductCategory.OTHER,
+    unitPrice: 0,
+    unit: '',
+    sku: '',
+    manufacturer: '',
+    supplier: '',
+    location: '',
+  });
+
+  const createProduct = api.product.create.useMutation({
+    onSuccess: () => {
+      toast.success('Product created successfully');
+      router.push('/admin/products');
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      await createProduct.mutateAsync(formData);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChange = (field: keyof ProductFormData, value: string | number) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  if (status === 'loading') {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    router.push('/auth/signin');
+    return null;
+  }
+
+  return (
+    <>
+      <Head>
+        <title>New Product - Admin Dashboard</title>
+      </Head>
+
+      <div className="container mx-auto px-4">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader className="flex flex-col gap-1">
+              <h1 className="text-2xl font-bold">New Product</h1>
+              <p className="text-gray-600">Add a new product to your catalog</p>
+            </CardHeader>
+            <CardBody>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-4">
+                  <Input
+                    label="Name"
+                    placeholder="Enter product name"
+                    value={formData.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    required
+                  />
+
+                  <Textarea
+                    label="Description"
+                    placeholder="Enter product description"
+                    value={formData.description}
+                    onChange={(e) => handleChange('description', e.target.value)}
+                  />
+
+                  <Select
+                    label="Category"
+                    placeholder="Select a category"
+                    selectedKeys={[formData.category]}
+                    onChange={(e) => handleChange('category', e.target.value)}
+                    required
+                  >
+                    {Object.values(ProductCategory).map((category) => (
+                      <SelectItem key={category} textValue={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </Select>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <NumberInput
+                      label="Unit Price"
+                      placeholder="0.00"
+                      value={formData.unitPrice}
+                      onValueChange={(value) => handleChange('unitPrice', Number(value))}
+                      required
+                      min={0}
+                      step={0.01}
+                    />
+
+                    <Input
+                      label="Unit"
+                      placeholder="e.g., pcs, kg, m"
+                      value={formData.unit}
+                      onChange={(e) => handleChange('unit', e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <Input
+                    label="SKU (Optional)"
+                    placeholder="Leave empty for auto-generation"
+                    value={formData.sku}
+                    onChange={(e) => handleChange('sku', e.target.value)}
+                  />
+
+                  <Input
+                    label="Manufacturer (Optional)"
+                    placeholder="Enter manufacturer name"
+                    value={formData.manufacturer}
+                    onChange={(e) => handleChange('manufacturer', e.target.value)}
+                  />
+
+                  <Input
+                    label="Supplier (Optional)"
+                    placeholder="Enter supplier name"
+                    value={formData.supplier}
+                    onChange={(e) => handleChange('supplier', e.target.value)}
+                  />
+
+                  <Input
+                    label="Location (Optional)"
+                    placeholder="Enter storage location"
+                    value={formData.location}
+                    onChange={(e) => handleChange('location', e.target.value)}
+                  />
+                </div>
+
+                <Divider />
+
+                <div className="flex justify-end gap-4">
+                  <Button
+                    variant="flat"
+                    onPress={() => router.push('/admin/products')}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    color="primary"
+                    type="submit"
+                    isLoading={isSubmitting}
+                  >
+                    Create Product
+                  </Button>
+                </div>
+              </form>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default NewProductPage; 

@@ -5,7 +5,7 @@ import { RefreshCw } from 'lucide-react';
 
 export default function ServerErrorPage() {
   return (
-    <>
+    <div className="">
       <Head>
         <title>Server Error | Construction Quote Manager</title>
       </Head>
@@ -42,6 +42,6 @@ export default function ServerErrorPage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 } 

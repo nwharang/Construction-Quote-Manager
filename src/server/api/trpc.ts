@@ -12,6 +12,7 @@ import superjson from 'superjson';
 import { ZodError } from 'zod';
 import { db } from '~/server/db';
 import { getServerAuthSession } from '~/server/auth/session';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 /**
  * 1. CONTEXT
@@ -22,7 +23,8 @@ import { getServerAuthSession } from '~/server/auth/session';
  */
 
 interface CreateContextOptions {
-  headers: Headers;
+  req: NextApiRequest;
+  res: NextApiResponse;
 }
 
 /**
@@ -36,13 +38,16 @@ interface CreateContextOptions {
  * @see https://create.t3.gg/en/usage/trpc#-serverapitrpcts
  */
 export const createInnerTRPCContext = async (opts: CreateContextOptions) => {
-  // Get the session using NextAuth with Next.js 15
-  const session = await getServerAuthSession();
+  const session = await getServerAuthSession({
+    req: opts.req,
+    res: opts.res,
+  });
 
   return {
     session,
     db,
-    ...opts,
+    req: opts.req,
+    res: opts.res,
   };
 };
 
@@ -63,6 +68,7 @@ export const createTRPCContext = async (opts: CreateContextOptions) => {
  * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
  * errors on the backend.
  */
+
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
@@ -70,18 +76,12 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
       ...shape,
       data: {
         ...shape.data,
-        zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
+        zodError:
+          error.cause instanceof ZodError ? error.cause.flatten() : null,
       },
     };
   },
 });
-
-/**
- * Create a server-side caller.
- *
- * @see https://trpc.io/docs/server/server-side-calls
- */
-export const createCallerFactory = t.createCallerFactory;
 
 /**
  * 3. ROUTER & PROCEDURE (THE IMPORTANT BIT)
@@ -96,33 +96,21 @@ export const createCallerFactory = t.createCallerFactory;
  * @see https://trpc.io/docs/router
  */
 export const createTRPCRouter = t.router;
-
-/**
- * Public (unauthenticated) procedure
- *
- * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
- * guarantee that a user querying is authorized, but you can still access user session data if they
- * are logged in.
- */
 export const publicProcedure = t.procedure;
 
 /**
- * Protected (authenticated) procedure
+ * This is how you create new procedures in your tRPC API.
  *
- * If you want a query or mutation to ONLY be accessible to logged in users, use this. It verifies
- * the session is valid and guarantees `ctx.session.user` is not null.
- *
- * @see https://trpc.io/docs/procedures
+ * @see https://trpc.io/docs/procedure
  */
-const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
+export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   if (!ctx.session?.user) {
-    throw new TRPCError({ code: 'UNAUTHORIZED' });
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'You must be logged in' });
   }
   return next({
     ctx: {
-      session: { ...ctx.session, user: ctx.session.user },
+      ...ctx,
+      session: ctx.session,
     },
   });
 });
-
-export const protectedProcedure = t.procedure.use(enforceUserIsAuthed);

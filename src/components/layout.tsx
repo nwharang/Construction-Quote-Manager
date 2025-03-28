@@ -1,12 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Navbar, NavbarBrand, NavbarContent, NavbarItem, Button, Link } from '@heroui/react';
-import { Moon, Sun, LogIn, LogOut } from 'lucide-react';
+import {
+  Navbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  Button,
+  Link,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from '@heroui/react';
+import { Moon, Sun, LogIn, LogOut, User, ChevronDown, Settings } from 'lucide-react';
 import Sidebar from './sidebar';
 import { useTheme } from 'next-themes';
 import { useSession } from 'next-auth/react';
 import { signOut, signIn } from 'next-auth/react';
+import { routes } from '~/config/routes';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,70 +26,120 @@ interface LayoutProps {
   description?: string;
 }
 
-// Define header height as a constant
+interface Route {
+  name: string;
+  href: string;
+}
+
+const navigationRoutes: Route[] = [
+  { name: 'Dashboard', href: routes.admin.dashboard },
+  { name: 'Quotes', href: routes.admin.quotes.list },
+  { name: 'Products', href: routes.admin.products.list },
+];
+
 export function Layout({ children, title, description }: LayoutProps) {
-  const [mounted, setMounted] = useState(false);
+  const { data: session } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { data: session, status } = useSession();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+  const handleSignOut = () => {
+    signOut({ callbackUrl: '/' });
   };
 
-  // Default metadata
-  const pageTitle = title || 'Application';
-  const pageDescription = description || 'Manage your business with our application';
+  const handleSignIn = () => {
+    signIn(undefined, { callbackUrl: '/admin/dashboard' });
+  };
 
   return (
-    <>
+    <div className="min-h-screen">
       <Head>
-        <title>{pageTitle}</title>
-        <meta name="description" content={pageDescription} />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>
+          {title ? `${title} | Construction Quote Manager` : 'Construction Quote Manager'}
+        </title>
+        <meta name="description" content={description || 'Construction Quote Manager'} />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex justify-center content-center overflow-hidden">
-        <Navbar className="border-b shadow-sm border-divider px-4 ">
-          <NavbarBrand>
-            <Link href="/" className="font-bold text-inherit">
-              MyApp
-            </Link>
-          </NavbarBrand>
+      <div className="flex h-screen">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Navbar maxWidth={'full'}>
+            <NavbarBrand className='hidden sm:block'>
+              <Link href="/" className="font-bold text-xl text-foreground/90">
+                TTXD
+              </Link>
+            </NavbarBrand>
 
-          <NavbarContent justify="end">
-            {mounted && (
+            <NavbarContent justify="end">
               <NavbarItem>
-                <Button isIconOnly aria-label="Toggle theme"  onPress={toggleTheme}>
-                  {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                <Button
+                  isIconOnly
+                  variant="light"
+                  onPress={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  aria-label="Toggle theme"
+                >
+                  {mounted && (theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />)}
                 </Button>
               </NavbarItem>
-            )}
-            <NavbarItem>
-              {status != 'authenticated' && (
-                <Button as={Link} color="primary" onPress={() => signIn()}>
-                  <LogIn size={20} />
-                </Button>
-              )}
-              {status == 'authenticated' && (
-                <Button as={Link} color="primary" onPress={() => signOut()}>
-                  <LogOut size={20} />
-                </Button>
-              )}
-            </NavbarItem>
-          </NavbarContent>
-        </Navbar>
-      </div>
 
-      <div className="flex-1 flex size-full min-h-[calc(100vh-60px)]">
-        {mounted && <Sidebar />}
-        <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
+              {session ? (
+                <NavbarItem>
+                  <Dropdown>
+                    <DropdownTrigger>
+                      <Button
+                        variant="light"
+                        startContent={<User size={20} />}
+                        endContent={<ChevronDown size={16} />}
+                      >
+                        {session.user?.name}
+                      </Button>
+                    </DropdownTrigger>
+                    <DropdownMenu aria-label="User menu">
+                      <DropdownItem
+                        key="profile"
+                        startContent={<User size={16} />}
+                        onPress={() => router.push('/admin/profile')}
+                      >
+                        Profile
+                      </DropdownItem>
+                      <DropdownItem
+                        key="settings"
+                        startContent={<Settings size={16} />}
+                        onPress={() => router.push('/admin/settings')}
+                      >
+                        Settings
+                      </DropdownItem>
+                      <DropdownItem
+                        key="logout"
+                        className="text-danger"
+                        color="danger"
+                        startContent={<LogOut size={16} />}
+                        onPress={handleSignOut}
+                      >
+                        Sign Out
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </NavbarItem>
+              ) : (
+                <NavbarItem>
+                  <Button color="primary" startContent={<LogIn size={20} />} onPress={handleSignIn}>
+                    Sign In
+                  </Button>
+                </NavbarItem>
+              )}
+            </NavbarContent>
+          </Navbar>
+          <div className="mx-auto flex-1 flex size-full min-h-[calc(100vh-3.5rem)]">
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto">{children}</main>
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

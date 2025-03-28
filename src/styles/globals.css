@@ -1,21 +1,6 @@
 @import 'tailwindcss';
 @config "../../tailwind.config.js";
 
-/* Base variables for theming */
-:root {
-  --foreground-rgb: 30, 41, 59;
-  --background-start-rgb: 255, 255, 255;
-  --background-end-rgb: 248, 250, 252;
-  --border-color: 226, 232, 240;
-  --card-bg: 255, 255, 255;
-  --input-bg: 255, 255, 255;
-}
-
 .dark {
-  --foreground-rgb: 241, 245, 249;
-  --background-start-rgb: 15, 23, 42;
-  --background-end-rgb: 30, 41, 59;
-  --border-color: 51, 65, 85;
-  --card-bg: 30, 41, 59;
-  --input-bg: 15, 23, 42;
+  --heroui-background: #18181b;
 }

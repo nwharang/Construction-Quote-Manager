@@ -1,18 +1,29 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FileText, Package, Home, Menu, X } from 'lucide-react';
-import { Button } from '@heroui/react';
+import { Home, Menu, X, Settings, FileText, Package } from 'lucide-react';
+import { Button, Card } from '@heroui/react';
+import { routes, navigationMenu } from '~/config/routes';
 
-// Export as default function for better compatibility
+// Icon mapping
+const iconMap = {
+  HomeIcon: Home,
+  DocumentTextIcon: FileText,
+  CubeIcon: Package,
+  SettingsIcon: Settings,
+} as const;
+
 export default function Sidebar() {
   const router = useRouter();
+  const sidebarRef = useRef(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const isActive = (pathname: string) => router.pathname === pathname;
+  const isActive = (pathname: string) => router.pathname.includes(pathname);
 
   const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+    if (sidebarRef.current) {
+      setIsMobileMenuOpen(!isMobileMenuOpen);
+      (sidebarRef.current as HTMLElement).classList.toggle('-translate-x-full');
+    }
   };
 
   return (
@@ -20,8 +31,8 @@ export default function Sidebar() {
       {/* Mobile Toggle Button */}
       <Button
         isIconOnly
-        
-        className="fixed md:hidden bottom-4 right-4 z-50 bg-primary text-white rounded-full shadow-lg"
+        color="primary"
+        className="fixed md:hidden bottom-4 right-4 z-50 rounded-full shadow-lg"
         onPress={toggleMobileMenu}
         aria-label="Toggle mobile menu"
       >
@@ -31,63 +42,41 @@ export default function Sidebar() {
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
+
       {/* Sidebar */}
-      <aside
-        className={`static left-0 w-64 h-full bg-[rgba(var(--background-start-rgb),0.95)] border-r border-[rgba(var(--border-color),0.5)] backdrop-blur-md overflow-y-auto z-40 shadow-sm transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      <Card
+        ref={sidebarRef}
+        className={`fixed sm:static sm:translate-x-0 top-0 left-0 h-full w-64 z-50 transform transition-transform duration-300 ease-in-out border-none shadow-none rounded-none ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="py-4 px-3">
-          <ul className="space-y-2">
-            <li>
-              <Link
-                href="/"
-                className={`flex items-center p-3 rounded-lg ${
-                  isActive('/')
-                    ? 'bg-primary/10 text-primary'
-                    : 'hover:bg-default-100 dark:hover:bg-default-50/10'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Home size={18} />
-                <span className="ml-3">Dashboard</span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/quotes"
-                className={`flex items-center p-3 rounded-lg ${
-                  isActive('/quotes') || router.pathname.startsWith('/quotes/')
-                    ? 'bg-primary/10 text-primary'
-                    : 'hover:bg-default-100 dark:hover:bg-default-50/10'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <FileText size={18} />
-                <span className="ml-3">Quotes</span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/products"
-                className={`flex items-center p-3 rounded-lg ${
-                  isActive('/products')
-                    ? 'bg-primary/10 text-primary'
-                    : 'hover:bg-default-100 dark:hover:bg-default-50/10'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Package size={18} />
-                <span className="ml-3">Products</span>
-              </Link>
-            </li>
-          </ul>
+        <div className="flex flex-col h-full p-4">
+          <div className="flex-1 space-y-1">
+            {navigationMenu.map((item) => {
+              const Icon = iconMap[item.icon as keyof typeof iconMap];
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-center px-4 py-2 text-sm font-medium transition-colors rounded-lg duration-200 ${
+                    isActive(item.href)
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-default-100 hover:text-foreground'
+                  }`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Icon className="mr-3 h-5 w-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
-      </aside>
+      </Card>
     </>
   );
 }

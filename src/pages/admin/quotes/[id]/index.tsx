@@ -3,51 +3,51 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { Edit, Trash2, ArrowLeft, FileText, Clock, CheckCircle, XCircle, Send } from 'lucide-react';
+import { api } from '~/utils/api';
+import { toast } from 'react-hot-toast';
+import { QuoteStatus } from '~/server/db/schema';
+import { type TRPCClientErrorLike } from '@trpc/client';
+import { type AppRouter } from '~/server/api/root';
+import { type RouterOutputs } from "~/utils/api";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableColumn,
+  TableRow,
+  TableCell,
+  Spinner,
+  Input,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Divider,
+} from '@heroui/react';
 
-// Mock data - in a real app, this would come from tRPC
-const QUOTE = {
-  id: '1',
-  title: 'Kitchen Renovation',
-  customerName: 'John Smith',
-  customerEmail: 'john.smith@example.com',
-  customerPhone: '(555) 123-4567',
-  status: 'DRAFT',
-  subtotalTasks: '2500.00',
-  subtotalMaterials: '1200.00',
-  complexityCharge: '200.00',
-  markupCharge: '300.00',
-  grandTotal: '4200.00',
-  notes: 'Customer would like work to start in early June. Must complete before July 15th for a family event.',
-  createdAt: new Date(2023, 10, 5).toISOString(),
-  tasks: [
-    {
-      id: 't1',
-      description: 'Remove old cabinets and countertops',
-      price: '600.00',
-      estimatedMaterialsCost: '0.00',
-      materials: [],
-    },
-    {
-      id: 't2',
-      description: 'Install new cabinets',
-      price: '1200.00',
-      estimatedMaterialsCost: '0.00',
-      materials: [
-        { id: 'm1', description: 'Oak cabinets', quantity: 5, cost: '800.00' },
-        { id: 'm2', description: 'Cabinet hardware', quantity: 20, cost: '160.00' },
-      ],
-    },
-    {
-      id: 't3',
-      description: 'Install new countertops',
-      price: '700.00',
-      estimatedMaterialsCost: '0.00',
-      materials: [
-        { id: 'm3', description: 'Granite countertops', quantity: 1, cost: '1200.00' },
-      ],
-    },
-  ],
-};
+type QuoteStatusType = typeof QuoteStatus[keyof typeof QuoteStatus];
+type QuoteResponse = RouterOutputs["quote"]["getById"];
+type Task = QuoteResponse["tasks"][number];
+type Material = Task["materials"][number];
+
+interface Quote {
+  id: string;
+  title: string;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  status: QuoteStatusType;
+  subtotalTasks: string;
+  subtotalMaterials: string;
+  complexityCharge: string;
+  markupCharge: string;
+  grandTotal: string;
+  notes?: string | null;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  tasks: Task[];
+}
 
 // Status badge component
 const StatusBadge = ({ status }: { status: string }) => {
@@ -96,10 +96,37 @@ export default function QuoteDetailPage() {
   const { data: session, status } = useSession();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   
+  // Fetch quote data using tRPC
+  const { data: quote, isLoading } = api.quote.getById.useQuery(
+    { id: id as string },
+    { enabled: !!id && status === 'authenticated' }
+  );
+
+  // Delete mutation
+  const deleteMutation = api.quote.delete.useMutation({
+    onSuccess: () => {
+      toast.success('Quote deleted successfully');
+      router.push('/admin/quotes');
+    },
+    onError: (error: TRPCClientErrorLike<any>) => {
+      toast.error(`Error deleting quote: ${error.message}`);
+    },
+  });
+
+  // Update mutation for status changes
+  const updateMutation = api.quote.update.useMutation({
+    onSuccess: () => {
+      toast.success('Quote status updated successfully');
+    },
+    onError: (error: TRPCClientErrorLike<any>) => {
+      toast.error(`Error updating quote status: ${error.message}`);
+    },
+  });
+  
   // Loading state
-  if (status === 'loading') {
+  if (status === 'loading' || isLoading) {
     return (
-      <div className="flex min-h-screen justify-center items-center">
+      <div className="flex justify-center items-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -111,26 +138,44 @@ export default function QuoteDetailPage() {
     return null;
   }
   
+  // Error state
+  if (!quote) {
+    return (
+      <div className="flex justify-center items-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Quote not found</h1>
+          <button
+            onClick={() => router.push('/admin/quotes')}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            Return to quotes list
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
   // Format currency helper
-  const formatCurrency = (value: string) => {
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
-    }).format(parseFloat(value));
+      currency: 'USD',
+    }).format(numValue);
   };
   
   // Format date helper
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (dateString: string | Date) => {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+      month: 'short',
+      day: 'numeric',
     }).format(date);
   };
   
   // Calculate task total
-  const calculateTaskTotal = (task: any) => {
+  const calculateTaskTotal = (task: Task) => {
     const taskPrice = parseFloat(task.price);
     
     if (task.materials.length === 0) {
@@ -138,7 +183,7 @@ export default function QuoteDetailPage() {
     }
     
     const materialsTotal = task.materials.reduce(
-      (sum: number, material: any) => sum + parseFloat(material.cost) * material.quantity, 
+      (sum: number, material: Material) => sum + parseFloat(material.unitPrice) * material.quantity, 
       0
     );
     
@@ -146,29 +191,28 @@ export default function QuoteDetailPage() {
   };
   
   // Handle status change
-  const handleStatusChange = (newStatus: string) => {
-    // In a real app, this would update the quote via tRPC
-    console.log('Change status to:', newStatus);
+  const handleStatusUpdate = (newStatus: QuoteStatusType) => {
+    updateMutation.mutate({ id: quote.id, status: newStatus });
   };
   
   // Handle delete
   const handleDelete = () => {
-    // In a real app, this would delete the quote via tRPC
-    console.log('Delete quote:', id);
-    router.push('/quotes');
+    if (confirm('Are you sure you want to delete this quote?')) {
+      deleteMutation.mutate({ id: quote.id });
+    }
   };
   
   return (
     <>
       <Head>
-        <title>{QUOTE.title} | Construction Quote Manager</title>
+        <title>{quote.title} | Construction Quote Manager</title>
       </Head>
       
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4">
         {/* Back button and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <button
-            onClick={() => router.push('/quotes')}
+            onClick={() => router.push('/admin/quotes')}
             className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-4 sm:mb-0"
           >
             <ArrowLeft className="h-5 w-5 mr-1" />
@@ -177,7 +221,7 @@ export default function QuoteDetailPage() {
           
           <div className="flex space-x-3">
             <button
-              onClick={() => router.push(`/quotes/${id}/edit`)}
+              onClick={() => router.push(`/admin/quotes/${id}/edit`)}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700"
             >
               <Edit className="h-4 w-4 mr-2" />
@@ -207,17 +251,17 @@ export default function QuoteDetailPage() {
           <div className="border-b border-gray-200 dark:border-gray-700 p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{QUOTE.title}</h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">Quote #{QUOTE.id} • Created on {formatDate(QUOTE.createdAt)}</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{quote.title}</h1>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">Quote #{quote.id} • Created on {formatDate(quote.createdAt)}</p>
               </div>
               
               <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row sm:items-center">
-                <StatusBadge status={QUOTE.status} />
+                <StatusBadge status={quote.status} />
                 
-                {QUOTE.status === 'DRAFT' && (
+                {quote.status === 'DRAFT' && (
                   <div className="mt-3 sm:mt-0 sm:ml-3">
                     <button
-                      onClick={() => handleStatusChange('SENT')}
+                      onClick={() => handleStatusUpdate('SENT')}
                       className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       <Send className="h-4 w-4 mr-2" />
@@ -235,15 +279,15 @@ export default function QuoteDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Name</p>
-                <p className="text-base font-medium text-gray-900 dark:text-white mt-1">{QUOTE.customerName}</p>
+                <p className="text-base font-medium text-gray-900 dark:text-white mt-1">{quote.customerName}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
-                <p className="text-base font-medium text-gray-900 dark:text-white mt-1">{QUOTE.customerEmail}</p>
+                <p className="text-base font-medium text-gray-900 dark:text-white mt-1">{quote.customerEmail}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Phone</p>
-                <p className="text-base font-medium text-gray-900 dark:text-white mt-1">{QUOTE.customerPhone}</p>
+                <p className="text-base font-medium text-gray-900 dark:text-white mt-1">{quote.customerPhone}</p>
               </div>
             </div>
           </div>
@@ -253,73 +297,62 @@ export default function QuoteDetailPage() {
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Tasks and Materials</h2>
             
             <div className="space-y-6">
-              {QUOTE.tasks.map((task, index) => (
-                <div key={task.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-base font-medium text-gray-900 dark:text-white">Task {index + 1}: {task.description}</h3>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(task.price)}</span>
+              {quote.tasks.map((task, index) => (
+                <Card key={task.id} className="w-full">
+                  <CardHeader className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-medium">{task.description}</h3>
+                      <p className="text-sm text-gray-500">
+                        Price: {formatCurrency(task.price)}
+                      </p>
                     </div>
-                  </div>
-                  
-                  {task.materials.length > 0 && (
-                    <div className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Materials</p>
-                      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead className="bg-gray-50 dark:bg-gray-900">
-                            <tr>
-                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Description
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Quantity
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Cost
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Total
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {task.materials.map((material) => (
-                              <tr key={material.id}>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {material.description}
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                  {material.quantity}
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
-                                  {formatCurrency(material.cost)}
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
-                                  {formatCurrency((parseFloat(material.cost) * material.quantity).toString())}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-t border-gray-200 dark:border-gray-700 text-right">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Task Total: </span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{calculateTaskTotal(task)}</span>
-                  </div>
-                </div>
+                  </CardHeader>
+                  <Divider/>
+                  <CardBody>
+                    <Table 
+                      aria-label={`Materials for task ${index + 1}`}
+                      isHeaderSticky
+                      classNames={{
+                        base: "max-h-[400px] overflow-auto",
+                        table: "min-h-[150px]",
+                      }}
+                    >
+                      <TableHeader>
+                        <TableColumn>PRODUCT</TableColumn>
+                        <TableColumn>QUANTITY</TableColumn>
+                        <TableColumn>UNIT PRICE</TableColumn>
+                        <TableColumn>TOTAL</TableColumn>
+                        <TableColumn>NOTES</TableColumn>
+                      </TableHeader>
+                      <TableBody
+                        items={task.materials}
+                        emptyContent="No materials found"
+                        loadingContent={<Spinner />}
+                      >
+                        {(material) => (
+                          <TableRow key={material.id}>
+                            <TableCell>{material.product?.name ?? 'Unknown Product'}</TableCell>
+                            <TableCell>{material.quantity}</TableCell>
+                            <TableCell>{formatCurrency(material.unitPrice)}</TableCell>
+                            <TableCell>
+                              {formatCurrency(material.quantity * parseFloat(material.unitPrice))}
+                            </TableCell>
+                            <TableCell>{material.notes || '-'}</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardBody>
+                </Card>
               ))}
             </div>
           </div>
           
           {/* Notes */}
-          {QUOTE.notes && (
+          {quote.notes && (
             <div className="border-b border-gray-200 dark:border-gray-700 p-6">
               <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Notes</h2>
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{QUOTE.notes}</p>
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.notes}</p>
             </div>
           )}
           
@@ -330,23 +363,23 @@ export default function QuoteDetailPage() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Subtotal (Tasks)</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(QUOTE.subtotalTasks)}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(quote.subtotalTasks)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Subtotal (Materials)</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(QUOTE.subtotalMaterials)}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(quote.subtotalMaterials)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Complexity Charge</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(QUOTE.complexityCharge)}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(quote.complexityCharge)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Markup Charge</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(QUOTE.markupCharge)}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{formatCurrency(quote.markupCharge)}</span>
                 </div>
                 <div className="pt-2 mt-2 border-t border-gray-200 dark:border-gray-700 flex justify-between">
                   <span className="text-base font-medium text-gray-900 dark:text-white">Grand Total</span>
-                  <span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(QUOTE.grandTotal)}</span>
+                  <span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(quote.grandTotal)}</span>
                 </div>
               </div>
             </div>
@@ -357,7 +390,7 @@ export default function QuoteDetailPage() {
       {/* Delete confirmation modal */}
       {showConfirmDelete && (
         <div className="fixed z-10 inset-0 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          <div className="flex items-center justify-center pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
               <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
             </div>
