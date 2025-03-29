@@ -18,18 +18,23 @@ import {
   DropdownItem,
   Pagination,
   Chip,
+  Select,
+  SelectItem,
 } from '@heroui/react';
 import type { Selection } from '@heroui/react';
 import { type NextPage } from 'next';
 import Head from 'next/head';
 import { api } from '~/utils/api';
 import { formatCurrency } from '~/utils/format';
-import { ProductCategory, type ProductCategoryType } from '~/server/db/schema';
+import { ProductCategory } from '~/server/db/schema';
 import { toast } from 'sonner';
 import type { products } from '~/server/db/schema';
 import type { InferModel } from 'drizzle-orm';
+import { useAppToast } from '~/components/providers/ToastProvider';
+import type { RouterOutputs } from '~/utils/api';
 
-type Product = InferModel<typeof products>;
+type Product = RouterOutputs['product']['getAll']['items'][number];
+type ProductCategoryType = keyof typeof ProductCategory;
 
 interface Column {
   name: string;
@@ -50,6 +55,7 @@ const ProductsPage: NextPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<ProductCategoryType | 'ALL'>('ALL');
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const toast = useAppToast();
 
   const { data: products, isLoading } = api.product.getAll.useQuery(
     {

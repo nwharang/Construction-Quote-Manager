@@ -1,4 +1,4 @@
-import { useToast } from '@heroui/react';
+import { Toaster, toast } from 'react-hot-toast';
 import type { ReactNode } from 'react';
 
 interface ToastProviderProps {
@@ -6,37 +6,48 @@ interface ToastProviderProps {
 }
 
 export function ToastProvider({ children }: ToastProviderProps) {
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#333',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#4ade80',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+    </>
+  );
 }
 
 // Export a hook for using toasts throughout the app
 export function useAppToast() {
-  const toast = useToast();
-
   return {
     success: (message: string) => {
-      toast({
-        title: 'Success',
-        description: message,
-        variant: 'success',
-        duration: 3000,
-      });
+      toast.success(message);
     },
     error: (message: string) => {
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'danger',
-        duration: 5000,
-      });
+      toast.error(message);
     },
     loading: (message: string) => {
-      toast({
-        title: 'Loading',
-        description: message,
-        variant: 'default',
-        duration: 2000,
-      });
+      toast.loading(message);
     },
   };
 } 

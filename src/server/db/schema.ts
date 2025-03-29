@@ -55,6 +55,42 @@ export const ProductCategory = {
 
 export type ProductCategoryType = (typeof ProductCategory)[keyof typeof ProductCategory];
 
+// Transaction type enum
+export const transactionTypeEnum = pgEnum('transaction_type', ['INCOME', 'EXPENSE']);
+
+export const TransactionType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export type TransactionTypeType = (typeof TransactionType)[keyof typeof TransactionType];
+
+// Transaction category enum
+export const transactionCategoryEnum = pgEnum('transaction_category', [
+  'QUOTE_PAYMENT',
+  'MATERIALS',
+  'LABOR',
+  'SUPPLIES',
+  'EQUIPMENT',
+  'RENT',
+  'UTILITIES',
+  'OTHER',
+]);
+
+export const TransactionCategory = {
+  QUOTE_PAYMENT: 'QUOTE_PAYMENT',
+  MATERIALS: 'MATERIALS',
+  LABOR: 'LABOR',
+  SUPPLIES: 'SUPPLIES',
+  EQUIPMENT: 'EQUIPMENT',
+  RENT: 'RENT',
+  UTILITIES: 'UTILITIES',
+  OTHER: 'OTHER',
+} as const;
+
+export type TransactionCategoryType =
+  (typeof TransactionCategory)[keyof typeof TransactionCategory];
+
 // Users table (with authentication fields)
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -121,23 +157,23 @@ export const verificationTokens = pgTable(
 // Quotes table
 export const quotes = pgTable('quotes', {
   id: uuid('id').primaryKey().defaultRandom(),
-  title: varchar('title', { length: 255 }).notNull(),
-  customerName: varchar('customer_name', { length: 255 }).notNull(),
-  customerEmail: varchar('customer_email', { length: 255 }),
-  customerPhone: varchar('customer_phone', { length: 50 }),
-  status: varchar('status', { length: 20 })
-    .notNull()
-    .$type<QuoteStatusType>()
-    .default(QuoteStatus.DRAFT),
-  subtotalTasks: varchar('subtotal_tasks', { length: 50 }).notNull().default('0'),
-  subtotalMaterials: varchar('subtotal_materials', { length: 50 }).notNull().default('0'),
-  complexityCharge: varchar('complexity_charge', { length: 50 }).notNull().default('0'),
-  markupCharge: varchar('markup_charge', { length: 50 }).notNull().default('0'),
-  grandTotal: varchar('grand_total', { length: 50 }).notNull().default('0'),
-  notes: text('notes'),
   userId: uuid('user_id')
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: 'cascade' }),
+  customerId: uuid('customer_id')
+    .notNull()
+    .references(() => customers.id),
+  title: text('title').notNull(),
+  customerName: text('customer_name').notNull(),
+  customerEmail: text('customer_email'),
+  customerPhone: text('customer_phone'),
+  status: quoteStatusEnum('status').notNull().default('DRAFT'),
+  subtotalTasks: text('subtotal_tasks').notNull().default('0'),
+  subtotalMaterials: text('subtotal_materials').notNull().default('0'),
+  complexityCharge: text('complexity_charge').notNull().default('0'),
+  markupCharge: text('markup_charge').notNull().default('0'),
+  grandTotal: text('grand_total').notNull().default('0'),
+  notes: text('notes'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -194,9 +230,34 @@ export const materials = pgTable('materials', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Transactions table
+export const transactions = pgTable('transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  quoteId: uuid('quote_id').references(() => quotes.id),
+  type: transactionTypeEnum('type').notNull(),
+  category: transactionCategoryEnum('category').notNull(),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  description: text('description'),
+  date: timestamp('date').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Quotes table
-export const quotesRelations = relations(quotes, ({ many }) => ({
+export const quotesRelations = relations(quotes, ({ one, many }) => ({
+  user: one(users, {
+    fields: [quotes.userId],
+    references: [users.id],
+  }),
+  customer: one(customers, {
+    fields: [quotes.customerId],
+    references: [customers.id],
+  }),
   tasks: many(tasks),
+  transactions: many(transactions),
 }));
 
 // Tasks table
@@ -235,8 +296,20 @@ export const settings = pgTable('settings', {
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  companyName: text('company_name').notNull().default(''),
+  companyEmail: text('company_email').notNull().default(''),
+  companyPhone: text('company_phone'),
+  companyAddress: text('company_address'),
+  defaultComplexityCharge: decimal('default_complexity_charge', { precision: 5, scale: 2 }).notNull().default('0'),
+  defaultMarkupCharge: decimal('default_markup_charge', { precision: 5, scale: 2 }).notNull().default('0'),
+  defaultTaskPrice: decimal('default_task_price', { precision: 10, scale: 2 }).notNull().default('0'),
+  defaultMaterialPrice: decimal('default_material_price', { precision: 10, scale: 2 }).notNull().default('0'),
+  emailNotifications: boolean('email_notifications').notNull().default(true),
+  quoteNotifications: boolean('quote_notifications').notNull().default(true),
+  taskNotifications: boolean('task_notifications').notNull().default(true),
+  theme: text('theme').notNull().default('system'),
   currency: text('currency').notNull().default('USD'),
-  locale: text('locale').notNull().default('en-US'),
+  currencySymbol: text('currency_symbol').notNull().default('$'),
   dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),
   timeFormat: text('time_format').notNull().default('12h'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -251,12 +324,13 @@ export const settingsRelations = relations(settings, ({ one }) => ({
   }),
 }));
 
-// Update users relations to include settings
+// Update users relations to include settings and transactions
 export const usersRelations = relations(users, ({ many, one }) => ({
   accounts: many(accounts),
   quotes: many(quotes),
   products: many(products),
   settings: one(settings),
+  transactions: many(transactions),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -265,4 +339,40 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
   user: one(users, { fields: [accounts.userId], references: [users.id] }),
+}));
+
+// Customer table
+export const customers = pgTable('customers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  email: text('email'),
+  phone: text('phone'),
+  address: text('address'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Customer relations
+export const customersRelations = relations(customers, ({ one, many }) => ({
+  user: one(users, {
+    fields: [customers.userId],
+    references: [users.id],
+  }),
+  quotes: many(quotes),
+}));
+
+// Transaction relations
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  user: one(users, {
+    fields: [transactions.userId],
+    references: [users.id],
+  }),
+  quote: one(quotes, {
+    fields: [transactions.quoteId],
+    references: [quotes.id],
+  }),
 }));

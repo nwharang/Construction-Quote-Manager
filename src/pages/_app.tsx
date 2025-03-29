@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/globals.css';
 import { SessionProvider } from 'next-auth/react';
-import { ThemeProvider } from 'next-themes';
 import { useRouter } from 'next/router';
 import { Layout } from '../components/layout';
-import { HeroUIProvider, Spinner, Toast } from '@heroui/react';
+import { HeroUIProvider, Spinner } from '@heroui/react';
 import { type AppType } from 'next/app';
 import { type Session } from 'next-auth';
 import { api } from '~/utils/api';
 import { SettingsProvider } from '~/contexts/settings-context';
+import { ThemeProvider } from '~/components/providers/ThemeProvider';
 
 const MyApp: AppType<{ session: Session | null }> = ({
   Component,
@@ -35,7 +35,7 @@ const MyApp: AppType<{ session: Session | null }> = ({
   return (
     <SessionProvider session={session}>
       <SettingsProvider>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider>
           <HeroUIProvider>
             {isAuthPage ? (
               <Component {...pageProps} />

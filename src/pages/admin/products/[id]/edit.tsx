@@ -4,15 +4,14 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Save } from 'lucide-react';
 import { api } from '~/utils/api';
-import { Button, Card, CardBody, Input, Textarea, Spinner } from '@heroui/react';
-import { useAppToast } from '~/components/providers/ToastProvider';
+import { Button, Card, CardBody, Input, Textarea, Spinner, useToast } from '@heroui/react';
 import { ProductCategory } from '~/server/db/schema';
 
 export default function EditProductPage() {
   const router = useRouter();
   const { id } = router.query;
   const { data: session, status } = useSession();
-  const toast = useAppToast();
+  const toast = useToast();
 
   // Form state
   const [formData, setFormData] = useState({

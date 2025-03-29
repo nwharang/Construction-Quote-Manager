@@ -22,62 +22,121 @@
 ## 2. Key Data & Schema (Drizzle ORM Summary)
 
 - **Key Terms:** `Task Price` (labor), `Materials Cost` (lump/itemized), `Product List` (reusable items), Adjustments (`Complexity`, `Markup`).
-- **Schema:** Uses **Drizzle ORM (PostgreSQL)**. Key tables: `users`, `products`, `quotes`, `quoteTasks`, `quoteMaterials`. **Crucially, rely on the previously provided FULL Drizzle schema for implementation details.** Totals (`subtotalTasks`, etc.) stored on `quotes` table, managed by backend.
-
-```typescript
-// Drizzle Schema Summary (Requires FULL schema provided separately)
-// Enums: quoteStatusEnum ('DRAFT', ...)
-// Tables: users, products, quotes, quoteTasks, quoteMaterials
-// Relations: Standard links (users<->quotes, quotes<->tasks, etc.)
-```
+- **Schema:** Uses **Drizzle ORM (PostgreSQL)**. Key tables:
+  - `users`: User management and authentication
+  - `quotes`: Main quote information
+  - `tasks`: Individual tasks within quotes
+  - `materials`: Materials used in tasks
+  - `products`: Reusable product catalog
+  - `customers`: Customer information
+  - `settings`: User preferences and app settings
+  - `transactions`: Financial tracking
+- **Relations:** Standard links between tables with proper foreign key constraints and cascading deletes where appropriate.
 
 ---
 
 ## 3. UI/Tech Requirements
 
 - **Stack:**
-  - **Next.js (Page Router)**, TS
+  - **Next.js (Page Router)**, TypeScript
   - **tRPC** (API)
   - **@heroui/react V2** (UI Components)
-  - **Tailwind CSS v4 (Required - Alpha/Beta)**
-    - **Caveat:** Tailwind v4 is experimental. Ensure configuration follows v4 practices (potentially minimal `tailwind.config.js`, leveraging new engine features). **Crucially, verify compatibility with @heroui/react v2.** Be prepared for potential styling conflicts or the need for specific compatibility configurations or workarounds between @heroui/react and Tailwind v4. Prioritize @heroui/react component functionality if direct conflicts arise.
-- **UI:** Use **@heroui/react V2** components extensively. **Must be Responsive**.
-- **Data:** **tRPC hooks** for all data ops. Handle loading (`Spinner`/`Skeleton`) & errors (inline/toast).
-- **Key Views (Summarized - Use @heroui/react Components):**
-  - **Auth:** Simple centered login/signup form.
-  - **Quote List (`/quotes`):** `Navbar`; `Table`/`Card` list; "Create" button. Responsive.
-  - **Quote Create/Edit (`/quotes/...`):** Multi-section form.
-    - **Task Component:** Inputs for Desc, `Task Price`; Material inputs (Opt A/B support, Opt B uses Modal/inline form potentially with `Autocomplete` for Products). Remove task button.
-    - **Other:** "Add Task" button; Adjustment inputs; Dynamic totals display; Save/Update button w/ loading state. Client-side validation needed (e.g., `react-hook-form`). Responsive (stacking).
-  - **Quote Detail (`/quotes/[id]`):** Read-only display. Edit/Delete/Status actions. Responsive.
-  - **Product Mgmt (`/products`, Optional):** CRUD interface for `Product List` using `Table`/`Card`s and `Modal` form. Responsive.
-- **Accessibility:** Use semantic HTML & @heroui/react's accessible components.
+  - **Tailwind CSS v4** (Required - Alpha/Beta)
+  - **react-hot-toast** (Notifications)
+  - **next-auth** (Authentication)
+  - **Drizzle ORM** (Database)
+  - **PostgreSQL** (Database)
+- **UI Features:**
+  - **Responsive Design:** Mobile-first approach
+  - **Dark/Light Mode:** System preference detection and manual toggle
+  - **Localization:** Support for multiple languages, currencies, date formats
+  - **Accessibility:** WCAG 2.1 compliance
+- **Key Views:**
+  - **Auth:** Login/signup forms
+  - **Dashboard:** Overview of quotes, stats, recent activity
+  - **Quotes:** List, create, edit, view details
+  - **Customers:** Management interface
+  - **Products:** Catalog management
+  - **Settings:** User preferences
+  - **Reports:** Financial and customer analytics
+- **Data Handling:**
+  - **Loading States:** Skeleton loaders, spinners
+  - **Error Handling:** Toast notifications, inline errors
+  - **Form Validation:** Client and server-side validation
+  - **Real-time Updates:** Optimistic updates where appropriate
 
 ---
 
 ## 4. Deployment & Testing
 
-- **Deployment:** Target **Vercel**. Ensure code compatibility (env vars, serverless functions, DB connections, Tailwind v4 build process).
-- **Testing:** **Playwright (Required)** for E2E tests. Cover key scenarios: Auth, Quote CRUD (incl. Task/Material variations, Adjustments), Product CRUD (if implemented), Responsiveness basics, Form Validation. **Refer to the previously provided detailed test case list.**
+- **Deployment:**
+  - Target: **Vercel**
+  - Environment Variables: Properly configured
+  - Database: PostgreSQL (Vercel Postgres)
+  - Build Process: Optimized for production
+- **Testing:**
+  - **Playwright** for E2E tests
+  - Coverage for:
+    - Authentication flows
+    - Quote CRUD operations
+    - Customer management
+    - Settings management
+    - Localization
+    - Responsive design
+    - Form validation
+    - Error handling
 
 ---
 
-## 5. AI Instructions
+## 5. Current Implementation Status
 
-Generate **Next.js (Page Router)**, **tRPC**, **Playwright**, and **TypeScript** code for the app.
-
-1.  Implement the **Core Workflow** accurately.
-2.  Use **Required Tech Stack** (@heroui/react v2, tRPC, Drizzle).
-3.  Configure and utilize **Tailwind CSS v4**, acknowledging potential **@heroui/react v2 compatibility issues** and its experimental nature. Prioritize functionality.
-4.  Ensure UI is **Responsive**.
-5.  Use **tRPC hooks** correctly (loading/error states).
-6.  Adhere to the **FULL Drizzle Schema** (provided previously).
-7.  Prioritize **Simplicity & UX** for the target user.
-8.  **Add Code Comments** for readability.
-9.  Ensure **Vercel Compatibility**, including Tailwind v4 build steps.
-10. Generate **Playwright Tests** covering key scenarios (referencing prior detailed list).
-11. **Ensure Build Success:** The final generated codebase **must be buildable** (`pnpm run build` or equivalent). Iteratively fix any build errors, including those potentially arising from Tailwind v4 integration or configuration.
-12. **For all the packages that we think we need, please add them to the package.json, also search for all of them in latest version, read their documentation before changing anything, also use pnpm instead of npm.**
-13. Ui need to implement darkmode and lightmode.
+- **Completed:**
+  - Basic project structure
+  - Database schema
+  - Authentication system
+  - Quote management
+  - Customer management
+  - Settings system
+  - Localization framework
+  - Toast notifications
+  - Basic UI components
+- **In Progress:**
+  - Financial reporting
+  - Product management
+  - Advanced quote features
+- **Pending:**
+  - Dark mode implementation
+  - Additional language support
+  - Advanced analytics
+  - PDF generation
+  - Email notifications
 
 ---
+
+## 6. Next Steps
+
+1. Implement dark mode support
+2. Add more language translations
+3. Enhance financial reporting
+4. Add PDF quote generation
+5. Implement email notifications
+6. Add advanced analytics
+7. Optimize performance
+8. Add more test coverage
+9. Improve accessibility
+10. Add user documentation
+
+---
+
+## 7. Development Guidelines
+
+1. Use TypeScript strictly
+2. Follow ESLint rules
+3. Write meaningful commit messages
+4. Document complex logic
+5. Test new features
+6. Review code before merging
+7. Keep dependencies updated
+8. Monitor performance
+9. Follow accessibility guidelines
+10. Maintain consistent code style

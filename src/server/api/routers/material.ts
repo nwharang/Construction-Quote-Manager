@@ -71,6 +71,13 @@ export const materialRouter = createTRPCRouter({
           })
           .returning();
 
+        if (!material) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create material',
+          });
+        }
+
         return material;
       } catch (error) {
         if (error instanceof TRPCError) throw error;

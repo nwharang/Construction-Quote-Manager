@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
-import { quotes, tasks, materials, QuoteStatus } from '~/server/db/schema';
-import { and, eq, ilike, or, sql, desc } from 'drizzle-orm';
+import { quotes, tasks, materials, QuoteStatus, customers } from '~/server/db/schema';
+import { and, eq, ilike, or, sql, desc, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { type InferInsertModel } from 'drizzle-orm';
 
@@ -16,81 +16,98 @@ const getAllInput = z.object({
 });
 
 export const quoteRouter = createTRPCRouter({
-  getAll: protectedProcedure.input(getAllInput).query(async ({ ctx, input }) => {
-    try {
-      const { page, limit, search, statuses } = input;
-      const skip = (page - 1) * limit;
+  getAll: protectedProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        status: z
+          .enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
+          .optional(),
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).max(100).default(10),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const offset = (input.page - 1) * input.limit;
 
-      const where = and(
-        eq(quotes.userId, ctx.session.user.id),
-        ...(search
-          ? [
+        // Build the where clause
+        const whereClause = input.search
+          ? and(
+              eq(quotes.userId, ctx.session.user.id),
               or(
-                ilike(quotes.title, `%${search}%`),
-                ilike(quotes.customerName, `%${search}%`),
-                ilike(quotes.customerEmail, `%${search}%`)
+                ilike(quotes.title, `%${input.search}%`),
+                ilike(quotes.customerName, `%${input.search}%`),
+                ilike(quotes.customerEmail, `%${input.search}%`)
               ),
-            ]
-          : []),
-        ...(statuses && statuses.length > 0 ? [sql`${quotes.status} = ANY(${statuses})`] : [])
-      );
+              input.status ? eq(quotes.status, input.status) : undefined
+            )
+          : input.status
+          ? and(eq(quotes.userId, ctx.session.user.id), eq(quotes.status, input.status))
+          : eq(quotes.userId, ctx.session.user.id);
 
-      const [items, total] = await Promise.all([
-        ctx.db
-          .select()
-          .from(quotes)
-          .where(where)
-          .limit(limit)
-          .offset(skip)
-          .orderBy(quotes.createdAt),
-        ctx.db
+        // Get total count
+        const countResult = await ctx.db
           .select({ count: sql<number>`count(*)` })
           .from(quotes)
-          .where(where)
-          .then((result) => Number(result[0]?.count ?? 0)),
-      ]);
+          .where(whereClause);
 
-      return {
-        items,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      };
-    } catch (error) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to fetch quotes',
-        cause: error,
-      });
-    }
-  }),
+        const total = countResult[0]?.count ?? 0;
+
+        // Get quotes with customer information
+        const quotesWithCustomers = await ctx.db
+          .select({
+            quote: quotes,
+            customer: customers,
+          })
+          .from(quotes)
+          .leftJoin(customers, eq(quotes.customerId, customers.id))
+          .where(whereClause)
+          .orderBy(desc(quotes.createdAt))
+          .limit(input.limit)
+          .offset(offset);
+
+        return {
+          quotes: quotesWithCustomers.map(({ quote, customer }) => ({
+            ...quote,
+            customer: customer || null,
+          })),
+          total,
+          page: input.page,
+          limit: input.limit,
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch quotes',
+          cause: error,
+        });
+      }
+    }),
 
   getById: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     try {
-      const quote = await ctx.db.query.quotes.findFirst({
-        where: and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)),
-        with: {
-          tasks: {
-            with: {
-              materials: {
-                with: {
-                  product: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      const quoteWithCustomer = await ctx.db
+        .select({
+          quote: quotes,
+          customer: customers,
+        })
+        .from(quotes)
+        .leftJoin(customers, eq(quotes.customerId, customers.id))
+        .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
+        .limit(1);
 
-      if (!quote) {
+      if (!quoteWithCustomer[0]) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Quote not found',
         });
       }
 
-      return quote;
+      return {
+        ...quoteWithCustomer[0].quote,
+        customer: quoteWithCustomer[0].customer || null,
+      };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
       throw new TRPCError({
@@ -113,11 +130,48 @@ export const quoteRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // First, try to find an existing customer
+        const existingCustomer = await ctx.db
+          .select()
+          .from(customers)
+          .where(
+            and(eq(customers.userId, ctx.session.user.id), eq(customers.name, input.customerName))
+          )
+          .limit(1);
+
+        let customerId: string;
+
+        // If no customer found, create one
+        if (!existingCustomer[0]) {
+          const [newCustomer] = await ctx.db
+            .insert(customers)
+            .values({
+              name: input.customerName,
+              email: input.customerEmail,
+              phone: input.customerPhone,
+              userId: ctx.session.user.id,
+            })
+            .returning();
+
+          if (!newCustomer) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to create customer',
+            });
+          }
+
+          customerId = newCustomer.id;
+        } else {
+          customerId = existingCustomer[0].id;
+        }
+
+        // Create the quote with the customer ID
         const [quote] = await ctx.db
           .insert(quotes)
           .values({
             id: crypto.randomUUID(),
             title: input.title,
+            customerId,
             customerName: input.customerName,
             customerEmail: input.customerEmail,
             customerPhone: input.customerPhone,
@@ -156,99 +210,89 @@ export const quoteRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        title: z.string().optional(),
-        customerName: z.string().optional(),
+        title: z.string(),
+        customerName: z.string(),
         customerEmail: z.string().email().optional(),
         customerPhone: z.string().optional(),
-        status: z
-          .enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
-          .optional(),
-        subtotalTasks: z.number().min(0).optional(),
-        subtotalMaterials: z.number().min(0).optional(),
-        complexityCharge: z.number().min(0).optional(),
-        markupCharge: z.number().min(0).optional(),
-        grandTotal: z.number().min(0).optional(),
         notes: z.string().optional(),
+        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED]).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // First, get the quote to verify ownership
-        const existingQuote = await ctx.db.query.quotes.findFirst({
-          where: and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)),
-        });
+        // First, check if the quote exists and belongs to the user
+        const existingQuote = await ctx.db
+          .select()
+          .from(quotes)
+          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
+          .limit(1);
 
-        if (!existingQuote) {
+        if (!existingQuote[0]) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Quote not found',
           });
         }
 
-        // Prepare update data
-        const updateData: Partial<InsertQuote> = {
-          updatedAt: new Date(),
-        };
+        // Try to find an existing customer
+        const existingCustomer = await ctx.db
+          .select()
+          .from(customers)
+          .where(
+            and(eq(customers.userId, ctx.session.user.id), eq(customers.name, input.customerName))
+          )
+          .limit(1);
 
-        if (input.title !== undefined) {
-          updateData.title = input.title;
+        let customerId: string;
+
+        // If no customer found, create one
+        if (!existingCustomer[0]) {
+          const [newCustomer] = await ctx.db
+            .insert(customers)
+            .values({
+              name: input.customerName,
+              email: input.customerEmail,
+              phone: input.customerPhone,
+              userId: ctx.session.user.id,
+            })
+            .returning();
+
+          if (!newCustomer) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to create customer',
+            });
+          }
+
+          customerId = newCustomer.id;
+        } else {
+          customerId = existingCustomer[0].id;
         }
 
-        if (input.customerName !== undefined) {
-          updateData.customerName = input.customerName;
-        }
-
-        if (input.customerEmail !== undefined) {
-          updateData.customerEmail = input.customerEmail;
-        }
-
-        if (input.customerPhone !== undefined) {
-          updateData.customerPhone = input.customerPhone;
-        }
-
-        if (input.status !== undefined) {
-          updateData.status = input.status;
-        }
-
-        if (input.subtotalTasks !== undefined) {
-          updateData.subtotalTasks = input.subtotalTasks.toString();
-        }
-
-        if (input.subtotalMaterials !== undefined) {
-          updateData.subtotalMaterials = input.subtotalMaterials.toString();
-        }
-
-        if (input.complexityCharge !== undefined) {
-          updateData.complexityCharge = input.complexityCharge.toString();
-        }
-
-        if (input.markupCharge !== undefined) {
-          updateData.markupCharge = input.markupCharge.toString();
-        }
-
-        if (input.grandTotal !== undefined) {
-          updateData.grandTotal = input.grandTotal.toString();
-        }
-
-        if (input.notes !== undefined) {
-          updateData.notes = input.notes;
-        }
-
-        // Update the quote
-        const [updatedQuote] = await ctx.db
+        // Update the quote with the customer ID
+        const [quote] = await ctx.db
           .update(quotes)
-          .set(updateData)
-          .where(eq(quotes.id, input.id))
+          .set({
+            title: input.title,
+            customerId,
+            customerName: input.customerName,
+            customerEmail: input.customerEmail,
+            customerPhone: input.customerPhone,
+            notes: input.notes,
+            status: input.status,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
           .returning();
 
-        if (!updatedQuote) {
+        if (!quote) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to update quote',
           });
         }
 
-        return { success: true };
+        return quote;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
@@ -263,12 +307,14 @@ export const quoteRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       try {
-        // First, get the quote to verify ownership
-        const quote = await ctx.db.query.quotes.findFirst({
-          where: and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)),
-        });
+        // First, check if the quote exists and belongs to the user
+        const existingQuote = await ctx.db
+          .select()
+          .from(quotes)
+          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
+          .limit(1);
 
-        if (!quote) {
+        if (!existingQuote[0]) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Quote not found',
@@ -278,7 +324,7 @@ export const quoteRouter = createTRPCRouter({
         // Delete the quote
         const [deletedQuote] = await ctx.db
           .delete(quotes)
-          .where(eq(quotes.id, input.id))
+          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
           .returning();
 
         if (!deletedQuote) {
@@ -286,6 +332,18 @@ export const quoteRouter = createTRPCRouter({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to delete quote',
           });
+        }
+
+        // Check if this was the last quote for this customer
+        const remainingQuotes = await ctx.db
+          .select()
+          .from(quotes)
+          .where(eq(quotes.customerId, deletedQuote.customerId))
+          .limit(1);
+
+        // If no remaining quotes, delete the customer
+        if (!remainingQuotes[0]) {
+          await ctx.db.delete(customers).where(eq(customers.id, deletedQuote.customerId));
         }
 
         return { success: true };
@@ -306,18 +364,38 @@ export const quoteRouter = createTRPCRouter({
         .select({
           totalQuotes: sql<number>`count(*)`,
           acceptedQuotes: sql<number>`count(*) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED})`,
-          totalCustomers: sql<number>`count(distinct ${quotes.customerName})`,
+          totalCustomers: sql<number>`count(distinct ${quotes.customerId})`,
           totalRevenue: sql<string>`coalesce(sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED}), '0')`,
         })
         .from(quotes)
         .where(eq(quotes.userId, ctx.session.user.id));
 
-      // Get recent quotes in a separate query for better performance
+      // Get recent quotes with customer information
       const recentQuotes = await ctx.db
-        .select()
+        .select({
+          quote: quotes,
+          customer: customers,
+        })
         .from(quotes)
+        .leftJoin(customers, eq(quotes.customerId, customers.id))
         .where(eq(quotes.userId, ctx.session.user.id))
         .orderBy(desc(quotes.createdAt))
+        .limit(5);
+
+      // Get top customers by revenue
+      const topCustomers = await ctx.db
+        .select({
+          customer: customers,
+          totalRevenue: sql<string>`coalesce(sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED}), '0')`,
+          quoteCount: sql<number>`count(*)`,
+        })
+        .from(quotes)
+        .leftJoin(customers, eq(quotes.customerId, customers.id))
+        .where(eq(quotes.userId, ctx.session.user.id))
+        .groupBy(customers.id, customers.name, customers.email, customers.phone)
+        .orderBy(
+          sql`sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED}) desc`
+        )
         .limit(5);
 
       if (!stats[0]) {
@@ -332,7 +410,15 @@ export const quoteRouter = createTRPCRouter({
         acceptedQuotes: Number(stats[0].acceptedQuotes ?? 0),
         totalCustomers: Number(stats[0].totalCustomers ?? 0),
         totalRevenue: stats[0].totalRevenue ?? '0',
-        recentQuotes,
+        recentQuotes: recentQuotes.map(({ quote, customer }) => ({
+          ...quote,
+          customer: customer || null,
+        })),
+        topCustomers: topCustomers.map(({ customer, totalRevenue, quoteCount }) => ({
+          ...customer,
+          totalRevenue: totalRevenue ?? '0',
+          quoteCount: Number(quoteCount ?? 0),
+        })),
       };
     } catch (error) {
       console.error('Dashboard stats error:', error);
