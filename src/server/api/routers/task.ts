@@ -28,7 +28,7 @@ export const taskRouter = createTRPCRouter({
           });
         }
 
-        // Get tasks for the quote
+        // Get tasks for the quote with proper numeric type handling
         const taskList = await ctx.db.query.tasks.findMany({
           where: eq(tasks.quoteId, input.quoteId),
           with: {
@@ -37,7 +37,18 @@ export const taskRouter = createTRPCRouter({
           orderBy: tasks.order,
         });
 
-        return taskList;
+        // Convert string values to numbers for client consumption
+        return taskList.map(task => {
+          return {
+            ...task,
+            price: parseFloat(task.price.toString()),
+            estimatedMaterialsCost: parseFloat(task.estimatedMaterialsCost.toString()),
+            materials: task.materials.map(material => ({
+              ...material,
+              unitPrice: parseFloat(material.unitPrice.toString()),
+            })),
+          };
+        });
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({

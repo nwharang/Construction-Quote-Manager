@@ -100,10 +100,13 @@ export const productRouter = createTRPCRouter({
       try {
         // Generate SKU if not provided
         const sku = input.sku || `SKU-${createId()}`;
+        // Generate a unique ID for the product
+        const id = createId();
 
         const product = await ctx.db
           .insert(products)
           .values({
+            id,
             ...input,
             sku,
             unitPrice: input.unitPrice.toString(),
@@ -113,9 +116,11 @@ export const productRouter = createTRPCRouter({
 
         return product[0];
       } catch (error) {
+        console.error('Product creation error:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to create product',
+          cause: error,
         });
       }
     }),
@@ -157,9 +162,11 @@ export const productRouter = createTRPCRouter({
 
         return product[0];
       } catch (error) {
+        console.error('Product update error:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to update product',
+          cause: error,
         });
       }
     }),

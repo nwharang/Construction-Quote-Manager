@@ -18,6 +18,12 @@ export const routes = {
       detail: (id: string) => `/admin/products/${id}`,
       edit: (id: string) => `/admin/products/${id}/edit`,
     },
+    customers: {
+      list: '/admin/customers',
+      new: '/admin/customers/new',
+      detail: (id: string) => `/admin/customers/${id}`,
+      edit: (id: string) => `/admin/customers/${id}/edit`,
+    },
   },
 } as const;
 
@@ -39,5 +45,10 @@ export const navigationMenu = [
     label: 'Products',
     href: routes.admin.products.list,
     icon: 'CubeIcon',
+  },
+  {
+    label: 'Customers',
+    href: routes.admin.customers.list,
+    icon: 'UserIcon',
   },
 ] as const; 

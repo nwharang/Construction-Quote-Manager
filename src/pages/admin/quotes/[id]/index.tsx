@@ -1,447 +1,575 @@
-import React, { useState, useEffect } from 'react';
+"use client";
+
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Printer, Edit, Trash2, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import {
   Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
   Spinner,
-  useDisclosure,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
+  Card,
+  CardHeader,
+  CardBody,
+  CardFooter,
+  Divider,
+  Breadcrumbs,
+  BreadcrumbItem,
+  Badge,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  Tooltip,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react';
-import { api } from '~/utils/api';
-import { useAppToast } from '~/components/providers/ToastProvider';
+import { Edit, Trash2, MoreVertical, ArrowLeft, Download, Mail, Copy } from 'lucide-react';
+import { useQuotes } from '~/contexts/QuotesContext';
 import { useTranslation } from '~/hooks/useTranslation';
-import type { RouterOutputs } from '~/utils/api';
-import type { TRPCClientErrorLike } from '@trpc/client';
-import type { AppRouter } from '~/server/api/root';
-import { useTrpcErrorHandling } from '~/hooks/useTrpcWithErrorHandling';
-
-type Quote = RouterOutputs['quote']['getById'];
-type Task = RouterOutputs['task']['getByQuoteId'][number];
-type QuoteStatus = Quote['status'];
-
-interface Material {
-  id: string;
-  name: string;
-  description: string | null;
-  price: string;
-  quantity: number;
-}
+import { QuoteStatus } from '~/server/db/schema';
 
 export default function QuoteDetailPage() {
   const router = useRouter();
   const { id } = router.query;
-  const { data: session, status: authStatus } = useSession();
-  const toast = useAppToast();
-  const { formatDate, formatCurrency } = useTranslation();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Fetch quote details
-  const quoteQuery = useTrpcErrorHandling(
-    api.quote.getById.useQuery(
-      { id: id as string },
-      { enabled: !!id && authStatus === 'authenticated' }
-    ),
-    {
-      fallbackMessage: 'Failed to load quote details',
-    }
-  );
-
-  // Fetch tasks for the quote
-  const tasksQuery = useTrpcErrorHandling(
-    api.task.getByQuoteId.useQuery(
-      { quoteId: id as string },
-      { enabled: !!id && authStatus === 'authenticated' }
-    ),
-    {
-      fallbackMessage: 'Failed to load quote tasks',
-    }
-  );
-
-  // Delete quote mutation
-  const deleteQuoteMutation = api.quote.delete.useMutation({
-    onSuccess: () => {
-      toast.success('Quote deleted successfully');
-      router.push('/admin/quotes');
-    },
-    onError: (err: TRPCClientErrorLike<AppRouter>) => {
-      toast.error(`Error deleting quote: ${err.message}`);
-    },
-  });
-
-  // Update quote mutation
-  const updateQuoteMutation = api.quote.update.useMutation({
-    onSuccess: () => {
-      toast.success('Quote status updated successfully');
-      void quoteQuery.refetch();
-    },
-    onError: (err: TRPCClientErrorLike<AppRouter>) => {
-      toast.error(`Error updating quote status: ${err.message}`);
-    },
-  });
-
+  const { status } = useSession();
+  const { t, formatCurrency, formatDate } = useTranslation();
+  const [mounted, setMounted] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  
+  // Get quote context
+  const {
+    currentQuote: quote,
+    tasks,
+    loading,
+    isSubmitting,
+    fetchQuoteById,
+    deleteQuote,
+    updateQuoteStatus,
+  } = useQuotes();
+  
+  // Fetch quote data when component mounts
   useEffect(() => {
-    if (authStatus === 'unauthenticated') {
-      router.push('/auth/signin');
+    if (id && typeof id === 'string' && status === 'authenticated' && !loading) {
+      fetchQuoteById(id);
     }
-  }, [authStatus, router]);
-
-  const handleDelete = () => {
-    if (!quoteQuery.data) return;
-    if (confirm('Are you sure you want to delete this quote?')) {
-      deleteQuoteMutation.mutate({ id: quoteQuery.data.id });
+  }, [id, status]);
+  
+  // Set mounted state on initial render only
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Handle quote deletion
+  const handleDeleteQuote = async () => {
+    if (id && typeof id === 'string') {
+      const success = await deleteQuote(id);
+      if (success) {
+        router.push('/admin/quotes');
+      }
     }
   };
-
-  const handleStatusUpdate = (status: QuoteStatus) => {
-    if (!quoteQuery.data) return;
-    const quote = quoteQuery.data;
-    updateQuoteMutation.mutate({
-      id: quote.id,
-      title: quote.title,
-      customerName: quote.customerName,
-      customerEmail: quote.customerEmail || undefined,
-      customerPhone: quote.customerPhone || undefined,
-      notes: quote.notes || undefined,
-      status,
-    });
+  
+  // Handle status change
+  const handleStatusChange = async (newStatus: string) => {
+    if (id && typeof id === 'string') {
+      await updateQuoteStatus(id, newStatus as any);
+    }
   };
-
-  const handlePrint = () => {
-    window.print();
+  
+  // Get status color
+  const getStatusColor = (status: string): "primary" | "success" | "warning" | "danger" | "default" => {
+    switch (status) {
+      case 'draft':
+        return "default";
+      case 'sent':
+        return "primary";
+      case 'accepted':
+        return "success";
+      case 'rejected':
+        return "danger";
+      case 'in_progress':
+        return "warning";
+      case 'completed':
+        return "success";
+      default:
+        return "default";
+    }
   };
-
-  if (authStatus === 'loading' || quoteQuery.isLoading) {
+  
+  // Get status display name
+  const getStatusDisplay = (status: string): string => {
+    switch (status) {
+      case 'draft':
+        return "Draft";
+      case 'sent':
+        return "Sent";
+      case 'accepted':
+        return "Accepted";
+      case 'rejected':
+        return "Rejected";
+      case 'in_progress':
+        return "In Progress";
+      case 'completed':
+        return "Completed";
+      default:
+        return status;
+    }
+  };
+  
+  // Render loading state
+  if (!mounted || status === 'loading' || loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Spinner />
+      <div className="flex h-full items-center justify-center p-8">
+        <Spinner size="lg" />
       </div>
     );
   }
-
-  if (!quoteQuery.data) {
+  
+  // Redirect if not authenticated
+  if (status === 'unauthenticated') {
+    router.push('/auth/signin');
+    return null;
+  }
+  
+  // Render not found state
+  if (!quote) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-center">
-          <p className="text-danger mb-4">Quote not found</p>
-          <Button color="primary" variant="light" onPress={() => router.push('/admin/quotes')}>
+      <div className="container mx-auto p-4">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-4">Quote Not Found</h2>
+          <p className="text-muted-foreground mb-6">The quote you're looking for doesn't exist or has been removed.</p>
+          <Button 
+            color="primary"
+            onPress={() => router.push('/admin/quotes')}
+            startContent={<ArrowLeft size={16} />}
+          >
             Back to Quotes
           </Button>
         </div>
       </div>
     );
   }
-
-  const quote = quoteQuery.data;
-  const tasks = tasksQuery.data || [];
-
+  
   return (
     <>
       <Head>
-        <title>Quote #{quote.id} | Construction Quote Manager</title>
+        <title>{quote.title} | Quote Details</title>
       </Head>
-
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <Button
-                isIconOnly
-                variant="light"
-                onPress={() => router.back()}
-                isDisabled={isLoading}
-              >
-                <ArrowLeft size={20} />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Quote #{quote.id}</h1>
-                <p className="text-muted-foreground">View quote details</p>
+      
+      <div className="container mx-auto p-4">
+        <div className="mb-6">
+          <Breadcrumbs>
+            <BreadcrumbItem href="/admin">Dashboard</BreadcrumbItem>
+            <BreadcrumbItem href="/admin/quotes">Quotes</BreadcrumbItem>
+            <BreadcrumbItem>{quote.title}</BreadcrumbItem>
+          </Breadcrumbs>
+          
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mt-4">
+            <div>
+              <h1 className="text-2xl font-bold">{quote.title}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge color={getStatusColor(quote.status)}>
+                  {getStatusDisplay(quote.status)}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Created {formatDate(quote.createdAt)}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="flex gap-2 mt-4 md:mt-0">
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button 
+                    variant="flat" 
+                    color="primary"
+                    aria-label="Change quote status"
+                  >
+                    Change Status
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu aria-label="Quote status options">
+                  <DropdownItem 
+                    key="draft"
+                    onPress={() => handleStatusChange('draft')}
+                    startContent={<Badge color="default">Draft</Badge>}
+                  >
+                    Mark as Draft
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="sent"
+                    onPress={() => handleStatusChange('sent')}
+                    startContent={<Badge color="primary">Sent</Badge>}
+                  >
+                    Mark as Sent
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="accepted"
+                    onPress={() => handleStatusChange('accepted')}
+                    startContent={<Badge color="success">Accepted</Badge>}
+                  >
+                    Mark as Accepted
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="rejected"
+                    onPress={() => handleStatusChange('rejected')}
+                    startContent={<Badge color="danger">Rejected</Badge>}
+                  >
+                    Mark as Rejected
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="in_progress"
+                    onPress={() => handleStatusChange('in_progress')}
+                    startContent={<Badge color="warning">In Progress</Badge>}
+                  >
+                    Mark as In Progress
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="completed"
+                    onPress={() => handleStatusChange('completed')}
+                    startContent={<Badge color="success">Completed</Badge>}
+                  >
+                    Mark as Completed
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+              
               <Button
+                as={Link}
+                href={`/admin/quotes/${id}/edit`}
                 color="primary"
                 variant="flat"
-                startContent={<Printer size={20} />}
-                onPress={handlePrint}
-                isDisabled={isLoading}
-              >
-                Print
-              </Button>
-              <Button
-                color="primary"
-                variant="flat"
-                startContent={<Edit size={20} />}
-                onPress={() => router.push(`/admin/quotes/${quote.id}/edit`)}
-                isDisabled={isLoading}
+                startContent={<Edit size={16} />}
+                aria-label="Edit quote"
               >
                 Edit
               </Button>
-              <Button
-                color="danger"
-                variant="flat"
-                startContent={<Trash2 size={20} />}
-                onPress={handleDelete}
-                isLoading={deleteQuoteMutation.isPending}
-                isDisabled={isLoading}
-              >
-                {deleteQuoteMutation.isPending ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Deleting...</span>
-                  </div>
-                ) : (
-                  'Delete'
-                )}
-              </Button>
+              
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button 
+                    isIconOnly 
+                    variant="light" 
+                    aria-label="More options"
+                  >
+                    <MoreVertical size={16} />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu aria-label="Quote actions">
+                  <DropdownItem 
+                    key="download"
+                    startContent={<Download size={16} />}
+                  >
+                    Download PDF
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="email"
+                    startContent={<Mail size={16} />}
+                  >
+                    Email to Customer
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="duplicate"
+                    startContent={<Copy size={16} />}
+                  >
+                    Duplicate Quote
+                  </DropdownItem>
+                  <DropdownItem 
+                    key="delete"
+                    className="text-danger"
+                    color="danger"
+                    startContent={<Trash2 size={16} />}
+                    onPress={() => setDeleteConfirmOpen(true)}
+                  >
+                    Delete Quote
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <h2 className="text-xl font-semibold">Quote Information</h2>
-              </CardHeader>
-              <CardBody>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Title</p>
-                    <p className="font-medium">{quote.title}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <Chip
-                      className="capitalize"
-                      color={
-                        quote.status === 'DRAFT'
-                          ? 'default'
-                          : quote.status === 'SENT'
-                          ? 'primary'
-                          : quote.status === 'ACCEPTED'
-                          ? 'success'
-                          : 'danger'
-                      }
-                      size="sm"
-                      variant="flat"
-                    >
-                      {quote.status.toLowerCase()}
-                    </Chip>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Created</p>
-                    <p className="font-medium">{formatDate(quote.createdAt)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Last Updated</p>
-                    <p className="font-medium">{formatDate(quote.updatedAt)}</p>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            {/* Customer Information */}
+            <Card className="mb-6">
               <CardHeader>
                 <h2 className="text-xl font-semibold">Customer Information</h2>
               </CardHeader>
               <CardBody>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium">{quote.customerName}</p>
+                    <h3 className="text-sm font-medium text-muted-foreground">Name</h3>
+                    <p className="text-lg">{quote.customerName}</p>
                   </div>
+                  
                   {quote.customerEmail && (
                     <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="font-medium">{quote.customerEmail}</p>
+                      <h3 className="text-sm font-medium text-muted-foreground">Email</h3>
+                      <p className="text-lg">{quote.customerEmail}</p>
                     </div>
                   )}
+                  
                   {quote.customerPhone && (
                     <div>
-                      <p className="text-sm text-muted-foreground">Phone</p>
-                      <p className="font-medium">{quote.customerPhone}</p>
+                      <h3 className="text-sm font-medium text-muted-foreground">Phone</h3>
+                      <p className="text-lg">{quote.customerPhone}</p>
                     </div>
                   )}
                 </div>
+                
+                {quote.notes && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-muted-foreground">Notes</h3>
+                    <p className="mt-1 whitespace-pre-line">{quote.notes}</p>
+                  </div>
+                )}
               </CardBody>
             </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold">Tasks</h2>
-            </CardHeader>
-            <CardBody>
-              <div className="space-y-6">
-                {tasksQuery.isLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Spinner />
-                  </div>
-                ) : tasks.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-muted-foreground">No tasks have been added to this quote yet.</p>
-                  </div>
+            
+            {/* Tasks */}
+            <Card className="mb-6">
+              <CardHeader className="flex justify-between">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold">Tasks</h2>
+                  <Badge variant="flat" size="sm">
+                    {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardBody>
+                {tasks.length > 0 ? (
+                  <Table aria-label="Quote tasks">
+                    <TableHeader>
+                      <TableColumn>Task</TableColumn>
+                      <TableColumn>Price</TableColumn>
+                      <TableColumn>Quantity</TableColumn>
+                      <TableColumn>Materials Cost</TableColumn>
+                      <TableColumn>Total</TableColumn>
+                    </TableHeader>
+                    <TableBody>
+                      {tasks.map((task, index) => {
+                        const taskTotal = Number(task.price) * task.quantity;
+                        let materialCost = 0;
+                        
+                        if (task.materialType === 'lumpsum') {
+                          materialCost = task.estimatedMaterialsCostLumpSum;
+                        } else {
+                          materialCost = task.materials.reduce(
+                            (sum, material) => sum + material.unitPrice * material.quantity, 
+                            0
+                          );
+                        }
+                        
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>{task.name}</TableCell>
+                            <TableCell>{formatCurrency(task.price)}</TableCell>
+                            <TableCell>{task.quantity}</TableCell>
+                            <TableCell>{formatCurrency(materialCost)}</TableCell>
+                            <TableCell className="font-semibold">
+                              {formatCurrency(taskTotal + materialCost)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 ) : (
-                  tasks.map((task) => (
-                    <div key={task.id} className="border-b pb-6 last:border-0">
-                      <div className="flex justify-between items-start mb-4">
+                  <div className="text-center py-8 text-muted-foreground">
+                    No tasks added to this quote.
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+            
+            {/* Materials Detail (Expandable Sections) */}
+            {tasks.filter(task => task.materialType === 'itemized' && task.materials.length > 0).length > 0 && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <h2 className="text-xl font-semibold">Materials Detail</h2>
+                </CardHeader>
+                <CardBody>
+                  <div className="space-y-4">
+                    {tasks.map((task, taskIndex) => {
+                      if (task.materialType === 'itemized' && task.materials.length > 0) {
+                        return (
+                          <div key={taskIndex} className="border rounded-lg overflow-hidden">
+                            <div className="bg-default-100 p-3">
+                              <h3 className="font-medium">{task.name}</h3>
+                            </div>
+                            <Table aria-label={`Materials for ${task.name}`}>
+                              <TableHeader>
+                                <TableColumn>Material</TableColumn>
+                                <TableColumn>Unit Price</TableColumn>
+                                <TableColumn>Quantity</TableColumn>
+                                <TableColumn>Total</TableColumn>
+                              </TableHeader>
+                              <TableBody>
+                                {task.materials.map((material, materialIndex) => (
+                                  <TableRow key={materialIndex}>
+                                    <TableCell>{material.name || 'Unnamed Material'}</TableCell>
+                                    <TableCell>{formatCurrency(material.unitPrice)}</TableCell>
+                                    <TableCell>{material.quantity}</TableCell>
+                                    <TableCell>
+                                      {formatCurrency(material.unitPrice * material.quantity)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+          </div>
+          
+          {/* Quote Summary Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-4">
+              <Card>
+                <CardHeader>
+                  <h2 className="text-xl font-semibold">Quote Summary</h2>
+                </CardHeader>
+                <CardBody>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-muted-foreground">Tasks Subtotal:</p>
+                      <p className="font-medium">{formatCurrency(quote.subtotalTasks)}</p>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <p className="text-muted-foreground">Materials Subtotal:</p>
+                      <p className="font-medium">{formatCurrency(quote.subtotalMaterials)}</p>
+                    </div>
+                    
+                    <Divider />
+                    
+                    {Number(quote.complexityCharge) > 0 && (
+                      <div className="flex justify-between items-center">
+                        <p className="text-muted-foreground">Complexity Charge:</p>
+                        <p className="font-medium">{formatCurrency(quote.complexityCharge)}</p>
+                      </div>
+                    )}
+                    
+                    {Number(quote.markupCharge) > 0 && (
+                      <div className="flex justify-between items-center">
+                        <p className="text-muted-foreground">Markup/Profit:</p>
+                        <p className="font-medium">{formatCurrency(quote.markupCharge)}</p>
+                      </div>
+                    )}
+                    
+                    <Divider />
+                    
+                    <div className="flex justify-between items-center font-bold">
+                      <p className="text-lg">Grand Total:</p>
+                      <p className="text-xl">{formatCurrency(quote.grandTotal)}</p>
+                    </div>
+                  </div>
+                </CardBody>
+                <CardFooter>
+                  <div className="w-full pt-2">
+                    <Button
+                      color="primary"
+                      className="w-full"
+                      startContent={<Download size={16} />}
+                    >
+                      Download Quote PDF
+                    </Button>
+                  </div>
+                </CardFooter>
+              </Card>
+              
+              {/* Quote Timeline */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <h2 className="text-xl font-semibold">Quote Timeline</h2>
+                </CardHeader>
+                <CardBody>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 rounded-full bg-success mt-2"></div>
+                      <div>
+                        <p className="font-medium">Created</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(quote.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {quote.updatedAt && quote.updatedAt !== quote.createdAt && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
                         <div>
-                          <h3 className="text-lg font-semibold">{task.description}</h3>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Price</p>
-                          <p className="font-medium">
-                            {formatCurrency(Number(task.price))}
+                          <p className="font-medium">Last Updated</p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDate(quote.updatedAt)}
                           </p>
                         </div>
                       </div>
-
-                      {task.materials && task.materials.length > 0 && (
-                        <div className="ml-4">
-                          <h4 className="font-medium mb-2">Materials</h4>
-                          <div className="space-y-2">
-                            {task.materials.map((material) => (
-                              <div
-                                key={material.id}
-                                className="flex justify-between items-center"
-                              >
-                                <div>
-                                  <p className="font-medium">{material.notes || 'Material'}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm text-muted-foreground">
-                                    {formatCurrency(Number(material.unitPrice))}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                    )}
+                    
+                    {quote.status.toLowerCase() !== 'draft' && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
+                        <div>
+                          <p className="font-medium">Status Changed</p>
+                          <p className="text-sm text-muted-foreground">
+                            Changed to {getStatusDisplay(quote.status)}
+                          </p>
                         </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold">Charges</h2>
-            </CardHeader>
-            <CardBody>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <p className="text-muted-foreground">Complexity Charge</p>
-                  <p className="font-medium">{formatCurrency(Number(quote.complexityCharge))}</p>
-                </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-muted-foreground">Markup Charge</p>
-                  <p className="font-medium">{formatCurrency(Number(quote.markupCharge))}</p>
-                </div>
-                <div className="flex justify-between items-center pt-4 border-t">
-                  <p className="font-semibold">Total</p>
-                  <p className="font-bold text-lg">{formatCurrency(Number(quote.grandTotal))}</p>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
-
-          {quote.notes && (
-            <Card>
+                      </div>
+                    )}
+                  </div>
+                </CardBody>
+              </Card>
+            </div>
+          </div>
+        </div>
+        
+        {/* Delete Confirmation Dialog */}
+        {deleteConfirmOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-md mx-4">
               <CardHeader>
-                <h2 className="text-xl font-semibold">Notes</h2>
+                <h3 className="text-xl font-bold">Delete Quote</h3>
               </CardHeader>
               <CardBody>
-                <p className="whitespace-pre-wrap">{quote.notes}</p>
+                <p>
+                  Are you sure you want to delete this quote? This action cannot be undone.
+                </p>
               </CardBody>
-            </Card>
-          )}
-
-          <div className="flex justify-end gap-4">
-            <Button
-              color="danger"
-              variant="light"
-              onPress={() => router.back()}
-              isDisabled={isLoading}
-            >
-              Back
-            </Button>
-            {quote.status === 'DRAFT' && (
-              <Button
-                color="primary"
-                onPress={() => handleStatusUpdate('SENT')}
-                isLoading={updateQuoteMutation.isPending}
-                isDisabled={isLoading}
-              >
-                {updateQuoteMutation.isPending ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Updating...</span>
-                  </div>
-                ) : (
-                  'Send Quote'
-                )}
-              </Button>
-            )}
-            {quote.status === 'SENT' && (
-              <div className="flex gap-2">
+              <CardFooter className="flex justify-end gap-2">
                 <Button
-                  color="success"
-                  onPress={() => handleStatusUpdate('ACCEPTED')}
-                  isLoading={updateQuoteMutation.isPending}
-                  isDisabled={isLoading}
+                  variant="flat"
+                  color="default"
+                  onPress={() => setDeleteConfirmOpen(false)}
                 >
-                  Accept
+                  Cancel
                 </Button>
                 <Button
                   color="danger"
-                  onPress={() => handleStatusUpdate('REJECTED')}
-                  isLoading={updateQuoteMutation.isPending}
-                  isDisabled={isLoading}
+                  onPress={handleDeleteQuote}
+                  isLoading={isSubmitting}
                 >
-                  Reject
+                  Delete
                 </Button>
-              </div>
-            )}
+              </CardFooter>
+            </Card>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Print styles */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        @media print {
-          .no-print {
-            display: none;
-          }
-          .container {
-            max-width: none;
-            padding: 0;
-          }
-          .card {
-            break-inside: avoid;
-            border: none;
-            box-shadow: none;
-          }
-          .card-header {
-            border-bottom: 1px solid #e5e7eb;
-          }
-          .card-body {
-            padding: 1rem;
-          }
-        }
-      `}} />
     </>
   );
-} 
+}

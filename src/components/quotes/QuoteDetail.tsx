@@ -12,6 +12,7 @@ import {
   Chip,
   Input,
   Spinner,
+  NumberInput
 } from "@heroui/react";
 import { api } from "~/utils/api";
 
@@ -105,8 +106,8 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
   const handleSaveCharges = () => {
     updateCharges.mutate({
       id: quote.id,
-      complexityCharge,
-      markupPercentage,
+      complexityCharge: complexityCharge,
+      markupCharge: markup
     });
   };
 
@@ -243,27 +244,28 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
           <Divider />
           <CardBody className="space-y-4">
             <div className="flex flex-wrap gap-4 items-end">
-              <Input
-                type="number"
+              <NumberInput
                 label="Complexity Charge"
-                value={complexityCharge.toString()}
-                onChange={(e) => setComplexityCharge(Number(e.target.value))}
-                startContent={
-                  <div className="pointer-events-none">$</div>
-                }
+                value={complexityCharge}
+                onValueChange={setComplexityCharge}
+                startContent="$"
+                min={0}
+                step={0.01}
+                formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
                 className="max-w-xs"
+                aria-label="Complexity Charge"
               />
-              <Input
-                type="number"
+              <NumberInput
                 label="Markup Percentage"
-                value={markupPercentage.toString()}
-                onChange={(e) => setMarkupPercentage(Number(e.target.value))}
-                endContent={
-                  <div className="pointer-events-none">%</div>
-                }
+                value={markupPercentage}
+                onValueChange={setMarkupPercentage}
+                endContent="%"
                 min={0}
                 max={100}
+                step={0.1}
+                formatOptions={{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 1 }}
                 className="max-w-xs"
+                aria-label="Markup Percentage"
               />
               <Button
                 color="primary"
@@ -295,7 +297,7 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
               <span>{formatCurrency(complexity)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Markup ({markupPercentage}%):</span>
+              <span>Markup ({markupPercentage.toFixed(1)}%):</span>
               <span>{formatCurrency(markup)}</span>
             </div>
             <Divider />

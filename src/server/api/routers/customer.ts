@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { customers } from '~/server/db/schema';
-import { eq, and, like, sql, or, ilike } from 'drizzle-orm';
+import { eq, and, like, sql, or, ilike, desc } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import { type SQL } from 'drizzle-orm';
 
 const customerInput = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -27,16 +28,19 @@ export const customerRouter = createTRPCRouter({
         const offset = (page - 1) * limit;
 
         // Build search condition
-        let whereClause = eq(customers.userId, ctx.session.user.id);
+        const baseCondition = eq(customers.userId, ctx.session.user.id);
         
+        let whereClause;
         if (search) {
           whereClause = and(
-            whereClause,
+            baseCondition,
             or(
               ilike(customers.name, `%${search}%`),
               ilike(customers.email, `%${search}%`)
             )
           );
+        } else {
+          whereClause = baseCondition;
         }
 
         // Get total count
@@ -58,21 +62,27 @@ export const customerRouter = createTRPCRouter({
             notes: customers.notes,
             createdAt: customers.createdAt,
             updatedAt: customers.updatedAt,
-            _count: {
-              quotes: sql<number>`(SELECT COUNT(*) FROM quotes WHERE customer_id = ${customers.id})`,
-            },
           })
           .from(customers)
           .where(whereClause)
-          .orderBy(customers.createdAt)
+          .orderBy(desc(customers.createdAt))
           .limit(limit)
           .offset(offset);
 
+        // Add empty count field to maintain API compatibility
+        const customersWithCounts = customerList.map(customer => ({
+          ...customer,
+          _count: {
+            quotes: 0 // Default to 0 - will need to be updated in UI
+          }
+        }));
+
         return {
-          customers: customerList,
+          customers: customersWithCounts,
           total,
         };
       } catch (error) {
+        console.error("Error fetching customers:", error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch customers',

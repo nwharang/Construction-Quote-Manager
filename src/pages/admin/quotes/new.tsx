@@ -1,632 +1,411 @@
+"use client";
+
 import React, { useEffect, useState } from 'react';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Plus, X, Save, Edit, Trash2, Loader2 } from 'lucide-react';
 import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
   Input,
+  Button,
+  Spinner,
+  Card,
+  CardHeader,
+  CardBody,
   Textarea,
+  NumberInput,
   Select,
   SelectItem,
   Divider,
-  Spinner,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
   Breadcrumbs,
   BreadcrumbItem,
-  NumberInput,
-  useDisclosure,
 } from '@heroui/react';
-import { api } from '~/utils/api';
-import type { TRPCClientErrorLike } from '@trpc/client';
-import type { AppRouter } from '~/server/api/root';
-import { useAppToast } from '~/components/providers/ToastProvider';
+import { Plus, Trash2 } from 'lucide-react';
+import { useQuotes } from '~/contexts/QuotesContext';
 import { useTranslation } from '~/hooks/useTranslation';
-import type { RouterOutputs } from '~/utils/api';
-
-interface Product {
-  id: string;
-  name: string;
-  unitPrice: string;
-}
-
-interface Material {
-  id: string;
-  productId: string;
-  quantity: number;
-  unitPrice: string;
-  notes?: string;
-}
-
-interface Task {
-  id: string;
-  description: string;
-  price: string;
-  materialType: 'itemized' | 'lumpsum';
-  estimatedMaterialsCostLumpSum: string;
-  materials: Material[];
-}
+import { ProductCategory } from '~/server/db/schema';
 
 export default function NewQuotePage() {
   const router = useRouter();
+  const { status } = useSession();
+  const { t, formatCurrency } = useTranslation();
   const [mounted, setMounted] = useState(false);
-  const { data: session, status } = useSession();
-  const toast = useAppToast();
-  const { formatCurrency } = useTranslation();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-
-  // Add tRPC mutation hooks at the top
-
-  const createTaskMutation = api.task.create.useMutation();
-  const createMaterialMutation = api.material.create.useMutation();
-  const createQuoteMutation = api.quote.create.useMutation({
-    onSuccess: async (data) => {
-      // After quote is created, create tasks
-      try {
-        for (const task of tasks) {
-          const taskResult = await createTaskMutation.mutateAsync({
-            quoteId: data.id,
-            description: task.description,
-            price: parseFloat(task.price),
-            estimatedMaterialsCost:
-              task.materialType === 'lumpsum'
-                ? parseFloat(task.estimatedMaterialsCostLumpSum)
-                : task.materials.reduce(
-                    (sum, material) => sum + parseFloat(material.unitPrice) * material.quantity,
-                    0
-                  ),
-          });
-
-          // If task has itemized materials, create them
-          if (task.materialType === 'itemized' && task.materials.length > 0) {
-            for (const material of task.materials) {
-              await createMaterialMutation.mutateAsync({
-                taskId: taskResult.id,
-                productId: material.productId,
-                quantity: material.quantity,
-                unitPrice: parseFloat(material.unitPrice),
-                notes: material.notes,
-              });
-            }
-          }
-        }
-        toast.success('Quote created successfully');
-        router.push('/admin/quotes');
-      } catch (error) {
-        console.error('Error creating tasks:', error);
-        toast.error('Failed to create tasks');
-      }
-    },
-    onError: (error: TRPCClientErrorLike<AppRouter>) => {
-      console.error('Error creating quote:', error);
-      toast.error(`Failed to create quote: ${error.message}`);
-    },
-  });
-
-  // Form state
-  const [formData, setFormData] = useState({
-    title: '',
-    customerName: '',
-    customerEmail: '',
-    customerPhone: '',
-    notes: '',
-    complexityCharge: '0.00',
-    markupCharge: '0.00',
-  });
-
-  // Tasks state
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '1',
-      description: '',
-      price: '0.00',
-      materialType: 'lumpsum',
-      estimatedMaterialsCostLumpSum: '0.00',
-      materials: [],
-    },
-  ]);
-
-  // Material modal state
-  const [showMaterialModal, setShowMaterialModal] = useState(false);
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-  const [currentMaterial, setCurrentMaterial] = useState<Material>({
-    id: '',
-    productId: '',
-    quantity: 1,
-    unitPrice: '0.00',
-    notes: '',
-  });
-  const [editingMaterialIndex, setEditingMaterialIndex] = useState<number | null>(null);
-
-  // Fetch available products
-  const { data: productData } = api.product.getAll.useQuery(
-    {},
-    {
-      enabled: status === 'authenticated',
-    }
-  );
-
-  const products = productData?.items ?? [];
-
+  
+  // Get quote context
+  const {
+    quoteFormData,
+    tasks,
+    products,
+    calculateTotals,
+    setQuoteFormData,
+    addTask,
+    updateTask,
+    removeTask,
+    addMaterial,
+    updateMaterial,
+    removeMaterial,
+    createQuote,
+    isSubmitting,
+    resetForm,
+  } = useQuotes();
+  
+  // Initialize the form with at least one task if none exist
   useEffect(() => {
+    if (mounted && tasks.length === 0) {
+      addTask();
+    }
+  }, [mounted, tasks.length, addTask]);
+  
+  // Set mounted state
+  useEffect(() => {
+    resetForm();
     setMounted(true);
-  }, []);
-
-  // Loading state
-  if (status === 'loading' || !mounted) {
+  }, [resetForm]);
+  
+  // Handle input changes
+  const handleInputChange = (name: string, value: string) => {
+    setQuoteFormData({ [name]: value });
+  };
+  
+  const handleNumberChange = (name: string, value: number) => {
+    setQuoteFormData({ [name]: value });
+  };
+  
+  // Handle task changes
+  const handleTaskChange = (index: number, field: string, value: string | number) => {
+    updateTask(index, { [field]: value });
+  };
+  
+  const handleTaskMaterialTypeChange = (index: number, type: 'lumpsum' | 'itemized') => {
+    updateTask(index, { materialType: type });
+  };
+  
+  // Handle material changes
+  const handleMaterialChange = (taskIndex: number, materialIndex: number, field: string, value: string | number) => {
+    updateMaterial(taskIndex, materialIndex, { [field]: value });
+  };
+  
+  const handleMaterialProductChange = (taskIndex: number, materialIndex: number, productId: string) => {
+    // Find the product to get its details
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      updateMaterial(taskIndex, materialIndex, {
+        productId,
+        name: product.name,
+        description: product.description || undefined,
+        unitPrice: Number(product.unitPrice),
+      });
+    }
+  };
+  
+  // Handle form submission
+  const handleSubmit = async () => {
+    const quoteId = await createQuote();
+    if (quoteId) {
+      router.push(`/admin/quotes/${quoteId}`);
+    }
+  };
+  
+  // Calculate totals
+  const totals = calculateTotals();
+  
+  // Render loading state
+  if (!mounted || status === 'loading') {
     return (
-      <div className="flex justify-center items-center min-h-[50vh]">
-        <Spinner />
+      <div className="flex h-full items-center justify-center p-8">
+        <Spinner size="lg" />
       </div>
     );
   }
-
-  // Not authenticated
+  
+  // Redirect if not authenticated
   if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
-
-  // Helper to format currency input
-  const formatCurrencyInput = (value: string) => {
-    const num = parseFloat(value.replace(/[^\d.]/g, ''));
-    return isNaN(num) ? '0.00' : num.toFixed(2);
-  };
-
-  // Calculate totals
-  const calculateTotals = () => {
-    let subtotalTasks = 0;
-    let subtotalMaterials = 0;
-
-    tasks.forEach((task) => {
-      subtotalTasks += parseFloat(task.price);
-
-      if (task.materialType === 'lumpsum') {
-        subtotalMaterials += parseFloat(task.estimatedMaterialsCostLumpSum);
-      } else {
-        task.materials.forEach((material) => {
-          subtotalMaterials += parseFloat(material.unitPrice) * material.quantity;
-        });
-      }
-    });
-
-    const complexityCharge = parseFloat(formData.complexityCharge) || 0;
-    const markupCharge = parseFloat(formData.markupCharge) || 0;
-    const grandTotal = subtotalTasks + subtotalMaterials + complexityCharge + markupCharge;
-
-    return {
-      subtotalTasks: subtotalTasks.toFixed(2),
-      subtotalMaterials: subtotalMaterials.toFixed(2),
-      complexityCharge: complexityCharge.toFixed(2),
-      markupCharge: markupCharge.toFixed(2),
-      grandTotal: grandTotal.toFixed(2),
-    };
-  };
-
-  const totals = calculateTotals();
-
-  // Handle input change
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-
-    if (name === 'complexityCharge' || name === 'markupCharge') {
-      setFormData({
-        ...formData,
-        [name]: formatCurrencyInput(value),
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value,
-      });
-    }
-  };
-
-  // Handle task input change
-  const handleTaskChange = (
-    index: number,
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    const newTasks = [...tasks];
-    const task = newTasks[index];
-
-    if (!task) return;
-
-    if (name === 'price' || name === 'estimatedMaterialsCostLumpSum') {
-      newTasks[index] = {
-        ...task,
-        [name]: formatCurrencyInput(value),
-      };
-    } else if (name === 'materialType') {
-      newTasks[index] = {
-        ...task,
-        materialType: value as 'lumpsum' | 'itemized',
-      };
-    } else {
-      newTasks[index] = {
-        ...task,
-        [name]: value,
-      };
-    }
-
-    setTasks(newTasks);
-  };
-
-  // Add a new task
-  const addTask = () => {
-    setTasks([
-      ...tasks,
-      {
-        id: Date.now().toString(),
-        description: '',
-        price: '0.00',
-        materialType: 'lumpsum',
-        estimatedMaterialsCostLumpSum: '0.00',
-        materials: [],
-      },
-    ]);
-  };
-
-  // Remove a task
-  const removeTask = (index: number) => {
-    if (tasks.length === 1) {
-      // Don't remove the last task, just reset it
-      setTasks([
-        {
-          id: Date.now().toString(),
-          description: '',
-          price: '0.00',
-          materialType: 'lumpsum',
-          estimatedMaterialsCostLumpSum: '0.00',
-          materials: [],
-        },
-      ]);
-    } else {
-      const newTasks = [...tasks];
-      newTasks.splice(index, 1);
-      setTasks(newTasks);
-    }
-  };
-
-  // Open material modal
-  const openMaterialModal = (taskIndex: number, materialIndex?: number) => {
-    setCurrentTaskIndex(taskIndex);
-
-    if (materialIndex !== undefined) {
-      setEditingMaterialIndex(materialIndex);
-      const materials = tasks[taskIndex]?.materials || [];
-      const material = materials[materialIndex];
-      if (material) {
-        setCurrentMaterial({ ...material });
-      }
-    } else {
-      setEditingMaterialIndex(null);
-      setCurrentMaterial({
-        id: '',
-        productId: '',
-        quantity: 1,
-        unitPrice: '0.00',
-        notes: '',
-      });
-    }
-
-    setShowMaterialModal(true);
-  };
-
-  // Handle material input change
-  const handleMaterialChange = (
-    e:
-      | React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-      | { target: { name: string; value: string | number } }
-  ) => {
-    const { name, value } = e.target;
-
-    if (name === 'quantity') {
-      setCurrentMaterial({
-        ...currentMaterial,
-        [name]: typeof value === 'string' ? parseInt(value) || 1 : value,
-      });
-    } else if (name === 'unitPrice') {
-      setCurrentMaterial({
-        ...currentMaterial,
-        [name]: typeof value === 'string' ? formatCurrencyInput(value) : value.toString(),
-      });
-    } else {
-      setCurrentMaterial({
-        ...currentMaterial,
-        [name]: value.toString(),
-      });
-    }
-  };
-
-  // Save material
-  const saveMaterial = () => {
-    const newTasks = [...tasks];
-    const task = newTasks[currentTaskIndex];
-
-    if (!task) return;
-
-    if (editingMaterialIndex !== null) {
-      task.materials[editingMaterialIndex] = currentMaterial;
-    } else {
-      task.materials.push(currentMaterial);
-    }
-
-    setTasks(newTasks);
-    setShowMaterialModal(false);
-  };
-
-  // Remove material
-  const removeMaterial = (taskIndex: number, materialIndex: number) => {
-    const newTasks = [...tasks];
-    const task = newTasks[taskIndex];
-
-    if (!task) return;
-
-    task.materials.splice(materialIndex, 1);
-    setTasks(newTasks);
-  };
-
-  // Material display in task card
-  const getMaterialDisplay = (material: Material) => {
-    const product = products.find((p: Product) => p.id === material.productId);
-    return {
-      name: product?.name ?? 'Unknown Product',
-      total: (material.quantity * parseFloat(material.unitPrice)).toFixed(2),
-    };
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      // Create quote using tRPC mutation
-      createQuoteMutation.mutate({
-        title: formData.title,
-        customerName: formData.customerName,
-        customerEmail: formData.customerEmail || undefined,
-        customerPhone: formData.customerPhone || undefined,
-        notes: formData.notes || undefined,
-      });
-    } catch (error) {
-      console.error('Error creating quote:', error);
-      toast.error('Failed to create quote');
-    }
-  };
-
+  
+  // Render the form
   return (
-    <div className="container mx-auto px-4">
-      {/* Breadcrumbs */}
-      <Breadcrumbs className="mb-6">
-        <BreadcrumbItem>
-          <Button
-            variant="light"
-            startContent={<ArrowLeft size={16} />}
-            onPress={() => router.push('/admin/quotes')}
-          >
-            Back to Quotes
-          </Button>
-        </BreadcrumbItem>
-      </Breadcrumbs>
-
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Quote</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Create a new construction quote</p>
+    <>
+      <Head>
+        <title>New Quote | Construction Quote Manager</title>
+      </Head>
+      
+      <div className="container mx-auto p-4">
+        <div className="mb-6">
+          <Breadcrumbs>
+            <BreadcrumbItem href="/admin">Dashboard</BreadcrumbItem>
+            <BreadcrumbItem href="/admin/quotes">Quotes</BreadcrumbItem>
+            <BreadcrumbItem>New Quote</BreadcrumbItem>
+          </Breadcrumbs>
+          
+          <h1 className="text-2xl font-bold mt-4">Create New Quote</h1>
+          <p className="text-muted-foreground">Add a new quote with tasks and materials</p>
         </div>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        {/* Quote Details */}
-        <Card className="mb-6">
-          <CardHeader>
-            <h2 className="text-lg font-bold">Quote Details</h2>
-          </CardHeader>
-          <Divider />
-          <CardBody className="space-y-4">
-            <Input
-              label="Quote Title"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              isRequired
-            />
-            <Input
-              label="Customer Name"
-              name="customerName"
-              value={formData.customerName}
-              onChange={handleInputChange}
-              isRequired
-            />
-            <Input
-              type="email"
-              label="Customer Email"
-              name="customerEmail"
-              value={formData.customerEmail}
-              onChange={handleInputChange}
-            />
-            <Input
-              type="tel"
-              label="Customer Phone"
-              name="customerPhone"
-              value={formData.customerPhone}
-              onChange={handleInputChange}
-            />
-            <Textarea
-              label="Notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              minRows={3}
-            />
-          </CardBody>
-        </Card>
-
-        {/* Tasks */}
-        <Card className="mb-6">
-          <CardHeader className="flex justify-between items-center">
-            <h2 className="text-lg font-bold">Tasks</h2>
-            <Button color="primary" startContent={<Plus size={16} />} onPress={addTask}>
-              Add Task
-            </Button>
-          </CardHeader>
-          <Divider />
-          <CardBody>
-            <div className="space-y-6">
-              {tasks.map((task, index) => (
-                <Card key={task.id}>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Form */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <h2 className="text-xl font-semibold">Quote Information</h2>
+              </CardHeader>
+              <CardBody>
+                <div className="space-y-4">
+                  <Input
+                    label="Quote Title"
+                    name="title"
+                    value={quoteFormData.title}
+                    onChange={(e) => handleInputChange('title', e.target.value)}
+                    placeholder="Quote for..."
+                    required
+                    aria-label="Quote title"
+                  />
+                  
+                  <Input
+                    label="Customer Name"
+                    name="customerName"
+                    value={quoteFormData.customerName}
+                    onChange={(e) => handleInputChange('customerName', e.target.value)}
+                    placeholder="Customer name"
+                    required
+                    aria-label="Customer name"
+                  />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Customer Email"
+                      name="customerEmail"
+                      value={quoteFormData.customerEmail}
+                      onChange={(e) => handleInputChange('customerEmail', e.target.value)}
+                      placeholder="customer@example.com"
+                      type="email"
+                      aria-label="Customer email"
+                    />
+                    
+                    <Input
+                      label="Customer Phone"
+                      name="customerPhone"
+                      value={quoteFormData.customerPhone}
+                      onChange={(e) => handleInputChange('customerPhone', e.target.value)}
+                      placeholder="(555) 123-4567"
+                      aria-label="Customer phone"
+                    />
+                  </div>
+                  
+                  <Textarea
+                    label="Notes"
+                    name="notes"
+                    value={quoteFormData.notes}
+                    onChange={(e) => handleInputChange('notes', e.target.value)}
+                    placeholder="Additional notes..."
+                    aria-label="Quote notes"
+                  />
+                </div>
+              </CardBody>
+            </Card>
+            
+            {/* Tasks Section */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Tasks</h2>
+                <Button
+                  color="primary"
+                  size="sm"
+                  startContent={<Plus size={16} />}
+                  onPress={addTask}
+                  aria-label="Add new task"
+                >
+                  Add Task
+                </Button>
+              </div>
+              
+              {tasks.map((task, taskIndex) => (
+                <Card key={taskIndex} className="mb-4">
                   <CardBody>
                     <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-semibold">Task {index + 1}</h3>
+                      <h3 className="text-lg font-medium">Task {taskIndex + 1}</h3>
                       <Button
                         isIconOnly
-                        color="danger"
                         variant="light"
-                        onPress={() => removeTask(index)}
+                        color="danger"
+                        size="sm"
+                        onPress={() => removeTask(taskIndex)}
+                        aria-label={`Remove task ${taskIndex + 1}`}
                       >
-                        <X size={20} />
+                        <Trash2 size={16} />
                       </Button>
                     </div>
-
+                    
                     <div className="space-y-4">
-                      <Textarea
-                        label="Description"
-                        name="description"
-                        value={task.description}
-                        onChange={(e) => handleTaskChange(index, e)}
-                        minRows={2}
-                        isRequired
+                      <Input
+                        label="Task Name"
+                        value={task.name}
+                        onChange={(e) => handleTaskChange(taskIndex, 'name', e.target.value)}
+                        placeholder="Task description"
+                        required
+                        aria-label={`Name for task ${taskIndex + 1}`}
                       />
-
+                      
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <NumberInput
-                          label="Task Price"
-                          name="price"
-                          value={parseFloat(task.price)}
-                          onValueChange={(value) => {
-                            const newTasks = [...tasks];
-                            const task = newTasks[index];
-                            if (!task) return;
-
-                            newTasks[index] = {
-                              ...task,
-                              price: formatCurrencyInput(value.toString()),
-                            };
-                            setTasks(newTasks);
-                          }}
-                          startContent={<span className="text-gray-500">$</span>}
-                          isRequired
+                          label="Price"
+                          value={parseFloat(task.price) || 0}
+                          onValueChange={(value) => handleTaskChange(taskIndex, 'price', value.toString())}
+                          startContent="$"
                           min={0}
                           step={0.01}
-                        />
-
-                        <Select
-                          label="Materials Type"
-                          name="materialType"
-                          selectedKeys={[task.materialType]}
-                          onSelectionChange={(keys) => {
-                            const key = Array.from(keys)[0];
-                            handleTaskChange(index, {
-                              target: { name: 'materialType', value: key as string },
-                            } as React.ChangeEvent<HTMLSelectElement>);
+                          formatOptions={{ 
+                            style: 'decimal', 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 2 
                           }}
-                        >
-                          <SelectItem key="lumpsum">Lump Sum</SelectItem>
-                          <SelectItem key="itemized">Itemized</SelectItem>
-                        </Select>
+                          aria-label={`Price for task ${taskIndex + 1}`}
+                        />
+                        
+                        <NumberInput
+                          label="Quantity"
+                          value={task.quantity}
+                          onValueChange={(value) => handleTaskChange(taskIndex, 'quantity', value)}
+                          min={1}
+                          step={1}
+                          aria-label={`Quantity for task ${taskIndex + 1}`}
+                        />
                       </div>
-
+                      
+                      <Divider />
+                      
+                      <div>
+                        <p className="text-sm font-medium mb-2">Materials Calculation</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <Button
+                            color={task.materialType === 'lumpsum' ? 'primary' : 'default'}
+                            variant={task.materialType === 'lumpsum' ? 'solid' : 'flat'}
+                            onPress={() => handleTaskMaterialTypeChange(taskIndex, 'lumpsum')}
+                            className="w-full"
+                            aria-label="Use lump sum for materials"
+                          >
+                            Lump Sum
+                          </Button>
+                          
+                          <Button
+                            color={task.materialType === 'itemized' ? 'primary' : 'default'}
+                            variant={task.materialType === 'itemized' ? 'solid' : 'flat'}
+                            onPress={() => handleTaskMaterialTypeChange(taskIndex, 'itemized')}
+                            className="w-full"
+                            aria-label="Use itemized materials"
+                          >
+                            Itemized
+                          </Button>
+                        </div>
+                      </div>
+                      
                       {task.materialType === 'lumpsum' ? (
                         <NumberInput
-                          type="text"
-                          label="Estimated Materials Cost (Lump Sum)"
-                          name="estimatedMaterialsCostLumpSum"
-                          value={parseFloat(task.estimatedMaterialsCostLumpSum)}
-                          onValueChange={(value) => {
-                            const newTasks = [...tasks];
-                            const task = newTasks[index];
-                            if (!task) return;
-
-                            newTasks[index] = {
-                              ...task,
-                              estimatedMaterialsCostLumpSum: formatCurrencyInput(value.toString()),
-                            };
-                            setTasks(newTasks);
-                          }}
-                          startContent={<span className="text-gray-500">$</span>}
+                          label="Estimated Materials Cost"
+                          value={task.estimatedMaterialsCostLumpSum}
+                          onValueChange={(value) => handleTaskChange(taskIndex, 'estimatedMaterialsCostLumpSum', value)}
+                          startContent="$"
                           min={0}
                           step={0.01}
+                          formatOptions={{ 
+                            style: 'decimal', 
+                            minimumFractionDigits: 2, 
+                            maximumFractionDigits: 2 
+                          }}
+                          aria-label={`Materials cost for task ${taskIndex + 1}`}
                         />
                       ) : (
                         <div className="space-y-4">
                           <div className="flex justify-between items-center">
-                            <h4 className="text-sm font-medium">Materials</h4>
+                            <p className="font-medium">Materials</p>
                             <Button
                               size="sm"
-                              variant="light"
+                              variant="flat"
                               color="primary"
                               startContent={<Plus size={16} />}
-                              onPress={() => openMaterialModal(index)}
+                              onPress={() => addMaterial(taskIndex)}
+                              aria-label={`Add material to task ${taskIndex + 1}`}
                             >
                               Add Material
                             </Button>
                           </div>
-
-                          {task.materials.length > 0 ? (
-                            <div className="space-y-2">
-                              {task.materials.map((material, materialIndex) => {
-                                const display = getMaterialDisplay(material);
-                                return (
-                                  <Card key={material.id}>
-                                    <CardBody>
-                                      <div className="flex justify-between items-start">
-                                        <div>
-                                          <p className="font-medium">{display.name}</p>
-                                          <p className="text-sm text-gray-600">
-                                            {material.quantity} x ${material.unitPrice} = $
-                                            {display.total}
-                                          </p>
-                                          {material.notes && (
-                                            <p className="text-sm text-gray-500 mt-1">
-                                              {material.notes}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <div className="flex gap-2">
-                                          <Button
-                                            isIconOnly
-                                            variant="light"
-                                            onPress={() => openMaterialModal(index, materialIndex)}
-                                          >
-                                            <Edit size={16} />
-                                          </Button>
-                                          <Button
-                                            isIconOnly
-                                            variant="light"
-                                            color="danger"
-                                            onPress={() => removeMaterial(index, materialIndex)}
-                                          >
-                                            <X size={16} />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </CardBody>
-                                  </Card>
-                                );
-                              })}
+                          
+                          {task.materials.map((material, materialIndex) => (
+                            <div 
+                              key={materialIndex} 
+                              className="border p-4 rounded-lg space-y-3"
+                            >
+                              <div className="flex justify-between items-start">
+                                <p className="font-medium">Material {materialIndex + 1}</p>
+                                <Button
+                                  isIconOnly
+                                  variant="light"
+                                  color="danger"
+                                  size="sm"
+                                  onPress={() => removeMaterial(taskIndex, materialIndex)}
+                                  aria-label={`Remove material ${materialIndex + 1}`}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
+                              </div>
+                              
+                              <Select
+                                label="Select Product"
+                                placeholder="Choose a product"
+                                selectedKeys={material.productId ? [material.productId] : []}
+                                onChange={(e) => handleMaterialProductChange(taskIndex, materialIndex, e.target.value)}
+                                aria-label={`Product for material ${materialIndex + 1}`}
+                              >
+                                {products.map((product) => (
+                                  <SelectItem key={product.id}>
+                                    {product.name} ({formatCurrency(product.unitPrice)})
+                                  </SelectItem>
+                                ))}
+                              </Select>
+                              
+                              <div className="grid grid-cols-2 gap-4">
+                                <NumberInput
+                                  label="Unit Price"
+                                  value={material.unitPrice}
+                                  onValueChange={(value) => 
+                                    handleMaterialChange(taskIndex, materialIndex, 'unitPrice', value)
+                                  }
+                                  startContent="$"
+                                  min={0}
+                                  step={0.01}
+                                  formatOptions={{ 
+                                    style: 'decimal', 
+                                    minimumFractionDigits: 2, 
+                                    maximumFractionDigits: 2 
+                                  }}
+                                  aria-label={`Unit price for material ${materialIndex + 1}`}
+                                />
+                                
+                                <NumberInput
+                                  label="Quantity"
+                                  value={material.quantity}
+                                  onValueChange={(value) => 
+                                    handleMaterialChange(taskIndex, materialIndex, 'quantity', value)
+                                  }
+                                  min={1}
+                                  step={1}
+                                  aria-label={`Quantity for material ${materialIndex + 1}`}
+                                />
+                              </div>
+                              
+                              <div className="flex justify-between items-center pt-2">
+                                <p className="text-sm text-muted-foreground">Total:</p>
+                                <p className="font-medium">
+                                  {formatCurrency(material.unitPrice * material.quantity)}
+                                </p>
+                              </div>
                             </div>
-                          ) : (
-                            <p className="text-center py-4 text-gray-500">No materials added yet</p>
+                          ))}
+                          
+                          {task.materials.length === 0 && (
+                            <div className="text-center py-4 text-muted-foreground border border-dashed rounded-lg">
+                              No materials added yet. Click "Add Material" to add one.
+                            </div>
                           )}
                         </div>
                       )}
@@ -634,184 +413,93 @@ export default function NewQuotePage() {
                   </CardBody>
                 </Card>
               ))}
+              
+              {tasks.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                  No tasks added yet. Click "Add Task" to add one.
+                </div>
+              )}
             </div>
-          </CardBody>
-        </Card>
-
-        {/* Adjustments and Totals */}
-        <Card className="mb-6">
-          <CardHeader>
-            <h2 className="text-lg font-bold">Adjustments & Totals</h2>
-          </CardHeader>
-          <Divider />
-          <CardBody>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Adjustments */}
+          </div>
+          
+          {/* Quote Summary */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-4">
               <Card>
                 <CardHeader>
-                  <h3 className="text-md font-bold">Adjustments</h3>
+                  <h2 className="text-xl font-semibold">Quote Summary</h2>
                 </CardHeader>
-                <Divider />
-                <CardBody className="space-y-4">
-                  <NumberInput
-                    label="Complexity Charge"
-                    name="complexityCharge"
-                    value={parseFloat(formData.complexityCharge)}
-                    onValueChange={(value) => {
-                      setFormData({
-                        ...formData,
-                        complexityCharge: formatCurrencyInput(value.toString()),
-                      });
-                    }}
-                    startContent={<span className="text-gray-500">$</span>}
-                    min={0}
-                    step={0.01}
-                  />
-                  <NumberInput
-                    label="Markup Charge"
-                    name="markupCharge"
-                    value={parseFloat(formData.markupCharge)}
-                    onValueChange={(value) => {
-                      setFormData({
-                        ...formData,
-                        markupCharge: formatCurrencyInput(value.toString()),
-                      });
-                    }}
-                    startContent={<span className="text-gray-500">$</span>}
-                    min={0}
-                    step={0.01}
-                  />
-                </CardBody>
-              </Card>
-
-              {/* Totals */}
-              <Card>
-                <CardHeader>
-                  <h3 className="text-md font-bold">Totals</h3>
-                </CardHeader>
-                <Divider />
-                <CardBody className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Tasks Subtotal:</span>
-                    <span>${totals.subtotalTasks}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Materials Subtotal:</span>
-                    <span>${totals.subtotalMaterials}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Complexity Charge:</span>
-                    <span>${totals.complexityCharge}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Markup Charge:</span>
-                    <span>${totals.markupCharge}</span>
-                  </div>
-                  <Divider />
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Grand Total:</span>
-                    <span>${totals.grandTotal}</span>
+                <CardBody>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-muted-foreground">Tasks Subtotal:</p>
+                      <p className="font-medium">{formatCurrency(totals.subtotalTasks)}</p>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <p className="text-muted-foreground">Materials Subtotal:</p>
+                      <p className="font-medium">{formatCurrency(totals.subtotalMaterials)}</p>
+                    </div>
+                    
+                    <Divider />
+                    
+                    <NumberInput
+                      label="Complexity/Contingency Charge"
+                      value={quoteFormData.complexityCharge}
+                      onValueChange={(value) => handleNumberChange('complexityCharge', value)}
+                      startContent="$"
+                      min={0}
+                      step={0.01}
+                      formatOptions={{ 
+                        style: 'decimal', 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      }}
+                      aria-label="Complexity charge"
+                    />
+                    
+                    <NumberInput
+                      label="Markup/Profit"
+                      value={quoteFormData.markupCharge}
+                      onValueChange={(value) => handleNumberChange('markupCharge', value)}
+                      startContent="$"
+                      min={0}
+                      step={0.01}
+                      formatOptions={{ 
+                        style: 'decimal', 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      }}
+                      aria-label="Markup charge"
+                    />
+                    
+                    <Divider />
+                    
+                    <div className="flex justify-between items-center font-bold">
+                      <p>Grand Total:</p>
+                      <p className="text-xl">{formatCurrency(totals.grandTotal)}</p>
+                    </div>
+                    
+                    <div className="pt-4">
+                      <Button
+                        color="primary"
+                        className="w-full"
+                        size="lg"
+                        onPress={handleSubmit}
+                        isLoading={isSubmitting}
+                        isDisabled={isSubmitting || tasks.length === 0 || !quoteFormData.title || !quoteFormData.customerName}
+                        aria-label="Create quote"
+                      >
+                        {isSubmitting ? 'Creating Quote...' : 'Create Quote'}
+                      </Button>
+                    </div>
                   </div>
                 </CardBody>
               </Card>
             </div>
-          </CardBody>
-        </Card>
-
-        {/* Submit Button */}
-        <div className="flex justify-end">
-          <Button
-            type="submit"
-            color="primary"
-            size="lg"
-            startContent={<Save size={20} />}
-            className="w-full md:w-auto"
-          >
-            Save Quote
-          </Button>
+          </div>
         </div>
-      </form>
-
-      {/* Material Modal */}
-      <Modal isOpen={showMaterialModal} onClose={() => setShowMaterialModal(false)}>
-        <ModalContent>
-          <ModalHeader>
-            {editingMaterialIndex !== null ? 'Edit Material' : 'Add Material'}
-          </ModalHeader>
-          <ModalBody>
-            <div className="space-y-4">
-              <Select
-                label="Product"
-                selectedKeys={currentMaterial.productId ? [currentMaterial.productId] : []}
-                onChange={(e) => {
-                  const product = products.find((p: Product) => p.id === e.target.value);
-                  if (product) {
-                    handleMaterialChange({
-                      target: { name: 'productId', value: product.id },
-                    });
-                    handleMaterialChange({
-                      target: { name: 'unitPrice', value: parseFloat(product.unitPrice) },
-                    });
-                  }
-                }}
-                name="productId"
-                required
-              >
-                {[
-                  <SelectItem key="placeholder" className="text-gray-500">
-                    Select a product
-                  </SelectItem>,
-                  ...products.map((product: Product) => (
-                    <SelectItem key={product.id} className="text-gray-900">
-                      {product.name} - ${product.unitPrice}
-                    </SelectItem>
-                  )),
-                ]}
-              </Select>
-
-              <NumberInput
-                label="Quantity"
-                value={currentMaterial.quantity}
-                onValueChange={(value) =>
-                  handleMaterialChange({
-                    target: { name: 'quantity', value },
-                  })
-                }
-                min={1}
-                required
-              />
-
-              <NumberInput
-                label="Unit Price"
-                value={parseFloat(currentMaterial.unitPrice)}
-                onValueChange={(value) =>
-                  handleMaterialChange({
-                    target: { name: 'unitPrice', value },
-                  })
-                }
-                min={0}
-                step={0.01}
-                required
-              />
-
-              <Textarea
-                label="Notes"
-                value={currentMaterial.notes ?? ''}
-                onChange={(e) => handleMaterialChange(e)}
-                name="notes"
-              />
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="light" onPress={() => setShowMaterialModal(false)}>
-              Cancel
-            </Button>
-            <Button color="primary" onPress={saveMaterial}>
-              Save
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </div>
+      </div>
+    </>
   );
 }

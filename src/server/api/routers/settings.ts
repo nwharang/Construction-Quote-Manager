@@ -17,6 +17,7 @@ const updateSettingsInput = z.object({
   quoteNotifications: z.boolean(),
   taskNotifications: z.boolean(),
   theme: z.enum(['light', 'dark', 'system']),
+  locale: z.enum(['en', 'vi', 'es']),
   currency: z.string().min(1, 'Currency is required'),
   currencySymbol: z.string().min(1, 'Currency symbol is required'),
   dateFormat: z.string().min(1, 'Date format is required'),
@@ -37,6 +38,7 @@ const defaultSettings = {
   quoteNotifications: true,
   taskNotifications: true,
   theme: 'system',
+  locale: 'en',
   currency: 'USD',
   currencySymbol: '$',
   dateFormat: 'MM/DD/YYYY',
@@ -48,7 +50,7 @@ export const settingsRouter = createTRPCRouter({
     try {
       // Use staleTime to cache the settings for 5 minutes (300000ms)
       // This is configured on the client side in utils/api.ts
-      
+
       const userSettings = await ctx.db
         .select()
         .from(settings)
@@ -79,39 +81,37 @@ export const settingsRouter = createTRPCRouter({
     }
   }),
 
-  update: protectedProcedure
-    .input(updateSettingsInput)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const [updatedSettings] = await ctx.db
-          .update(settings)
-          .set({
-            ...input,
-            defaultComplexityCharge: input.defaultComplexityCharge.toString(),
-            defaultMarkupCharge: input.defaultMarkupCharge.toString(),
-            defaultTaskPrice: input.defaultTaskPrice.toString(),
-            defaultMaterialPrice: input.defaultMaterialPrice.toString(),
-            updatedAt: new Date(),
-          })
-          .where(eq(settings.userId, ctx.session.user.id))
-          .returning();
+  update: protectedProcedure.input(updateSettingsInput).mutation(async ({ ctx, input }) => {
+    try {
+      const [updatedSettings] = await ctx.db
+        .update(settings)
+        .set({
+          ...input,
+          defaultComplexityCharge: input.defaultComplexityCharge.toString(),
+          defaultMarkupCharge: input.defaultMarkupCharge.toString(),
+          defaultTaskPrice: input.defaultTaskPrice.toString(),
+          defaultMaterialPrice: input.defaultMaterialPrice.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(settings.userId, ctx.session.user.id))
+        .returning();
 
-        if (!updatedSettings) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Settings not found',
-          });
-        }
-
-        return updatedSettings;
-      } catch (error) {
-        console.error('Error updating settings:', error);
-        if (error instanceof TRPCError) throw error;
+      if (!updatedSettings) {
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to update settings',
-          cause: error,
+          code: 'NOT_FOUND',
+          message: 'Settings not found',
         });
       }
-    }),
-}); 
+
+      return updatedSettings;
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to update settings',
+        cause: error,
+      });
+    }
+  }),
+});

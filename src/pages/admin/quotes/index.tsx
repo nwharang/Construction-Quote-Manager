@@ -1,365 +1,391 @@
-import React, { useState, useMemo } from 'react';
+"use client";
+
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Plus, Search, MoreVertical, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import {
   Button,
+  Card,
+  CardHeader,
+  CardBody,
+  Spinner,
   Table,
   TableHeader,
   TableColumn,
   TableBody,
   TableRow,
   TableCell,
+  Badge,
   Input,
-  Chip,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
   Pagination,
-  Spinner,
   Select,
   SelectItem,
-  Card,
-  CardBody,
 } from '@heroui/react';
+import { Plus, Search, Filter, MoreVertical, Eye, Edit, Trash2, Download } from 'lucide-react';
 import { api } from '~/utils/api';
-import { useAppToast } from '~/components/providers/ToastProvider';
-import { QuoteStatus } from '~/server/db/schema';
-import type { RouterOutputs } from '~/utils/api';
+import { useQuotes } from '~/contexts/QuotesContext';
 import { useTranslation } from '~/hooks/useTranslation';
-import { TRPCClientError } from '@trpc/client';
-import type { AppRouter } from '~/server/api/root';
 
-type Quote = RouterOutputs['quote']['getAll']['quotes'][number];
-type QuoteStatusType = (typeof QuoteStatus)[keyof typeof QuoteStatus];
-
-interface Column {
-  name: string;
-  uid: string;
-}
-
-const statusColorMap: Record<QuoteStatusType, 'default' | 'primary' | 'success' | 'danger'> = {
-  [QuoteStatus.DRAFT]: 'default',
-  [QuoteStatus.SENT]: 'primary',
-  [QuoteStatus.ACCEPTED]: 'success',
-  [QuoteStatus.REJECTED]: 'danger',
-};
-
-const columns: Column[] = [
-  { name: 'TITLE', uid: 'title' },
-  { name: 'CUSTOMER', uid: 'customer' },
-  { name: 'STATUS', uid: 'status' },
-  { name: 'TOTAL', uid: 'total' },
-  { name: 'DATE', uid: 'date' },
-  { name: 'ACTIONS', uid: 'actions' },
-];
-
-const QuoteLoadingError = ({ 
-  error, 
-  onRetry 
-}: { 
-  error: unknown; 
-  onRetry: () => void;
-}) => {
-  const errorMessage = error instanceof Error 
-    ? error.message 
-    : typeof error === 'string' 
-      ? error 
-      : 'Failed to load quotes';
-      
-  const isNetworkError = errorMessage.includes('Failed to fetch') || 
-                         errorMessage.includes('network');
-  
-  return (
-    <Card className="w-full bg-danger-50">
-      <CardBody>
-        <div className="flex flex-col items-center justify-center py-8 gap-4">
-          <AlertTriangle size={48} className="text-danger" />
-          <h2 className="text-xl font-semibold">Error Loading Quotes</h2>
-          <p className="text-gray-600">
-            {isNetworkError 
-              ? 'Network error. Please check your internet connection.' 
-              : errorMessage}
-          </p>
-          <Button 
-            color="primary" 
-            startContent={<RefreshCw className="h-4 w-4" />}
-            onClick={onRetry}
-          >
-            Retry
-          </Button>
-        </div>
-      </CardBody>
-    </Card>
-  );
+// Type for quote list item
+type QuoteListItem = {
+  id: string;
+  title: string;
+  customerName: string;
+  status: string;
+  grandTotal: number;
+  createdAt: Date;
 };
 
 export default function QuotesPage() {
   const router = useRouter();
-  const { data: session, status: authStatus } = useSession();
-  const [filterValue, setFilterValue] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<QuoteStatusType | 'all'>('all');
-  const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const toast = useAppToast();
-  const { formatDate, formatCurrency } = useTranslation();
-
-  // Fetch quotes with pagination
-  const quotesQuery = api.quote.getAll.useQuery(
-    {
-      page,
-      limit: rowsPerPage,
-      search: filterValue,
-      status: selectedStatus === 'all' ? undefined : selectedStatus,
+  const { status } = useSession();
+  const { t, formatCurrency, formatDate } = useTranslation();
+  const [mounted, setMounted] = useState(false);
+  
+  // Local state for filtering and pagination
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortField, setSortField] = useState<string>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  // Get all quotes
+  const { data: quotesData, isLoading } = api.quote.getAll.useQuery(
+    { 
+      limit: pageSize,
+      page: currentPage,
+      search: searchQuery,
+      status: statusFilter !== 'all' ? statusFilter as any : undefined,
     },
-    { enabled: authStatus === 'authenticated' }
+    { 
+      enabled: status === 'authenticated' && mounted,
+      refetchOnWindowFocus: true,
+    }
   );
 
-  // Delete quote mutation
-  const deleteQuoteMutation = api.quote.delete.useMutation({
-    onSuccess: () => {
-      toast.success('Quote deleted successfully');
-      // Refetch the quotes after deletion
-      void quotesQuery.refetch();
-    },
-    onError: (err) => {
-      toast.error(`Error deleting quote: ${err.message}`);
-    },
-  });
+  // Get quote context for deletions
+  const { deleteQuote, isSubmitting } = useQuotes();
+  
+  // Set mounted state
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const handleDeleteQuote = (id: string) => {
-    if (confirm('Are you sure you want to delete this quote?')) {
-      deleteQuoteMutation.mutate({ id });
+  // Handle search
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+  
+  // Handle status filter change
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+  
+  // Handle sorting
+  const handleSort = (field: string) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+  
+  // Handle delete confirmation
+  const handleDeleteQuote = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this quote?')) {
+      const success = await deleteQuote(id);
+      if (success) {
+        // Refetch quotes
+        void refetch();
+      }
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
+  // Refetch quotes data
+  const { refetch } = api.quote.getAll.useQuery(
+    { 
+      limit: pageSize,
+      page: currentPage,
+      search: searchQuery,
+      status: statusFilter !== 'all' ? statusFilter as any : undefined,
+    },
+    { 
+      enabled: false,
+    }
+  );
+  
+  // Get status color
+  const getStatusColor = (status: string): "primary" | "success" | "warning" | "danger" | "default" => {
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'draft':
+        return "default";
+      case 'sent':
+        return "primary";
+      case 'accepted':
+        return "success";
+      case 'rejected':
+        return "danger";
+      case 'in_progress':
+        return "warning";
+      case 'completed':
+        return "success";
+      default:
+        return "default";
+    }
   };
-
-  const handleRowsPerPageChange = (newRowsPerPage: number) => {
-    setRowsPerPage(newRowsPerPage);
-    setPage(1);
+  
+  // Get status display name
+  const getStatusDisplay = (status: string): string => {
+    // Convert snake_case to Title Case
+    return status
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
-
-  // Not authenticated
-  if (authStatus === 'unauthenticated') {
+  
+  // Calculate total pages
+  const totalPages = quotesData ? Math.ceil(quotesData.total / pageSize) : 0;
+  
+  // Render loading state
+  if (!mounted || status === 'loading') {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+  
+  // Redirect if not authenticated
+  if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
-
-  const renderCell = (quote: Quote, columnKey: string) => {
-    switch (columnKey) {
-      case 'title':
-        return (
-          <div className="flex flex-col">
-            <p className="text-bold text-small capitalize text-foreground">{quote.title}</p>
-            <p className="text-bold text-tiny capitalize text-muted-foreground">#{quote.id}</p>
-          </div>
-        );
-      case 'customer':
-        return (
-          <div className="flex flex-col">
-            <p className="text-bold text-small capitalize text-foreground">{quote.customerName}</p>
-            {quote.customerEmail && (
-              <p className="text-bold text-tiny capitalize text-muted-foreground">
-                {quote.customerEmail}
-              </p>
-            )}
-          </div>
-        );
-      case 'status':
-        return (
-          <Chip
-            className="capitalize"
-            color={statusColorMap[quote.status]}
-            size="sm"
-            variant="flat"
-          >
-            {quote.status.toLowerCase()}
-          </Chip>
-        );
-      case 'total':
-        return formatCurrency(Number(quote.grandTotal));
-      case 'date':
-        return formatDate(quote.createdAt);
-      case 'actions':
-        return (
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="flat"
-              color="primary"
-              onPress={() => router.push(`/admin/quotes/${quote.id}`)}
-              isDisabled={deleteQuoteMutation.isPending}
-            >
-              View
-            </Button>
-            <Dropdown>
-              <DropdownTrigger>
-                <Button isIconOnly size="sm" variant="light" isDisabled={deleteQuoteMutation.isPending}>
-                  <MoreVertical className="text-default-500" />
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu aria-label="Quote actions">
-                <DropdownItem
-                  key="edit"
-                  onPress={() => router.push(`/admin/quotes/${quote.id}/edit`)}
-                >
-                  Edit
-                </DropdownItem>
-                <DropdownItem
-                  key="delete"
-                  className="text-danger"
-                  color="danger"
-                  onPress={() => handleDeleteQuote(quote.id)}
-                  isDisabled={deleteQuoteMutation.isPending}
-                >
-                  {deleteQuoteMutation.isPending ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Deleting...</span>
-                    </div>
-                  ) : (
-                    'Delete'
-                  )}
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
+  
   return (
     <>
       <Head>
         <title>Quotes | Construction Quote Manager</title>
       </Head>
-
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center">
+      
+      <div className="container mx-auto p-4">
+        <div className="mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Quotes</h1>
-              <p className="text-muted-foreground">Manage your construction quotes</p>
+              <h1 className="text-2xl font-bold">Quotes</h1>
+              <p className="text-muted-foreground">
+                Manage your construction quotes and estimates
+              </p>
             </div>
+            
             <Button
+              as={Link}
+              href="/admin/quotes/new"
               color="primary"
-              startContent={<Plus size={20} />}
-              onPress={() => router.push('/admin/quotes/new')}
+              startContent={<Plus size={16} />}
+              aria-label="Create new quote"
             >
               New Quote
             </Button>
           </div>
-
-          <div className="flex justify-between items-center gap-3">
+          
+          <div className="mt-6 flex flex-col md:flex-row gap-3">
             <Input
-              isClearable
-              className="w-full sm:max-w-[44%]"
-              placeholder="Search by title or customer..."
-              startContent={<Search size={18} />}
-              value={filterValue}
-              onValueChange={(value) => {
-                setFilterValue(value);
-                setPage(1);
-              }}
+              placeholder="Search quotes..."
+              startContent={<Search size={16} />}
+              value={searchQuery}
+              onChange={handleSearch}
+              className="max-w-md"
+              aria-label="Search quotes"
             />
+            
             <Select
-              className="w-full sm:max-w-[44%]"
               placeholder="Filter by status"
-              selectedKeys={[selectedStatus]}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value as QuoteStatusType | 'all');
-                setPage(1);
-              }}
+              selectedKeys={[statusFilter]}
+              onChange={(e) => handleStatusFilterChange(e.target.value)}
+              aria-label="Filter by status"
+              startContent={<Filter size={16} />}
+              className="max-w-xs"
             >
-              <SelectItem key="all" textValue="All Statuses">
-                All Statuses
-              </SelectItem>
-              <SelectItem key={QuoteStatus.DRAFT} textValue="Draft">
-                Draft
-              </SelectItem>
-              <SelectItem key={QuoteStatus.SENT} textValue="Sent">
-                Sent
-              </SelectItem>
-              <SelectItem key={QuoteStatus.ACCEPTED} textValue="Accepted">
-                Accepted
-              </SelectItem>
-              <SelectItem key={QuoteStatus.REJECTED} textValue="Rejected">
-                Rejected
-              </SelectItem>
+              <SelectItem key="all">All Statuses</SelectItem>
+              <SelectItem key="draft">Draft</SelectItem>
+              <SelectItem key="sent">Sent</SelectItem>
+              <SelectItem key="accepted">Accepted</SelectItem>
+              <SelectItem key="rejected">Rejected</SelectItem>
+              <SelectItem key="in_progress">In Progress</SelectItem>
+              <SelectItem key="completed">Completed</SelectItem>
             </Select>
           </div>
-
-          {quotesQuery.isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Spinner />
-            </div>
-          ) : quotesQuery.isError ? (
-            <QuoteLoadingError error={quotesQuery.error} onRetry={() => void quotesQuery.refetch()} />
-          ) : (
-            <>
-              <Table
-                aria-label="Quotes table"
-                isHeaderSticky
-                classNames={{
-                  wrapper: 'max-h-[600px]',
-                  th: 'bg-background/50 backdrop-blur-lg text-foreground',
-                  td: 'text-foreground',
-                }}
-              >
-                <TableHeader columns={columns}>
-                  {(column) => (
-                    <TableColumn key={column.uid} align={column.uid === 'actions' ? 'center' : 'start'}>
-                      {column.name}
-                    </TableColumn>
-                  )}
-                </TableHeader>
-                <TableBody
-                  items={quotesQuery.data?.quotes ?? []}
-                  emptyContent="No quotes found"
-                  isLoading={quotesQuery.isLoading}
-                  loadingContent={<Spinner />}
-                >
-                  {(quote) => (
-                    <TableRow key={quote.id}>
-                      {(columnKey) => <TableCell>{renderCell(quote, String(columnKey))}</TableCell>}
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-
-              <div className="flex justify-between items-center">
-                <Pagination
-                  total={Math.ceil((quotesQuery.data?.total ?? 0) / rowsPerPage)}
-                  page={page}
-                  onChange={handlePageChange}
-                  showControls
-                />
-                <Select
-                  className="w-32"
-                  selectedKeys={[rowsPerPage.toString()]}
-                  onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
-                >
-                  <SelectItem key="10" textValue="10 per page">
-                    10 per page
-                  </SelectItem>
-                  <SelectItem key="20" textValue="20 per page">
-                    20 per page
-                  </SelectItem>
-                  <SelectItem key="50" textValue="50 per page">
-                    50 per page
-                  </SelectItem>
-                </Select>
-              </div>
-            </>
-          )}
         </div>
+        
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Quote List</h2>
+          </CardHeader>
+          <CardBody>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Spinner />
+              </div>
+            ) : quotesData && quotesData.quotes.length > 0 ? (
+              <>
+                <Table aria-label="Quotes table">
+                  <TableHeader>
+                    <TableColumn 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('title')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Title
+                        {sortField === 'title' && (
+                          <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </TableColumn>
+                    <TableColumn 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('customerName')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Customer
+                        {sortField === 'customerName' && (
+                          <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </TableColumn>
+                    <TableColumn 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Status
+                        {sortField === 'status' && (
+                          <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </TableColumn>
+                    <TableColumn 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('grandTotal')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Total
+                        {sortField === 'grandTotal' && (
+                          <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </TableColumn>
+                    <TableColumn 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('createdAt')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Created
+                        {sortField === 'createdAt' && (
+                          <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </TableColumn>
+                    <TableColumn>Actions</TableColumn>
+                  </TableHeader>
+                  <TableBody>
+                    {quotesData.quotes.map((quote) => (
+                      <TableRow key={quote.id}>
+                        <TableCell>
+                          <Link 
+                            href={`/admin/quotes/${quote.id}`}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            {quote.title}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{quote.customerName}</TableCell>
+                        <TableCell>
+                          <Badge color={getStatusColor(quote.status)}>
+                            {getStatusDisplay(quote.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatCurrency(Number(quote.grandTotal))}</TableCell>
+                        <TableCell>{formatDate(quote.createdAt)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              as={Link}
+                              href={`/admin/quotes/${quote.id}`}
+                              isIconOnly
+                              variant="light"
+                              aria-label={`View quote ${quote.title}`}
+                            >
+                              <Eye size={16} />
+                            </Button>
+                            
+                            <Button
+                              as={Link}
+                              href={`/admin/quotes/${quote.id}/edit`}
+                              isIconOnly
+                              variant="light"
+                              color="primary"
+                              aria-label={`Edit quote ${quote.title}`}
+                            >
+                              <Edit size={16} />
+                            </Button>
+                            
+                            <Button
+                              isIconOnly
+                              variant="light"
+                              color="danger"
+                              aria-label={`Delete quote ${quote.title}`}
+                              onPress={() => handleDeleteQuote(quote.id)}
+                              isDisabled={isSubmitting}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                
+                <div className="flex justify-between items-center mt-6">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(currentPage - 1) * pageSize + 1}-
+                    {Math.min(currentPage * pageSize, quotesData.total)} of {quotesData.total} quotes
+                  </p>
+                  
+                  <Pagination
+                    total={totalPages}
+                    page={currentPage}
+                    onChange={setCurrentPage}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-6">No quotes found</p>
+                <Button
+                  as={Link}
+                  href="/admin/quotes/new"
+                  color="primary"
+                  startContent={<Plus size={16} />}
+                >
+                  Create Your First Quote
+                </Button>
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </>
   );

@@ -1,5 +1,5 @@
 export const defaultLocale = 'en';
-export const locales = ['en', 'es', 'fr', 'de'] as const;
+export const locales = ['en', 'es', 'fr', 'de', 'vi'] as const;
 export type Locale = (typeof locales)[number];
 
 export const localeNames: Record<Locale, string> = {
@@ -7,6 +7,7 @@ export const localeNames: Record<Locale, string> = {
   es: 'Español',
   fr: 'Français',
   de: 'Deutsch',
+  vi: 'Tiếng Việt',
 };
 
 export const dateFormats: Record<Locale, string> = {
@@ -14,6 +15,7 @@ export const dateFormats: Record<Locale, string> = {
   es: 'DD/MM/YYYY',
   fr: 'DD/MM/YYYY',
   de: 'DD.MM.YYYY',
+  vi: 'DD/MM/YYYY',
 };
 
 export const timeFormats: Record<Locale, string> = {
@@ -21,6 +23,7 @@ export const timeFormats: Record<Locale, string> = {
   es: '24h',
   fr: '24h',
   de: '24h',
+  vi: '24h',
 };
 
 export const currencyFormats: Record<Locale, string> = {
@@ -28,6 +31,7 @@ export const currencyFormats: Record<Locale, string> = {
   es: 'EUR',
   fr: 'EUR',
   de: 'EUR',
+  vi: 'VND',
 };
 
 export const numberFormats: Record<Locale, string> = {
@@ -35,4 +39,5 @@ export const numberFormats: Record<Locale, string> = {
   es: 'es-ES',
   fr: 'fr-FR',
   de: 'de-DE',
+  vi: 'vi-VN',
 }; 

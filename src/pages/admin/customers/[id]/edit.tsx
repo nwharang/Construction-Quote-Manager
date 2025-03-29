@@ -1,74 +1,69 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft } from 'lucide-react';
-import { Button, Spinner } from '@heroui/react';
-import { CustomerForm } from '~/components/customers/CustomerForm';
+import { 
+  Button, 
+  Spinner,
+  Card,
+  CardHeader,
+  CardBody,
+  Input,
+  Textarea,
+  Divider
+} from '@heroui/react';
 import { api } from '~/utils/api';
-import type { z } from 'zod';
-import type { customerSchema } from '~/components/customers/CustomerForm';
-
-type CustomerFormData = z.infer<typeof customerSchema>;
+import { useCustomers } from '~/contexts/CustomersContext';
 
 export default function EditCustomerPage() {
   const router = useRouter();
   const { id } = router.query;
-  const { data: session, status: authStatus } = useSession();
+  const { status } = useSession();
+  const { 
+    customerFormData, 
+    setCustomerFormData, 
+    updateCustomer, 
+    isSubmitting, 
+    fetchCustomerById, 
+    loading 
+  } = useCustomers();
 
-  // Fetch customer data
-  const { data: customer, isLoading: isLoadingCustomer } = api.customer.getById.useQuery(
-    { id: id as string },
-    { enabled: !!id && authStatus === 'authenticated' }
-  );
+  // Fetch customer when component mounts
+  useEffect(() => {
+    if (id && typeof id === 'string' && status === 'authenticated') {
+      fetchCustomerById(id);
+    }
+  }, [id, status]);
 
-  // Update customer mutation
-  const updateCustomerMutation = api.customer.update.useMutation({
-    onSuccess: () => {
-      router.push('/admin/customers');
-    },
-  });
+  const handleChange = (field: keyof typeof customerFormData, value: string) => {
+    setCustomerFormData({ [field]: value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (id && typeof id === 'string') {
+      const success = await updateCustomer(id);
+      if (success) {
+        router.push('/admin/customers');
+      }
+    }
+  };
 
   // Not authenticated
-  if (authStatus === 'unauthenticated') {
+  if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
 
   // Loading customer data
-  if (isLoadingCustomer) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Spinner />
       </div>
     );
   }
-
-  // Customer not found
-  if (!customer) {
-    return (
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center justify-center h-64">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Customer Not Found</h1>
-          <p className="text-muted-foreground">The customer you&apos;re looking for doesn&apos;t exist.</p>
-          <Button
-            color="primary"
-            className="mt-4"
-            onPress={() => router.push('/admin/customers')}
-          >
-            Back to Customers
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleSubmit = async (data: CustomerFormData) => {
-    await updateCustomerMutation.mutateAsync({
-      id: customer.id,
-      ...data,
-    });
-  };
 
   return (
     <>
@@ -89,16 +84,98 @@ export default function EditCustomerPage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Edit Customer</h1>
-              <p className="text-muted-foreground">Update customer&apos;s information</p>
+              <p className="text-muted-foreground">Update customer's information</p>
             </div>
           </div>
 
           <div className="max-w-2xl mx-auto w-full">
-            <CustomerForm
-              customer={customer}
-              onSubmit={handleSubmit}
-              isLoading={updateCustomerMutation.isPending}
-            />
+            <Card className="border-none shadow-none">
+              <CardHeader className="flex flex-col gap-1">
+                <h2 className="text-xl font-semibold">Customer Information</h2>
+              </CardHeader>
+              <CardBody className="border-none">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-4">
+                    <Input
+                      label="Name"
+                      placeholder="Enter customer name"
+                      value={customerFormData.name}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      required
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                    />
+
+                    <Input
+                      label="Email"
+                      type="email"
+                      placeholder="Enter customer email"
+                      value={customerFormData.email}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                    />
+
+                    <Input
+                      label="Phone"
+                      placeholder="Enter customer phone"
+                      value={customerFormData.phone}
+                      onChange={(e) => handleChange('phone', e.target.value)}
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                    />
+
+                    <Input
+                      label="Address"
+                      placeholder="Enter customer address"
+                      value={customerFormData.address}
+                      onChange={(e) => handleChange('address', e.target.value)}
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                    />
+
+                    <Textarea
+                      label="Notes"
+                      placeholder="Enter any additional notes"
+                      value={customerFormData.notes}
+                      onChange={(e) => handleChange('notes', e.target.value)}
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                    />
+
+                    <Divider className="my-4" />
+
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        color="default"
+                        variant="flat"
+                        onPress={() => router.push('/admin/customers')}
+                      >
+                        Cancel
+                      </Button>
+
+                      <Button
+                        color="primary"
+                        type="submit"
+                        isLoading={isSubmitting}
+                      >
+                        Update Customer
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </CardBody>
+            </Card>
           </div>
         </div>
       </div>

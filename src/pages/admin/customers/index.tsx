@@ -18,6 +18,8 @@ import {
   DropdownItem,
   Pagination,
   Spinner,
+  Select,
+  SelectItem,
 } from '@heroui/react';
 import { api } from '~/utils/api';
 import { useAppToast } from '~/components/providers/ToastProvider';
@@ -234,18 +236,20 @@ export default function CustomersPage() {
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Rows per page:</span>
-                    <select
-                      className="text-sm border rounded-md px-2 py-1 bg-background text-foreground"
-                      value={rowsPerPage}
+                    <span className="text-sm text-gray-600">Rows per page:</span>
+                    <Select
+                      aria-label="Rows per page"
+                      selectedKeys={[rowsPerPage.toString()]}
                       onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
+                      className="w-20 min-w-0"
+                      size="sm"
                     >
                       {[10, 20, 30, 40, 50].map((value) => (
-                        <option key={value} value={value}>
+                        <SelectItem key={value.toString()} textValue={value.toString()}>
                           {value}
-                        </option>
+                        </SelectItem>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">

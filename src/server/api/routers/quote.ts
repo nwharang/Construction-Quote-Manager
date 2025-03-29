@@ -31,22 +31,27 @@ export const quoteRouter = createTRPCRouter({
       try {
         const offset = (input.page - 1) * input.limit;
 
-        // Build the where clause
+        // Build the where clause safely
         let whereClause = eq(quotes.userId, ctx.session.user.id);
-        
+
         if (input.search) {
-          whereClause = and(
-            whereClause,
-            or(
-              ilike(quotes.title, `%${input.search}%`),
-              ilike(quotes.customerName, `%${input.search}%`),
-              ilike(quotes.customerEmail, `%${input.search}%`)
-            )
-          );
+          const searchPattern = `%${input.search}%`;
+          // For email that can be null, create a safe condition
+          const titleCondition = ilike(quotes.title, searchPattern);
+          const nameCondition = ilike(quotes.customerName, searchPattern);
+          const emailCondition = sql`${quotes.customerEmail} ILIKE ${searchPattern}`;
+          
+          // Combine with OR for the search terms
+          const searchCondition = sql`(${titleCondition} OR ${nameCondition} OR ${emailCondition})`;
+          
+          // Combine with AND for the user ID filter
+          whereClause = sql`${whereClause} AND ${searchCondition}`;
         }
         
         if (input.status) {
-          whereClause = and(whereClause, eq(quotes.status, input.status));
+          // Add status filter using the same pattern
+          const statusCondition = eq(quotes.status, input.status);
+          whereClause = sql`${whereClause} AND ${statusCondition}`;
         }
 
         // Get total count
@@ -70,9 +75,17 @@ export const quoteRouter = createTRPCRouter({
           .limit(input.limit)
           .offset(offset);
 
+        // Transform the data to use numeric types for front-end consumption
         return {
           quotes: quotesWithCustomers.map(({ quote, customer }) => ({
             ...quote,
+            // Convert string values to numbers for the client
+            subtotalTasks: parseFloat(quote.subtotalTasks),
+            subtotalMaterials: parseFloat(quote.subtotalMaterials),
+            complexityCharge: parseFloat(quote.complexityCharge),
+            markupCharge: parseFloat(quote.markupCharge),
+            markupPercentage: parseFloat(quote.markupPercentage),
+            grandTotal: parseFloat(quote.grandTotal),
             customer: customer || null,
           })),
           total,
@@ -129,6 +142,8 @@ export const quoteRouter = createTRPCRouter({
         customerEmail: z.string().email().optional(),
         customerPhone: z.string().optional(),
         notes: z.string().optional(),
+        complexityCharge: z.number().default(0),
+        markupCharge: z.number().default(0)
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -181,8 +196,8 @@ export const quoteRouter = createTRPCRouter({
             status: QuoteStatus.DRAFT,
             subtotalTasks: '0',
             subtotalMaterials: '0',
-            complexityCharge: '0',
-            markupCharge: '0',
+            complexityCharge: input.complexityCharge.toString(),
+            markupCharge: input.markupCharge.toString(),
             grandTotal: '0',
             notes: input.notes,
             userId: ctx.session.user.id,
@@ -219,6 +234,11 @@ export const quoteRouter = createTRPCRouter({
         customerPhone: z.string().optional(),
         notes: z.string().optional(),
         status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED]).optional(),
+        subtotalTasks: z.string(),
+        subtotalMaterials: z.string(),
+        complexityCharge: z.string(),
+        markupCharge: z.string(),
+        grandTotal: z.string(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -272,7 +292,7 @@ export const quoteRouter = createTRPCRouter({
           customerId = existingCustomer[0].id;
         }
 
-        // Update the quote with the customer ID
+        // Update the quote with the customer ID and financial details
         const [quote] = await ctx.db
           .update(quotes)
           .set({
@@ -283,6 +303,12 @@ export const quoteRouter = createTRPCRouter({
             customerPhone: input.customerPhone,
             notes: input.notes,
             status: input.status,
+            // Store numeric values as strings in the database
+            subtotalTasks: input.subtotalTasks,
+            subtotalMaterials: input.subtotalMaterials,
+            complexityCharge: input.complexityCharge,
+            markupCharge: input.markupCharge,
+            grandTotal: input.grandTotal,
             updatedAt: new Date(),
           })
           .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
@@ -295,7 +321,16 @@ export const quoteRouter = createTRPCRouter({
           });
         }
 
-        return quote;
+        // Convert the string values to numbers for client consumption
+        return {
+          ...quote,
+          subtotalTasks: parseFloat(quote.subtotalTasks),
+          subtotalMaterials: parseFloat(quote.subtotalMaterials),
+          complexityCharge: parseFloat(quote.complexityCharge),
+          markupCharge: parseFloat(quote.markupCharge),
+          markupPercentage: parseFloat(quote.markupPercentage),
+          grandTotal: parseFloat(quote.grandTotal),
+        };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
@@ -438,18 +473,19 @@ export const quoteRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         complexityCharge: z.number(),
+        markupCharge: z.number()
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // Calculate new grand total based on the quote data
+        // Check if the quote exists and belongs to the user
         const quoteData = await ctx.db
           .select()
           .from(quotes)
           .where(
             and(
-              eq(quotes.id, input.id), 
-              eq(quotes.userId, ctx.session.user.id)
+              eq(quotes.id, input.id),
+              eq(quotes.userId, ctx.session?.user.id || '')
             )
           )
           .limit(1);
@@ -474,8 +510,8 @@ export const quoteRouter = createTRPCRouter({
         
         // Calculate grand total
         const complexityCharge = input.complexityCharge;
-        const markup = (subtotal + complexityCharge) * (quoteData[0].markupPercentage / 100);
-        const grandTotal = subtotal + complexityCharge + markup;
+        const markupCharge = input.markupCharge;
+        const grandTotal = subtotal + complexityCharge + markupCharge;
         
         // Update the quote
         const [updatedQuote] = await ctx.db
@@ -484,14 +520,14 @@ export const quoteRouter = createTRPCRouter({
             complexityCharge: complexityCharge.toString(),
             subtotalTasks: subtotalTasks.toString(),
             subtotalMaterials: subtotalMaterials.toString(),
-            markupCharge: markup.toString(),
+            markupCharge: markupCharge.toString(),
             grandTotal: grandTotal.toString(),
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(quotes.id, input.id), 
-              eq(quotes.userId, ctx.session.user.id)
+              eq(quotes.userId, ctx.session?.user.id || '')
             )
           )
           .returning();
@@ -503,7 +539,16 @@ export const quoteRouter = createTRPCRouter({
           });
         }
         
-        return updatedQuote;
+        // Convert the string values to numbers for client consumption
+        return {
+          ...updatedQuote,
+          subtotalTasks: parseFloat(updatedQuote.subtotalTasks),
+          subtotalMaterials: parseFloat(updatedQuote.subtotalMaterials),
+          complexityCharge: parseFloat(updatedQuote.complexityCharge),
+          markupCharge: parseFloat(updatedQuote.markupCharge),
+          markupPercentage: parseFloat(updatedQuote.markupPercentage),
+          grandTotal: parseFloat(updatedQuote.grandTotal),
+        };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({

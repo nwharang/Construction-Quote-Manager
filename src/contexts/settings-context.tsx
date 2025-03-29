@@ -3,12 +3,17 @@ import { useSession } from 'next-auth/react';
 import { api } from '~/utils/api';
 import type { RouterOutputs } from '~/utils/api';
 import { addToast } from '@heroui/toast';
+import type { SupportedLocale } from '~/i18n/locales';
+import { useAppToast } from '~/components/providers/ToastProvider';
 
 type SettingsResponse = RouterOutputs['settings']['get'];
 
 interface Settings {
   // Theme settings
   theme: 'light' | 'dark' | 'system';
+  
+  // Localization settings
+  locale: SupportedLocale;
   
   // Quote settings
   defaultComplexityCharge: string;
@@ -44,6 +49,7 @@ interface SettingsContextType {
 
 const defaultSettings: Settings = {
   theme: 'system',
+  locale: 'en',
   defaultComplexityCharge: '0.00',
   defaultMarkupCharge: '0.00',
   defaultTaskPrice: '0.00',
@@ -77,45 +83,48 @@ const debounce = <F extends (...args: any[]) => any>(
 };
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
+  const { status, data: session } = useSession();
+  const toast = useAppToast();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch settings from API if logged in
+  // Get tRPC context at component level, not inside callbacks
+  const trpcUtils = api.useContext();
+
+  // Get settings from API
   const { data: dbSettings, isLoading: isDbLoading } = api.settings.get.useQuery(
     undefined, 
     {
       enabled: !!session,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
       gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-      // Only refetch when explicitly invalidated
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       refetchOnReconnect: false,
     }
   );
 
-  // Update local state when API data changes
+  // Update local settings when API data changes
   useEffect(() => {
     if (dbSettings) {
       setSettings({
-        // Ensure correct types
         theme: dbSettings.theme as 'light' | 'dark' | 'system',
-        defaultComplexityCharge: dbSettings.defaultComplexityCharge?.toString() || '0.00',
-        defaultMarkupCharge: dbSettings.defaultMarkupCharge?.toString() || '0.00',
-        defaultTaskPrice: dbSettings.defaultTaskPrice?.toString() || '0.00',
-        defaultMaterialPrice: dbSettings.defaultMaterialPrice?.toString() || '0.00',
+        locale: dbSettings.locale as SupportedLocale,
+        defaultComplexityCharge: dbSettings.defaultComplexityCharge || '0',
+        defaultMarkupCharge: dbSettings.defaultMarkupCharge || '0',
+        defaultTaskPrice: dbSettings.defaultTaskPrice || '0',
+        defaultMaterialPrice: dbSettings.defaultMaterialPrice || '0',
         companyName: dbSettings.companyName || '',
         companyEmail: dbSettings.companyEmail || '',
         companyPhone: dbSettings.companyPhone || '',
         companyAddress: dbSettings.companyAddress || '',
-        emailNotifications: dbSettings.emailNotifications || false,
-        quoteNotifications: dbSettings.quoteNotifications || false,
-        taskNotifications: dbSettings.taskNotifications || false,
+        emailNotifications: dbSettings.emailNotifications,
+        quoteNotifications: dbSettings.quoteNotifications,
+        taskNotifications: dbSettings.taskNotifications,
         currency: dbSettings.currency || 'USD',
         currencySymbol: dbSettings.currencySymbol || '$',
         dateFormat: dbSettings.dateFormat || 'MM/DD/YYYY',
-        timeFormat: dbSettings.timeFormat || '12h',
+        timeFormat: dbSettings.timeFormat as '12h' | '24h' || '12h',
       });
       setIsLoading(false);
     }
@@ -125,7 +134,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const updateSettingsMutation = api.settings.update.useMutation({
     // When the mutation succeeds, invalidate the settings query to refresh the cache
     onSuccess: () => {
-      api.useContext().settings.get.invalidate();
+      // Use the trpcUtils from above instead of calling useContext() here
+      trpcUtils.settings.get.invalidate();
     },
     onError: (error) => {
       console.error('Settings update error:', error);
@@ -139,21 +149,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         
         // Use a single toast for all validation errors
         if (formattedErrors) {
-          addToast({
-            title: "Validation Error",
-            description: formattedErrors,
-            color: "danger",
-            variant: "bordered",
-          });
+          toast.error("Validation Error: " + formattedErrors);
         }
       } else {
         // For other types of errors
-        addToast({
-          title: "Error",
-          description: error.message || "Failed to update settings",
-          color: "danger",
-          variant: "bordered",
-        });
+        toast.error(error.message || "Failed to update settings");
       }
     }
   });
@@ -243,18 +243,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           currencySymbol: newSettings.currencySymbol || dbSettings.currencySymbol,
           dateFormat: newSettings.dateFormat || dbSettings.dateFormat,
           timeFormat: (newSettings.timeFormat || dbSettings.timeFormat) as '12h' | '24h',
+          locale: (newSettings.locale || dbSettings.locale || 'en') as 'en' | 'vi',
         });
         
       } catch (error) {
         console.error('Error updating settings:', error);
         
         // Show error toast
-        addToast({
-          title: "Error",
-          description: "Failed to update settings",
-          color: "danger",
-          variant: "bordered",
-        });
+        toast.error("Failed to update settings");
       }
     }
   }, [session, dbSettings, updateSettingsMutation]);

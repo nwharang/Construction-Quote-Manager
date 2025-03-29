@@ -30,6 +30,7 @@ type ProductFormData = {
   manufacturer?: string;
   supplier?: string;
   location?: string;
+  notes?: string;
 };
 
 const NewProductPage: NextPage = () => {
@@ -47,6 +48,7 @@ const NewProductPage: NextPage = () => {
     manufacturer: '',
     supplier: '',
     location: '',
+    notes: '',
   });
 
   const createProduct = api.product.create.useMutation({
@@ -65,8 +67,14 @@ const NewProductPage: NextPage = () => {
     setIsSubmitting(true);
 
     try {
-      await createProduct.mutateAsync(formData);
+      console.log('Submitting product data:', formData);
+      await createProduct.mutateAsync({
+        ...formData,
+        // Ensure notes is included even if undefined
+        notes: formData.notes || '',
+      });
     } catch (error) {
+      console.error('Error submitting product:', error);
       // Error handling is done in the onError callback
     }
   };
@@ -96,12 +104,12 @@ const NewProductPage: NextPage = () => {
 
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto">
-          <Card>
+          <Card className="border-none shadow-none">
             <CardHeader className="flex flex-col gap-1">
               <h1 className="text-2xl font-bold">New Product</h1>
               <p className="text-gray-600">Add a new product to your catalog</p>
             </CardHeader>
-            <CardBody>
+            <CardBody className="border-none">
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-4">
                   <Input
@@ -110,6 +118,10 @@ const NewProductPage: NextPage = () => {
                     value={formData.name}
                     onChange={(e) => handleChange('name', e.target.value)}
                     required
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
                   />
 
                   <Textarea
@@ -117,6 +129,10 @@ const NewProductPage: NextPage = () => {
                     placeholder="Enter product description"
                     value={formData.description}
                     onChange={(e) => handleChange('description', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
                   />
 
                   <Select
@@ -125,6 +141,11 @@ const NewProductPage: NextPage = () => {
                     selectedKeys={[formData.category]}
                     onChange={(e) => handleChange('category', e.target.value)}
                     required
+                    aria-label="Select product category"
+                    radius="none"
+                    classNames={{
+                      trigger: "border-none"
+                    }}
                   >
                     {Object.values(ProductCategory).map((category) => (
                       <SelectItem key={category} textValue={category}>
@@ -142,6 +163,11 @@ const NewProductPage: NextPage = () => {
                       required
                       min={0}
                       step={0.01}
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                      aria-label="Product Unit Price"
                     />
 
                     <Input
@@ -150,6 +176,10 @@ const NewProductPage: NextPage = () => {
                       value={formData.unit}
                       onChange={(e) => handleChange('unit', e.target.value)}
                       required
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
                     />
                   </div>
 
@@ -158,6 +188,10 @@ const NewProductPage: NextPage = () => {
                     placeholder="Leave empty for auto-generation"
                     value={formData.sku}
                     onChange={(e) => handleChange('sku', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
                   />
 
                   <Input
@@ -165,6 +199,10 @@ const NewProductPage: NextPage = () => {
                     placeholder="Enter manufacturer name"
                     value={formData.manufacturer}
                     onChange={(e) => handleChange('manufacturer', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
                   />
 
                   <Input
@@ -172,6 +210,10 @@ const NewProductPage: NextPage = () => {
                     placeholder="Enter supplier name"
                     value={formData.supplier}
                     onChange={(e) => handleChange('supplier', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
                   />
 
                   <Input
@@ -179,6 +221,21 @@ const NewProductPage: NextPage = () => {
                     placeholder="Enter storage location"
                     value={formData.location}
                     onChange={(e) => handleChange('location', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
+                  />
+
+                  <Textarea
+                    label="Notes (Optional)"
+                    placeholder="Enter any additional notes"
+                    value={formData.notes || ''}
+                    onChange={(e) => handleChange('notes', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
                   />
                 </div>
 

@@ -56,7 +56,7 @@ export const materialRouter = createTRPCRouter({
           });
         }
 
-        // Create the material
+        // Create the material with proper handling of numeric values
         const [material] = await ctx.db
           .insert(materials)
           .values({
@@ -64,7 +64,7 @@ export const materialRouter = createTRPCRouter({
             taskId: input.taskId,
             productId: input.productId,
             quantity: input.quantity,
-            unitPrice: input.unitPrice.toString(),
+            unitPrice: input.unitPrice.toString(), // Store as string in DB
             notes: input.notes,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -78,7 +78,12 @@ export const materialRouter = createTRPCRouter({
           });
         }
 
-        return material;
+        // Return with numeric values for client consumption
+        return { 
+          ...material,
+          unitPrice: parseFloat(material.unitPrice.toString()),
+          quoteId: task.quote.id 
+        };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
@@ -151,7 +156,10 @@ export const materialRouter = createTRPCRouter({
           .where(eq(materials.id, input.id))
           .returning();
 
-        return updatedMaterial;
+        return {
+          ...updatedMaterial,
+          quoteId: material.task.quote.id
+        };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
@@ -243,8 +251,9 @@ export const materialRouter = createTRPCRouter({
           .delete(materials)
           .where(eq(materials.id, input.id));
 
-        return { success: true };
+        return { success: true, quoteId: material.task.quote.id, taskId: material.task.id };
       } catch (error) {
+        console.error('Error deleting material:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

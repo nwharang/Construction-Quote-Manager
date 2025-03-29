@@ -5,6 +5,7 @@ import { httpBatchLink, loggerLink } from '@trpc/client';
 import { createTRPCNext } from '@trpc/next';
 import { type inferRouterInputs, type inferRouterOutputs } from '@trpc/server';
 import superjson from 'superjson';
+import fetchPonyfill from 'fetch-ponyfill';
 
 import { type AppRouter } from '~/server/api/root';
 
@@ -13,6 +14,8 @@ const getBaseUrl = () => {
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`; // SSR should use vercel url
   return `http://localhost:${process.env.PORT ?? 3000}`; // dev SSR should use localhost
 };
+
+const { fetch } = fetchPonyfill();
 
 /**
  * Safely determine if we're in a browser environment
@@ -37,15 +40,8 @@ export const api = createTRPCNext<AppRouter>({
         httpBatchLink({
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
-          // Increase timeout for potentially slow operations
-          fetch(url, options) {
-            return fetch(url, {
-              ...options,
-              signal: options?.signal,
-              // Increase timeout
-              cache: 'no-store',
-            });
-          },
+          // Use fetch-ponyfill to fix request issues
+          fetch: fetch,
           headers: () => {
             return {
               // Add any required headers
@@ -57,10 +53,10 @@ export const api = createTRPCNext<AppRouter>({
       queryClientConfig: {
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000, // 1 minute by default
-            refetchOnWindowFocus: false,
-            refetchOnReconnect: false,
-            refetchOnMount: false,
+            staleTime: 30 * 1000, // 30 seconds by default for more frequent refresh
+            refetchOnWindowFocus: true, // Refresh data when window regains focus
+            refetchOnReconnect: true, // Refresh when reconnecting
+            refetchOnMount: true, // Refresh when component mounts
             // Set up retry behavior
             retry: (failureCount, error) => {
               // Don't retry on 404s and authorization errors
@@ -91,11 +87,6 @@ export const api = createTRPCNext<AppRouter>({
         'settings.get': {
           staleTime: 5 * 60 * 1000, // Cache settings for 5 minutes
           gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-        },
-        'quote.getAll': {
-          // Quote-specific query options
-          retry: 2,  // Retry quote fetching more aggressively
-          retryDelay: 1000, // Use a shorter delay for quotes
         },
       },
     };

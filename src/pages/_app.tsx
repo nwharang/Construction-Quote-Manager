@@ -1,62 +1,50 @@
-import React, { useEffect, useState } from 'react';
-import '../styles/globals.css';
+import '@/styles/globals.css';
+import React from 'react';
+import type { AppProps } from 'next/app';
 import { SessionProvider } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import { Layout } from '../components/layout';
-import { HeroUIProvider, Spinner } from '@heroui/react';
-import { type AppProps } from 'next/app';
-import { type Session } from 'next-auth';
+import { HeroUIProvider } from '@heroui/react';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { ToastProvider } from '@/components/providers/ToastProvider';
+import { SidebarComponent } from '@/components/SidebarComponent';
+import { NavBar } from '@/components/NavBar';
 import { api } from '~/utils/api';
 import { SettingsProvider } from '~/contexts/settings-context';
-import { ThemeProvider } from '~/components/providers/ThemeProvider';
-import { ToastProvider } from '~/components/providers/ToastProvider';
+import { QuotesProvider } from '~/contexts/QuotesContext';
 import { LocalizationProvider } from '~/contexts/LocalizationContext';
-import Head from 'next/head';
+import { CustomersProvider } from '~/contexts/CustomersContext';
+import { ProductsProvider } from '~/contexts/ProductsContext';
 
-// Use the built-in AppProps type with Session
-type AppPropsWithSession = AppProps<{ session: Session | null }>;
-
-const MyApp = ({ Component, pageProps: { session, ...pageProps } }: AppPropsWithSession) => {
-  const router = useRouter();
-  const isAuthPage = router.pathname.startsWith('/auth/');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Initialize app and hide loading spinner
-    setLoading(false);
-  }, []);
-
-  if (loading) {
-    return (
-      <HeroUIProvider>
-        <div className="flex h-screen w-full justify-center items-center">
-          <Spinner size="lg" />
-        </div>
-      </HeroUIProvider>
-    );
-  }
-
+function App({ Component, pageProps }: AppProps) {
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={pageProps.session}>
       <SettingsProvider>
-        <ThemeProvider>
-          <LocalizationProvider>
+        <LocalizationProvider>
+          <ThemeProvider>
             <HeroUIProvider>
               <ToastProvider>
-                {isAuthPage ? (
-                  <Component {...pageProps} />
-                ) : (
-                  <Layout>
-                    <Component {...pageProps} />
-                  </Layout>
-                )}
+                <QuotesProvider>
+                  <CustomersProvider>
+                    <ProductsProvider>
+                      <div className="flex h-screen divide-x-1 divide-foreground/5">
+                        <SidebarComponent />
+                        <div className="flex flex-col flex-1 overflow-hidden">
+                          <NavBar />
+                          <main className="flex-1 overflow-auto p-4">
+                            <Component {...pageProps} />
+                          </main>
+                        </div>
+                      </div>
+                    </ProductsProvider>
+                  </CustomersProvider>
+                </QuotesProvider>
               </ToastProvider>
             </HeroUIProvider>
-          </LocalizationProvider>
-        </ThemeProvider>
+          </ThemeProvider>
+        </LocalizationProvider>
       </SettingsProvider>
     </SessionProvider>
   );
-};
+}
 
-export default api.withTRPC(MyApp);
+// Wrap the App with tRPC
+export default api.withTRPC(App);

@@ -1,68 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Save } from 'lucide-react';
 import { api } from '~/utils/api';
-import { Button, Card, CardBody, Input, Textarea, Spinner } from '@heroui/react';
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Input,
+  Select,
+  SelectItem,
+  Textarea,
+  Spinner,
+  NumberInput,
+  Divider,
+} from '@heroui/react';
 import { ProductCategory } from '~/server/db/schema';
 import { useAppToast } from '~/components/providers/ToastProvider';
+import { useProducts } from '~/contexts/ProductsContext';
+
+type ProductFormData = {
+  name: string;
+  description: string;
+  category: typeof ProductCategory[keyof typeof ProductCategory];
+  unitPrice: number;
+  unit: string;
+  sku?: string;
+  manufacturer?: string;
+  supplier?: string;
+  location?: string;
+  notes?: string;
+};
 
 export default function EditProductPage() {
   const router = useRouter();
   const { id } = router.query;
   const { status } = useSession();
   const toast = useAppToast();
+  const { productFormData, setProductFormData, updateProduct, isSubmitting, fetchProductById, loading } = useProducts();
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '0.00',
-    sku: '',
-    stock: '0',
-  });
-
-  // Fetch product data using tRPC
-  const { data: product, isLoading: isLoadingProduct } = api.product.getById.useQuery(
-    { id: id as string },
-    { enabled: !!id && status === 'authenticated' }
-  );
-
-  // Update mutation
-  const updateProductMutation = api.product.update.useMutation({
-    onSuccess: () => {
-      toast.success('Product updated successfully');
-      router.push('/admin/products');
-    },
-    onError: (error) => {
-      toast.error(`Error updating product: ${error.message}`);
-    },
-  });
-
-  // Set initial form data when product is loaded
+  // Fetch product when component mounts
   useEffect(() => {
-    if (product) {
-      setFormData({
-        name: product.name,
-        description: product.description || '',
-        price: product.unitPrice.toString(),
-        sku: product.sku || '',
-        stock: product.unitPrice.toString(),
-      });
+    if (id && typeof id === 'string' && status === 'authenticated') {
+      fetchProductById(id);
     }
-  }, [product]);
+  }, [id, status]);
 
-  // Add error handling with useEffect
-  useEffect(() => {
-    if (isLoadingProduct) return;
-    if (!product && id) {
-      toast.error(`Failed to load product details`);
+  const handleChange = (field: keyof typeof productFormData, value: string | number) => {
+    setProductFormData({ [field]: value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (id && typeof id === 'string') {
+      const success = await updateProduct(id);
+      if (success) {
+        router.push('/admin/products');
+      }
     }
-  }, [product, id, isLoadingProduct, toast]);
+  };
 
-  // Loading state
-  if (status === 'loading' || isLoadingProduct) {
+  if (status === 'loading' || loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Spinner size="lg" />
@@ -70,144 +69,179 @@ export default function EditProductPage() {
     );
   }
 
-  // Not authenticated
   if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
 
-  // Error state
-  if (!product) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-danger mb-4">Product not found</h1>
-          <Button color="primary" variant="light" onClick={() => router.push('/admin/products')}>
-            Return to products list
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Helper to format currency input
-  const formatCurrency = (value: string) => {
-    const num = parseFloat(value.replace(/[^\d.]/g, ''));
-    return isNaN(num) ? '0.00' : num.toFixed(2);
-  };
-
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-
-    if (name === 'price') {
-      setFormData({
-        ...formData,
-        [name]: formatCurrency(value),
-      });
-    } else if (name === 'stock') {
-      setFormData({
-        ...formData,
-        [name]: value.replace(/[^\d]/g, ''),
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value,
-      });
-    }
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    updateProductMutation.mutate({
-      id: id as string,
-      data: {
-        name: formData.name,
-        description: formData.description,
-        category: ProductCategory.OTHER, // Default category
-        unitPrice: parseFloat(formData.price),
-        unit: 'unit', // Default unit
-        sku: formData.sku,
-      },
-    });
-  };
-
   return (
     <>
       <Head>
-        <title>Edit Product - {product.name}</title>
+        <title>Edit Product - Admin Dashboard</title>
       </Head>
 
-      <div className="container mx-auto px-4 py-8">
-        <Card className="max-w-4xl mx-auto">
-          <CardBody className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <Button
-                variant="light"
-                startContent={<ArrowLeft size={20} />}
-                onPress={() => router.push('/admin/products')}
-              >
-                Back to Products
-              </Button>
-              <h1 className="text-2xl font-semibold">Edit Product</h1>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="container mx-auto px-4">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-none shadow-none">
+            <CardHeader className="flex flex-col gap-1">
+              <h1 className="text-2xl font-bold">Edit Product</h1>
+              <p className="text-gray-600">Update product information</p>
+            </CardHeader>
+            <CardBody className="border-none">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-4">
                   <Input
-                    label="Product Name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
+                    label="Name"
+                    placeholder="Enter product name"
+                    value={productFormData.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
                     required
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
                   />
-                  <Input label="SKU" name="sku" value={formData.sku} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-4">
-                  <Input
-                    label="Price"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    startContent={<span className="text-default-400">$</span>}
-                    required
-                  />
-                  <Input
-                    label="Stock"
-                    name="stock"
-                    type="number"
-                    value={formData.stock}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-              </div>
 
-              <Textarea
-                label="Description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                className="min-h-[100px]"
-              />
+                  <Textarea
+                    label="Description"
+                    placeholder="Enter product description"
+                    value={productFormData.description}
+                    onChange={(e) => handleChange('description', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
+                  />
 
-              <div className="flex justify-end space-x-4">
-                <Button
-                  color="primary"
-                  type="submit"
-                  startContent={<Save size={20} />}
-                  isLoading={updateProductMutation.isPending}
-                >
-                  Save Changes
-                </Button>
-              </div>
-            </form>
-          </CardBody>
-        </Card>
+                  <Select
+                    label="Category"
+                    placeholder="Select a category"
+                    selectedKeys={[productFormData.category]}
+                    onChange={(e) => handleChange('category', e.target.value)}
+                    required
+                    aria-label="Select product category"
+                    radius="none"
+                    classNames={{
+                      trigger: "border-none"
+                    }}
+                  >
+                    {Object.values(ProductCategory).map((category) => (
+                      <SelectItem key={category} textValue={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </Select>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <NumberInput
+                      label="Unit Price"
+                      placeholder="0.00"
+                      value={productFormData.unitPrice}
+                      onValueChange={(value) => handleChange('unitPrice', Number(value))}
+                      required
+                      min={0}
+                      step={0.01}
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                      aria-label="Product Unit Price"
+                      startContent="$"
+                      formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                    />
+
+                    <Input
+                      label="Unit"
+                      placeholder="e.g., pcs, kg, m"
+                      value={productFormData.unit}
+                      onChange={(e) => handleChange('unit', e.target.value)}
+                      required
+                      radius="none"
+                      classNames={{
+                        inputWrapper: "border-none"
+                      }}
+                    />
+                  </div>
+
+                  <Input
+                    label="SKU (Optional)"
+                    placeholder="Leave empty for auto-generation"
+                    value={productFormData.sku}
+                    onChange={(e) => handleChange('sku', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
+                  />
+
+                  <Input
+                    label="Manufacturer (Optional)"
+                    placeholder="Enter manufacturer name"
+                    value={productFormData.manufacturer}
+                    onChange={(e) => handleChange('manufacturer', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
+                  />
+
+                  <Input
+                    label="Supplier (Optional)"
+                    placeholder="Enter supplier name"
+                    value={productFormData.supplier}
+                    onChange={(e) => handleChange('supplier', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
+                  />
+
+                  <Input
+                    label="Location (Optional)"
+                    placeholder="Enter storage location"
+                    value={productFormData.location}
+                    onChange={(e) => handleChange('location', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
+                  />
+
+                  <Textarea
+                    label="Notes (Optional)"
+                    placeholder="Enter additional notes"
+                    value={productFormData.notes || ''}
+                    onChange={(e) => handleChange('notes', e.target.value)}
+                    radius="none"
+                    classNames={{
+                      inputWrapper: "border-none"
+                    }}
+                  />
+
+                  <Divider className="my-4" />
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      color="default"
+                      variant="flat"
+                      onPress={() => router.push('/admin/products')}
+                    >
+                      Cancel
+                    </Button>
+
+                    <Button
+                      color="primary"
+                      type="submit"
+                      isLoading={isSubmitting}
+                    >
+                      Update Product
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </CardBody>
+          </Card>
+        </div>
       </div>
     </>
   );

@@ -12,6 +12,7 @@ interface ActiveToast {
   id: string;
   message: string;
   timestamp: number;
+  type: 'success' | 'error' | 'loading';
 }
 
 // Track active toasts
@@ -35,14 +36,14 @@ export function ToastProvider({ children }: ToastProviderProps) {
       <HeroUIToastProvider
         toastProps={{
           classNames: {
-            base: "bg-background border border-border",
+            base: "bg-background/95 backdrop-blur border border-border shadow-md",
             content: "flex gap-2 text-foreground",
             title: "text-sm font-medium",
             description: "text-xs",
             closeButton: "text-foreground"
           },
           timeout: 3000,
-          variant: "bordered",
+          variant: "solid",
           hideIcon: false,
         }}
       />
@@ -54,6 +55,11 @@ export function ToastProvider({ children }: ToastProviderProps) {
 export function useAppToast() {
   return {
     success: (message: string) => {
+      // Check for duplicate success messages
+      if (activeToasts.some(toast => toast.message === message && toast.type === 'success')) {
+        return null; // Prevent duplicate success messages
+      }
+      
       // Manage active toasts to limit number displayed
       cleanupOldToasts();
       
@@ -64,7 +70,8 @@ export function useAppToast() {
       activeToasts.push({
         id,
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        type: 'success'
       });
       
       // Limit visible toasts
@@ -82,11 +89,18 @@ export function useAppToast() {
         description: message,
         variant: "bordered",
         color: "success",
+        onClose: () => {
+          // Remove from tracking when closed
+          const index = activeToasts.findIndex(t => t.id === id);
+          if (index !== -1) {
+            activeToasts.splice(index, 1);
+          }
+        }
       });
     },
     error: (message: string) => {
       // Check for duplicate error messages
-      if (activeToasts.some(toast => toast.message === message)) {
+      if (activeToasts.some(toast => toast.message === message && toast.type === 'error')) {
         return null; // Prevent duplicate errors
       }
       
@@ -99,7 +113,8 @@ export function useAppToast() {
       activeToasts.push({
         id,
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        type: 'error'
       });
       
       // Limit visible toasts
@@ -119,7 +134,7 @@ export function useAppToast() {
         color: "danger",
         onClose: () => {
           // Remove from tracking when closed
-          const index = activeToasts.findIndex(t => t.message === message);
+          const index = activeToasts.findIndex(t => t.id === id);
           if (index !== -1) {
             activeToasts.splice(index, 1);
           }
@@ -127,7 +142,23 @@ export function useAppToast() {
       });
     },
     loading: (message: string) => {
+      // Check for duplicate loading messages
+      if (activeToasts.some(toast => toast.message === message && toast.type === 'loading')) {
+        return null; // Prevent duplicate loading messages
+      }
+      
       cleanupOldToasts();
+      
+      // Create a unique ID based on timestamp
+      const id = `toast-${Date.now()}`;
+      
+      // Track this toast
+      activeToasts.push({
+        id,
+        message,
+        timestamp: Date.now(),
+        type: 'loading'
+      });
       
       return addToast({
         title: "Loading",
@@ -135,6 +166,13 @@ export function useAppToast() {
         variant: "bordered",
         color: "primary",
         timeout: 10000, // Longer timeout for loading toasts
+        onClose: () => {
+          // Remove from tracking when closed
+          const index = activeToasts.findIndex(t => t.id === id);
+          if (index !== -1) {
+            activeToasts.splice(index, 1);
+          }
+        }
       });
     }
   };

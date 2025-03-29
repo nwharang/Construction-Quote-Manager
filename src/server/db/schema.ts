@@ -11,6 +11,7 @@ import {
   primaryKey,
   varchar,
   index,
+  serial,
 } from 'drizzle-orm/pg-core';
 import { type AdapterAccount } from 'next-auth/adapters';
 /**
@@ -156,7 +157,8 @@ export const verificationTokens = pgTable(
 
 // Quotes table
 export const quotes = pgTable('quotes', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: text('id').primaryKey(),
+  sequentialId: serial('sequential_id').notNull(),
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
@@ -182,7 +184,7 @@ export const quotes = pgTable('quotes', {
 // Tasks table
 export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().defaultRandom(),
-  quoteId: uuid('quote_id')
+  quoteId: text('quote_id')
     .notNull()
     .references(() => quotes.id, { onDelete: 'cascade' }),
   description: text('description').notNull(),
@@ -197,7 +199,8 @@ export const tasks = pgTable('tasks', {
 
 // Products table
 export const products = pgTable('products', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: text('id').primaryKey(),
+  sequentialId: serial('sequential_id').notNull(),
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
@@ -221,7 +224,7 @@ export const materials = pgTable('materials', {
   taskId: uuid('task_id')
     .notNull()
     .references(() => tasks.id, { onDelete: 'cascade' }),
-  productId: uuid('product_id')
+  productId: text('product_id')
     .notNull()
     .references(() => products.id),
   quantity: integer('quantity').notNull().default(1),
@@ -237,7 +240,7 @@ export const transactions = pgTable('transactions', {
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  quoteId: uuid('quote_id').references(() => quotes.id),
+  quoteId: text('quote_id').references(() => quotes.id),
   type: transactionTypeEnum('type').notNull(),
   category: transactionCategoryEnum('category').notNull(),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
@@ -309,6 +312,7 @@ export const settings = pgTable('settings', {
   quoteNotifications: boolean('quote_notifications').notNull().default(true),
   taskNotifications: boolean('task_notifications').notNull().default(true),
   theme: text('theme').notNull().default('system'),
+  locale: text('locale').notNull().default('en'),
   currency: text('currency').notNull().default('USD'),
   currencySymbol: text('currency_symbol').notNull().default('$'),
   dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),

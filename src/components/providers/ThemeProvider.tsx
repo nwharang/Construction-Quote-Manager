@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { api } from '~/utils/api';
+import { type SupportedLocale } from '~/i18n/locales';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -55,6 +56,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         currencySymbol: settings.currencySymbol,
         dateFormat: settings.dateFormat,
         timeFormat: settings.timeFormat as "12h" | "24h",
+        locale: (settings.locale || 'en') as SupportedLocale,
       });
     } else {
       // If no session, save to localStorage

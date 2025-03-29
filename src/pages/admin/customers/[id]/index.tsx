@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Edit, Mail, Phone, MapPin, FileText, Plus } from 'lucide-react';
+import { ArrowLeft, Edit, Mail, Phone, MapPin, FileText, Plus, CalendarDays, Search } from 'lucide-react';
 import {
   Button,
   Card,
@@ -18,6 +18,10 @@ import {
   Chip,
   Divider,
   Link,
+  Pagination,
+  Tabs,
+  Tab,
+  Input,
 } from '@heroui/react';
 import { api } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
@@ -26,6 +30,9 @@ import { useAppToast } from '~/components/providers/ToastProvider';
 
 // Fix: Use import type for type-only imports
 import type { customers } from '~/server/db/schema';
+import type { RouterOutputs } from '~/utils/api';
+
+type Quote = RouterOutputs['quote']['getAll']['quotes'][number];
 
 const statusColorMap: Record<keyof typeof QuoteStatus, 'default' | 'primary' | 'success' | 'danger'> = {
   DRAFT: 'default',
@@ -39,6 +46,9 @@ export default function CustomerDetailsPage() {
   const { id } = router.query;
   const { data: session, status: authStatus } = useSession();
   const { formatDate, formatCurrency } = useTranslation();
+  const [page, setPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch customer data
   const { data: customer, isLoading: isLoadingCustomer } = api.customer.getById.useQuery(
@@ -46,14 +56,24 @@ export default function CustomerDetailsPage() {
     { enabled: !!id && authStatus === 'authenticated' }
   );
 
-  // Fetch customer's quotes
-  const { data: quotes, isLoading: isLoadingQuotes } = api.quote.getAll.useQuery(
+  // Fetch customer's quotes with pagination
+  const { data: quotesData, isLoading: isLoadingQuotes } = api.quote.getAll.useQuery(
     {
-      search: id as string, // Use search parameter instead of customerId
-      limit: 10,
+      search: id as string,
+      page,
+      limit: rowsPerPage,
     },
     { enabled: !!id && authStatus === 'authenticated' }
   );
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+  };
 
   // Not authenticated
   if (authStatus === 'unauthenticated') {
@@ -92,7 +112,7 @@ export default function CustomerDetailsPage() {
   return (
     <>
       <Head>
-        <title>Customer Details | Construction Quote Manager</title>
+        <title>{customer.name} | Customer Details</title>
       </Head>
 
       <div className="container mx-auto px-4">
@@ -109,96 +129,149 @@ export default function CustomerDetailsPage() {
               </Button>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">{customer.name}</h1>
-                <p className="text-muted-foreground">Customer&apos;s details and quotes</p>
+                <p className="text-muted-foreground">Customer&apos;s details and history</p>
               </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                color="primary"
+                variant="bordered"
+                onPress={() => router.push(`/admin/customers/${customer.id}/edit`)}
+              >
+                Edit
+              </Button>
+              <Button
+                color="primary"
+                startContent={<Plus size={18} />}
+                onPress={() => router.push(`/admin/quotes/new?customerId=${customer.id}`)}
+              >
+                New Quote
+              </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-foreground">Contact Information</h2>
-                <Button
-                  isIconOnly
-                  variant="light"
-                  onPress={() => router.push(`/admin/customers/${customer.id}/edit`)}
-                  aria-label="Edit customer"
-                >
-                  <Edit size={20} />
-                </Button>
-              </CardHeader>
-              <CardBody>
-                <div className="flex flex-col gap-4">
-                  {customer.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-5 w-5 text-muted-foreground" />
-                      <a
-                        href={`mailto:${customer.email}`}
-                        className="text-primary hover:underline"
-                      >
-                        {customer.email}
-                      </a>
-                    </div>
-                  )}
-                  {customer.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-5 w-5 text-muted-foreground" />
-                      <a
-                        href={`tel:${customer.phone}`}
-                        className="text-primary hover:underline"
-                      >
-                        {customer.phone}
-                      </a>
-                    </div>
-                  )}
-                  {customer.address && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-foreground">{customer.address}</span>
-                    </div>
-                  )}
-                  {customer.notes && (
-                    <div className="flex items-start gap-2">
-                      <FileText className="h-5 w-5 text-muted-foreground mt-1" />
-                      <span className="text-foreground">{customer.notes}</span>
-                    </div>
-                  )}
+          {/* Customer Information Panel */}
+          <div className="bg-background/50 p-6 rounded-lg">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Contact Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {customer.email && (
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <Mail className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <a
+                      href={`mailto:${customer.email}`}
+                      className="text-primary hover:underline"
+                    >
+                      {customer.email}
+                    </a>
+                  </div>
                 </div>
-              </CardBody>
-            </Card>
+              )}
+              {customer.phone && (
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <Phone className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Phone</p>
+                    <a
+                      href={`tel:${customer.phone}`}
+                      className="text-primary hover:underline"
+                    >
+                      {customer.phone}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {customer.address && (
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Address</p>
+                    <span className="text-foreground">{customer.address}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 p-2 rounded-full">
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer Since</p>
+                  <span className="text-foreground">{formatDate(customer.createdAt)}</span>
+                </div>
+              </div>
+            </div>
 
-            <Card>
-              <CardHeader className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-foreground">Recent Quotes</h2>
+            {customer.notes && (
+              <div className="mt-6">
+                <h3 className="text-md font-medium text-foreground mb-2 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Notes
+                </h3>
+                <p className="text-foreground bg-background/80 p-4 rounded-md">{customer.notes}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Customer History Section */}
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-foreground">Quote History</h2>
+              <div className="flex gap-2">
+                <Input
+                  isClearable
+                  placeholder="Search quotes..."
+                  startContent={<Search size={16} />}
+                  size="sm"
+                  value={searchQuery}
+                  onValueChange={handleSearch}
+                  className="w-64"
+                />
+              </div>
+            </div>
+
+            {isLoadingQuotes ? (
+              <div className="flex justify-center items-center h-48">
+                <Spinner />
+              </div>
+            ) : !quotesData || quotesData.quotes.length === 0 ? (
+              <div className="text-center py-12 bg-background/50 rounded-lg">
+                <p className="text-muted-foreground">No quotes found for this customer</p>
                 <Button
                   color="primary"
-                  startContent={<Plus size={20} />}
+                  className="mt-4"
+                  startContent={<Plus size={16} />}
                   onPress={() => router.push(`/admin/quotes/new?customerId=${customer.id}`)}
                 >
-                  New Quote
+                  Create First Quote
                 </Button>
-              </CardHeader>
-              <CardBody>
-                {isLoadingQuotes ? (
-                  <div className="flex justify-center items-center h-32">
-                    <Spinner />
-                  </div>
-                ) : quotes?.quotes.length === 0 ? (
-                  <p className="text-muted-foreground text-center">No quotes found</p>
-                ) : (
-                  <Table aria-label="Recent quotes">
-                    <TableHeader>
-                      <TableColumn>DATE</TableColumn>
-                      <TableColumn>STATUS</TableColumn>
-                      <TableColumn>TOTAL</TableColumn>
-                    </TableHeader>
-                    <TableBody>
-                      {(quotes?.quotes || []).map((quote) => (
-                        <TableRow
-                          key={quote.id}
-                          className="cursor-pointer"
-                          onClick={() => router.push(`/admin/quotes/${quote.id}`)}
-                        >
+              </div>
+            ) : (
+              <div className="bg-background/50 rounded-lg overflow-hidden">
+                <Table aria-label="Customer quotes history">
+                  <TableHeader>
+                    <TableColumn>QUOTE #</TableColumn>
+                    <TableColumn>TITLE</TableColumn>
+                    <TableColumn>DATE</TableColumn>
+                    <TableColumn>STATUS</TableColumn>
+                    <TableColumn>TOTAL</TableColumn>
+                    <TableColumn>ACTIONS</TableColumn>
+                  </TableHeader>
+                  <TableBody>
+                    {quotesData.quotes.map((quote, index) => {
+                      // Calculate quote number based on pagination
+                      const quoteNumber = (page - 1) * rowsPerPage + index + 1;
+                      
+                      return (
+                        <TableRow key={quote.id}>
+                          <TableCell>#{quote.sequentialId}</TableCell>
+                          <TableCell>{quote.title}</TableCell>
                           <TableCell>{formatDate(quote.createdAt)}</TableCell>
                           <TableCell>
                             <Chip
@@ -211,13 +284,60 @@ export default function CustomerDetailsPage() {
                             </Chip>
                           </TableCell>
                           <TableCell>{formatCurrency(Number(quote.grandTotal))}</TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              color="primary"
+                              variant="flat"
+                              onPress={() => router.push(`/admin/quotes/${quote.id}`)}
+                            >
+                              View
+                            </Button>
+                          </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+
+                {/* Pagination */}
+                {quotesData.total > rowsPerPage && (
+                  <div className="flex justify-center p-4">
+                    <Pagination
+                      total={Math.ceil(quotesData.total / rowsPerPage)}
+                      page={page}
+                      onChange={handlePageChange}
+                      showControls
+                      color="primary"
+                    />
+                  </div>
                 )}
-              </CardBody>
-            </Card>
+              </div>
+            )}
+          </div>
+
+          {/* Summary Section */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-background/50 p-6 rounded-lg">
+              <h3 className="text-md font-medium text-foreground mb-2">Total Quotes</h3>
+              <p className="text-2xl font-bold">{quotesData?.total || 0}</p>
+            </div>
+            <div className="bg-background/50 p-6 rounded-lg">
+              <h3 className="text-md font-medium text-foreground mb-2">Accepted Quotes</h3>
+              <p className="text-2xl font-bold text-success">
+                {quotesData?.quotes.filter(q => q.status === 'ACCEPTED').length || 0}
+              </p>
+            </div>
+            <div className="bg-background/50 p-6 rounded-lg">
+              <h3 className="text-md font-medium text-foreground mb-2">Revenue</h3>
+              <p className="text-2xl font-bold">
+                {formatCurrency(
+                  quotesData?.quotes
+                    .filter(q => q.status === 'ACCEPTED')
+                    .reduce((sum, quote) => sum + Number(quote.grandTotal), 0) || 0
+                )}
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -1,35 +1,53 @@
-import { useCallback } from 'react';
-import { t, type TranslationKey, type NestedTranslationKey } from '~/i18n/locales';
-import { useFormatting } from './useFormatting';
+import { useLocalization } from '../contexts/LocalizationContext';
+import type { SupportedLocale } from '../contexts/LocalizationContext';
 
-// Mock function to get the current locale
-// In a real app, this would come from a context provider or settings
-const getCurrentLocale = () => {
-  // For now, we'll always return 'en'
-  // This would be replaced with actual locale detection/selection
-  return 'en';
+export type TranslationKey = string;
+
+// Export a function to get the current locale
+export const getCurrentLocale = (): SupportedLocale => {
+  const defaultLocale: SupportedLocale = 'en';
+  
+  try {
+    const storedLocale = localStorage.getItem('locale') as SupportedLocale | null;
+    return storedLocale || defaultLocale;
+  } catch (e) {
+    return defaultLocale;
+  }
 };
 
 export function useTranslation() {
-  const locale = getCurrentLocale();
-  const formatting = useFormatting();
-  
-  const translate = useCallback(<T extends TranslationKey, K extends NestedTranslationKey<T>>(
-    section: T,
-    key: K,
-    params?: Record<string, string | number>,
-  ) => {
-    return t(locale, section, key, params);
-  }, [locale]);
-  
+  const { 
+    t: translate, 
+    locale, 
+    setLocale, 
+    formatDate, 
+    formatTime, 
+    formatCurrency, 
+    formatNumber, 
+    formatPhone 
+  } = useLocalization();
+
+  const t = (section: string, key: string, params?: Record<string, string | number>) => {
+    let translatedText = translate(section, key);
+    
+    // Replace params if provided
+    if (params && translatedText) {
+      Object.entries(params).forEach(([paramKey, paramValue]) => {
+        translatedText = translatedText.replace(`{${paramKey}}`, String(paramValue));
+      });
+    }
+    
+    return translatedText;
+  };
+
   return {
-    t: translate,
+    t,
     locale,
-    // Include formatting functions
-    formatDate: formatting.formatDate,
-    formatTime: formatting.formatTime,
-    formatCurrency: formatting.formatCurrency,
-    formatNumber: formatting.formatNumber,
-    formatPhone: formatting.formatPhone,
+    setLocale,
+    formatDate,
+    formatTime,
+    formatCurrency,
+    formatNumber,
+    formatPhone,
   };
 } 

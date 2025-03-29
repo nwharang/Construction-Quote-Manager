@@ -14,7 +14,6 @@ import {
   DropdownItem,
 } from '@heroui/react';
 import { LogIn, LogOut, User, ChevronDown, Settings } from 'lucide-react';
-import Sidebar from './sidebar';
 import { useSession } from 'next-auth/react';
 import { signOut, signIn } from 'next-auth/react';
 import { routes } from '~/config/routes';
@@ -122,7 +121,6 @@ export function Layout({ children, title, description }: LayoutProps) {
         </Navbar>
 
         <div className="flex flex-1">
-          <Sidebar />
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
