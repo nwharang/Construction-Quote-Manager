@@ -6,20 +6,29 @@ import { FileText, ArrowRight, CheckCircle2, Users } from 'lucide-react';
 import { api } from '~/utils/api';
 import type { RouterOutputs } from '~/utils/api';
 import { QuoteStatus } from '~/server/db/schema';
+import { useTrpcErrorHandling } from '~/hooks/useTrpcWithErrorHandling';
 
-type Quote = RouterOutputs['quote']['getAll']['items'][number];
+type Quote = RouterOutputs['quote']['getAll']['quotes'][number];
 
 export default function Home() {
   const router = useRouter();
   const { data: session, status: authStatus } = useSession();
 
-  // Conditionally fetch quotes only when authenticated
-  const { data: quotesData, isLoading: isQuotesLoading } = api.quote.getAll.useQuery(
-    { page: 1, limit: 10 },
+  // Conditionally fetch quotes only when authenticated with error handling
+  const { 
+    data: quotesData, 
+    isLoading: isQuotesLoading 
+  } = useTrpcErrorHandling(
+    api.quote.getAll.useQuery(
+      { page: 1, limit: 10 },
+      { 
+        enabled: authStatus === 'authenticated',
+        // Don't refetch on window focus to avoid unnecessary requests
+        refetchOnWindowFocus: false,
+      }
+    ),
     {
-      enabled: authStatus === 'authenticated',
-      // Don't refetch on window focus to avoid unnecessary requests
-      refetchOnWindowFocus: false,
+      fallbackMessage: 'Failed to load quotes data',
     }
   );
 
@@ -40,9 +49,9 @@ export default function Home() {
 
   // Get stats from the quotes data
   const totalQuotes = quotesData?.total ?? 0;
-  const acceptedQuotes =
-    quotesData?.items.filter((q) => q.status === QuoteStatus.ACCEPTED).length ?? 0;
-  const pendingQuotes = quotesData?.items.filter((q) => q.status === QuoteStatus.SENT).length ?? 0;
+  const quotes = quotesData?.quotes ?? [];
+  const acceptedQuotes = quotes.filter((q) => q.status === QuoteStatus.ACCEPTED).length;
+  const pendingQuotes = quotes.filter((q) => q.status === QuoteStatus.SENT).length;
 
   return (
     <div className="container mx-auto px-4">
@@ -147,9 +156,9 @@ export default function Home() {
           <Card className="bg-card/50 backdrop-blur-sm border border-border/50">
             <CardBody className="p-6">
               <h3 className="text-lg font-medium text-foreground/90 mb-4">Recent Activity</h3>
-              {quotesData?.items && quotesData.items.length > 0 ? (
+              {quotes.length > 0 ? (
                 <div className="space-y-4">
-                  {quotesData.items.slice(0, 3).map((quote: Quote) => (
+                  {quotes.slice(0, 3).map((quote: Quote) => (
                     <div key={quote.id} className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-foreground/90">{quote.title}</p>

@@ -32,19 +32,22 @@ export const quoteRouter = createTRPCRouter({
         const offset = (input.page - 1) * input.limit;
 
         // Build the where clause
-        const whereClause = input.search
-          ? and(
-              eq(quotes.userId, ctx.session.user.id),
-              or(
-                ilike(quotes.title, `%${input.search}%`),
-                ilike(quotes.customerName, `%${input.search}%`),
-                ilike(quotes.customerEmail, `%${input.search}%`)
-              ),
-              input.status ? eq(quotes.status, input.status) : undefined
+        let whereClause = eq(quotes.userId, ctx.session.user.id);
+        
+        if (input.search) {
+          whereClause = and(
+            whereClause,
+            or(
+              ilike(quotes.title, `%${input.search}%`),
+              ilike(quotes.customerName, `%${input.search}%`),
+              ilike(quotes.customerEmail, `%${input.search}%`)
             )
-          : input.status
-          ? and(eq(quotes.userId, ctx.session.user.id), eq(quotes.status, input.status))
-          : eq(quotes.userId, ctx.session.user.id);
+          );
+        }
+        
+        if (input.status) {
+          whereClause = and(whereClause, eq(quotes.status, input.status));
+        }
 
         // Get total count
         const countResult = await ctx.db
@@ -429,4 +432,146 @@ export const quoteRouter = createTRPCRouter({
       });
     }
   }),
+
+  updateCharges: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        complexityCharge: z.number(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Calculate new grand total based on the quote data
+        const quoteData = await ctx.db
+          .select()
+          .from(quotes)
+          .where(
+            and(
+              eq(quotes.id, input.id), 
+              eq(quotes.userId, ctx.session.user.id)
+            )
+          )
+          .limit(1);
+          
+        if (!quoteData[0]) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Quote not found',
+          });
+        }
+        
+        // Get all tasks to calculate subtotals
+        const quoteTasks = await ctx.db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.quoteId, input.id));
+          
+        // Calculate subtotals
+        const subtotalTasks = quoteTasks.reduce((sum, task) => sum + Number(task.price), 0);
+        const subtotalMaterials = quoteTasks.reduce((sum, task) => sum + Number(task.estimatedMaterialsCost), 0);
+        const subtotal = subtotalTasks + subtotalMaterials;
+        
+        // Calculate grand total
+        const complexityCharge = input.complexityCharge;
+        const markup = (subtotal + complexityCharge) * (quoteData[0].markupPercentage / 100);
+        const grandTotal = subtotal + complexityCharge + markup;
+        
+        // Update the quote
+        const [updatedQuote] = await ctx.db
+          .update(quotes)
+          .set({
+            complexityCharge: complexityCharge.toString(),
+            subtotalTasks: subtotalTasks.toString(),
+            subtotalMaterials: subtotalMaterials.toString(),
+            markupCharge: markup.toString(),
+            grandTotal: grandTotal.toString(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(quotes.id, input.id), 
+              eq(quotes.userId, ctx.session.user.id)
+            )
+          )
+          .returning();
+          
+        if (!updatedQuote) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update quote charges',
+          });
+        }
+        
+        return updatedQuote;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update quote charges',
+          cause: error,
+        });
+      }
+    }),
+    
+  updateStatus: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Check if the quote exists and belongs to the user
+        const existingQuote = await ctx.db
+          .select()
+          .from(quotes)
+          .where(
+            and(
+              eq(quotes.id, input.id), 
+              eq(quotes.userId, ctx.session.user.id)
+            )
+          )
+          .limit(1);
+          
+        if (!existingQuote[0]) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Quote not found',
+          });
+        }
+        
+        // Update the quote status
+        const [updatedQuote] = await ctx.db
+          .update(quotes)
+          .set({
+            status: input.status,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(quotes.id, input.id), 
+              eq(quotes.userId, ctx.session.user.id)
+            )
+          )
+          .returning();
+          
+        if (!updatedQuote) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update quote status',
+          });
+        }
+        
+        return updatedQuote;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update quote status',
+          cause: error,
+        });
+      }
+    }),
 });

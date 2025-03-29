@@ -172,6 +172,7 @@ export const quotes = pgTable('quotes', {
   subtotalMaterials: text('subtotal_materials').notNull().default('0'),
   complexityCharge: text('complexity_charge').notNull().default('0'),
   markupCharge: text('markup_charge').notNull().default('0'),
+  markupPercentage: text('markup_percentage').notNull().default('10'),
   grandTotal: text('grand_total').notNull().default('0'),
   notes: text('notes'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

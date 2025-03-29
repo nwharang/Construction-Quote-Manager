@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Plus, X, Save, Edit } from 'lucide-react';
+import { ArrowLeft, Plus, X, Save, Edit, Trash2, Loader2 } from 'lucide-react';
 import {
   Button,
   Card,
@@ -21,11 +21,14 @@ import {
   Breadcrumbs,
   BreadcrumbItem,
   NumberInput,
+  useDisclosure,
 } from '@heroui/react';
-import { toast } from 'sonner';
 import { api } from '~/utils/api';
 import type { TRPCClientErrorLike } from '@trpc/client';
 import type { AppRouter } from '~/server/api/root';
+import { useAppToast } from '~/components/providers/ToastProvider';
+import { useTranslation } from '~/hooks/useTranslation';
+import type { RouterOutputs } from '~/utils/api';
 
 interface Product {
   id: string;
@@ -54,6 +57,9 @@ export default function NewQuotePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const { data: session, status } = useSession();
+  const toast = useAppToast();
+  const { formatCurrency } = useTranslation();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Add tRPC mutation hooks at the top
 
@@ -168,7 +174,7 @@ export default function NewQuotePage() {
   }
 
   // Helper to format currency input
-  const formatCurrency = (value: string) => {
+  const formatCurrencyInput = (value: string) => {
     const num = parseFloat(value.replace(/[^\d.]/g, ''));
     return isNaN(num) ? '0.00' : num.toFixed(2);
   };
@@ -214,7 +220,7 @@ export default function NewQuotePage() {
     if (name === 'complexityCharge' || name === 'markupCharge') {
       setFormData({
         ...formData,
-        [name]: formatCurrency(value),
+        [name]: formatCurrencyInput(value),
       });
     } else {
       setFormData({
@@ -238,7 +244,7 @@ export default function NewQuotePage() {
     if (name === 'price' || name === 'estimatedMaterialsCostLumpSum') {
       newTasks[index] = {
         ...task,
-        [name]: formatCurrency(value),
+        [name]: formatCurrencyInput(value),
       };
     } else if (name === 'materialType') {
       newTasks[index] = {
@@ -332,7 +338,7 @@ export default function NewQuotePage() {
     } else if (name === 'unitPrice') {
       setCurrentMaterial({
         ...currentMaterial,
-        [name]: typeof value === 'string' ? formatCurrency(value) : value.toString(),
+        [name]: typeof value === 'string' ? formatCurrencyInput(value) : value.toString(),
       });
     } else {
       setCurrentMaterial({
@@ -514,7 +520,7 @@ export default function NewQuotePage() {
 
                             newTasks[index] = {
                               ...task,
-                              price: formatCurrency(value.toString()),
+                              price: formatCurrencyInput(value.toString()),
                             };
                             setTasks(newTasks);
                           }}
@@ -553,7 +559,7 @@ export default function NewQuotePage() {
 
                             newTasks[index] = {
                               ...task,
-                              estimatedMaterialsCostLumpSum: formatCurrency(value.toString()),
+                              estimatedMaterialsCostLumpSum: formatCurrencyInput(value.toString()),
                             };
                             setTasks(newTasks);
                           }}
@@ -654,7 +660,7 @@ export default function NewQuotePage() {
                     onValueChange={(value) => {
                       setFormData({
                         ...formData,
-                        complexityCharge: formatCurrency(value.toString()),
+                        complexityCharge: formatCurrencyInput(value.toString()),
                       });
                     }}
                     startContent={<span className="text-gray-500">$</span>}
@@ -668,7 +674,7 @@ export default function NewQuotePage() {
                     onValueChange={(value) => {
                       setFormData({
                         ...formData,
-                        markupCharge: formatCurrency(value.toString()),
+                        markupCharge: formatCurrencyInput(value.toString()),
                       });
                     }}
                     startContent={<span className="text-gray-500">$</span>}

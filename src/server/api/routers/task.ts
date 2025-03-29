@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { tasks, quotes } from "~/server/db/schema";
+import { tasks, quotes, materials } from "~/server/db/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { type InferInsertModel } from "drizzle-orm";
@@ -9,6 +9,45 @@ import { type InferInsertModel } from "drizzle-orm";
 type InsertTask = InferInsertModel<typeof tasks>;
 
 export const taskRouter = createTRPCRouter({
+  getByQuoteId: protectedProcedure
+    .input(z.object({ quoteId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        // Check if quote belongs to user
+        const quote = await ctx.db.query.quotes.findFirst({
+          where: and(
+            eq(quotes.id, input.quoteId),
+            eq(quotes.userId, ctx.session.user.id)
+          ),
+        });
+
+        if (!quote) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: "You don't have permission to view tasks for this quote",
+          });
+        }
+
+        // Get tasks for the quote
+        const taskList = await ctx.db.query.tasks.findMany({
+          where: eq(tasks.quoteId, input.quoteId),
+          with: {
+            materials: true,
+          },
+          orderBy: tasks.order,
+        });
+
+        return taskList;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch tasks',
+          cause: error,
+        });
+      }
+    }),
+
   create: protectedProcedure
     .input(
       z.object({

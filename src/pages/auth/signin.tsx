@@ -132,7 +132,7 @@ const SignIn: NextPage = () => {
             <CardFooter>
               <div className="relative z-10">
                 <p className="opacity-80 text-sm">
-                  Don't have an account?{' '}
+                  Don&apos;t have an account?{' '}
                   <Link href={routes.auth.signUp} className="underline hover:opacity-100 text-sm">
                     Sign up
                   </Link>

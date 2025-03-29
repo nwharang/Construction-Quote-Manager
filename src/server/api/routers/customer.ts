@@ -27,15 +27,17 @@ export const customerRouter = createTRPCRouter({
         const offset = (page - 1) * limit;
 
         // Build search condition
-        const whereClause = search
-          ? and(
-              eq(customers.userId, ctx.session.user.id),
-              or(
-                ilike(customers.name, `%${search}%`),
-                ilike(customers.email, `%${search}%`)
-              )
+        let whereClause = eq(customers.userId, ctx.session.user.id);
+        
+        if (search) {
+          whereClause = and(
+            whereClause,
+            or(
+              ilike(customers.name, `%${search}%`),
+              ilike(customers.email, `%${search}%`)
             )
-          : eq(customers.userId, ctx.session.user.id);
+          );
+        }
 
         // Get total count
         const countResult = await ctx.db

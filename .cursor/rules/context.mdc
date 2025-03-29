@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+### Code Quality
+10. Use TypeScript strictly
+11. Follow ESLint rules
+12. Write meaningful code comments
+13. Document complex logic
+14. Test new features
+15. Review code before finishing
+16. Keep dependencies updated
+17. Monitor performance
+
+### Consistency
+18. Follow accessibility guidelines
+19. Maintain consistent code style
+20. Maintain consistent UI style
+21. Maintain consistent package documentation
+22. Ensure localization for each page
+
+### Best Practices
+23. Avoid deprecated methods
+24. Use Tailwind CSS (no inline styling)
+25. Keep project clean (no useless files/packages)
+26. Ensure no lint errors, even during build
+27. Maintain high standard for code, logic, and testing
+28. Centralize localization
+29. Update changelog for every code update
+30. Document all features and packages
+31. Use consistent naming conventions for page notes
+
+### Code Review
+32. Perform thorough code reviews on all non-ignored directories and files to ensure consistent organization, naming conventions, and adherence to project standards.

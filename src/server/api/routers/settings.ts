@@ -23,9 +23,32 @@ const updateSettingsInput = z.object({
   timeFormat: z.enum(['12h', '24h']),
 });
 
+// Default settings
+const defaultSettings = {
+  companyName: '',
+  companyEmail: '',
+  companyPhone: '',
+  companyAddress: '',
+  defaultComplexityCharge: '0',
+  defaultMarkupCharge: '0',
+  defaultTaskPrice: '0',
+  defaultMaterialPrice: '0',
+  emailNotifications: true,
+  quoteNotifications: true,
+  taskNotifications: true,
+  theme: 'system',
+  currency: 'USD',
+  currencySymbol: '$',
+  dateFormat: 'MM/DD/YYYY',
+  timeFormat: '12h',
+};
+
 export const settingsRouter = createTRPCRouter({
   get: protectedProcedure.query(async ({ ctx }) => {
     try {
+      // Use staleTime to cache the settings for 5 minutes (300000ms)
+      // This is configured on the client side in utils/api.ts
+      
       const userSettings = await ctx.db
         .select()
         .from(settings)
@@ -38,22 +61,7 @@ export const settingsRouter = createTRPCRouter({
           .insert(settings)
           .values({
             userId: ctx.session.user.id,
-            companyName: '',
-            companyEmail: '',
-            companyPhone: '',
-            companyAddress: '',
-            defaultComplexityCharge: '0',
-            defaultMarkupCharge: '0',
-            defaultTaskPrice: '0',
-            defaultMaterialPrice: '0',
-            emailNotifications: true,
-            quoteNotifications: true,
-            taskNotifications: true,
-            theme: 'system',
-            currency: 'USD',
-            currencySymbol: '$',
-            dateFormat: 'MM/DD/YYYY',
-            timeFormat: '12h',
+            ...defaultSettings,
           })
           .returning();
 
@@ -62,6 +70,7 @@ export const settingsRouter = createTRPCRouter({
 
       return userSettings[0];
     } catch (error) {
+      console.error('Error fetching settings:', error);
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to fetch settings',
@@ -96,6 +105,7 @@ export const settingsRouter = createTRPCRouter({
 
         return updatedSettings;
       } catch (error) {
+        console.error('Error updating settings:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

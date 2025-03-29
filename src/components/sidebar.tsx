@@ -50,7 +50,7 @@ export default function Sidebar() {
       {/* Sidebar */}
       <Card
         ref={sidebarRef}
-        className={`fixed sm:static sm:translate-x-0 top-0 left-0 h-full w-64 z-50 transform transition-transform duration-300 ease-in-out border-none shadow-none rounded-none ${
+        className={`fixed sm:static sm:translate-x-0 top-0 left-0 h-full w-64 z-50 transform bg-transparent transition-transform duration-300 ease-in-out border-none shadow-none rounded-none ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

@@ -4,29 +4,33 @@ import { SessionProvider } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { Layout } from '../components/layout';
 import { HeroUIProvider, Spinner } from '@heroui/react';
-import { type AppType } from 'next/app';
+import { type AppProps } from 'next/app';
 import { type Session } from 'next-auth';
 import { api } from '~/utils/api';
 import { SettingsProvider } from '~/contexts/settings-context';
 import { ThemeProvider } from '~/components/providers/ThemeProvider';
+import { ToastProvider } from '~/components/providers/ToastProvider';
+import { LocalizationProvider } from '~/contexts/LocalizationContext';
+import Head from 'next/head';
 
-const MyApp: AppType<{ session: Session | null }> = ({
-  Component,
-  pageProps: { session, ...pageProps },
-}) => {
+// Use the built-in AppProps type with Session
+type AppPropsWithSession = AppProps<{ session: Session | null }>;
+
+const MyApp = ({ Component, pageProps: { session, ...pageProps } }: AppPropsWithSession) => {
   const router = useRouter();
   const isAuthPage = router.pathname.startsWith('/auth/');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Initialize app and hide loading spinner
     setLoading(false);
   }, []);
 
   if (loading) {
     return (
       <HeroUIProvider>
-        <div className="flex justify-center items-center">
-          <Spinner />
+        <div className="flex h-screen w-full justify-center items-center">
+          <Spinner size="lg" />
         </div>
       </HeroUIProvider>
     );
@@ -36,15 +40,19 @@ const MyApp: AppType<{ session: Session | null }> = ({
     <SessionProvider session={session}>
       <SettingsProvider>
         <ThemeProvider>
-          <HeroUIProvider>
-            {isAuthPage ? (
-              <Component {...pageProps} />
-            ) : (
-              <Layout>
-                <Component {...pageProps} />
-              </Layout>
-            )}
-          </HeroUIProvider>
+          <LocalizationProvider>
+            <HeroUIProvider>
+              <ToastProvider>
+                {isAuthPage ? (
+                  <Component {...pageProps} />
+                ) : (
+                  <Layout>
+                    <Component {...pageProps} />
+                  </Layout>
+                )}
+              </ToastProvider>
+            </HeroUIProvider>
+          </LocalizationProvider>
         </ThemeProvider>
       </SettingsProvider>
     </SessionProvider>

@@ -1,14 +1,14 @@
 import React from 'react';
 import Head from 'next/head';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { LogOut, FileText, Plus, User, Home, Settings, CreditCard, BarChart4 } from 'lucide-react';
+import { FileText, Plus, User, BarChart4 } from 'lucide-react';
 import { api } from '~/utils/api';
 import { QuoteStatus } from '~/server/db/schema';
 import type { RouterOutputs } from '~/utils/api';
-import { Button, Card, CardBody, CardHeader, CardFooter, Chip, Spinner } from '@heroui/react';
+import { Button, Card, CardBody, CardHeader, Chip, Spinner } from '@heroui/react';
 
-type Quote = RouterOutputs['quote']['getAll']['items'][number];
+type Quote = RouterOutputs['quote']['getDashboardStats']['recentQuotes'][number];
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -106,7 +106,7 @@ export default function Dashboard() {
               <CardBody className="p-6">
                 <div className="flex items-center gap-4">
                   <div className="p-2 rounded-lg bg-success/5">
-                    <CreditCard className="h-6 w-6 text-success/80" />
+                    <FileText className="h-6 w-6 text-success/80" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground/80">Accepted Quotes</p>

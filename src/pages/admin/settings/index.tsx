@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import {
@@ -10,19 +10,28 @@ import {
   SelectItem,
   Switch,
   Button,
-  Divider,
   Spinner,
   Tabs,
   Tab,
 } from '@heroui/react';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import { useSettings } from '~/contexts/settings-context';
+import { Save } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { settings, updateSettings, isLoading } = useSettings();
   const toast = useAppToast();
+  
+  // Create local state for form values
+  const [formValues, setFormValues] = useState({...settings});
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Update local form state when settings are loaded
+  useEffect(() => {
+    setFormValues({...settings});
+  }, [settings]);
 
   // Loading state
   if (status === 'loading' || isLoading) {
@@ -39,12 +48,64 @@ export default function SettingsPage() {
     return null;
   }
 
-  const handleSettingChange = (
+  const handleInputChange = (
     key: keyof typeof settings,
     value: string | boolean | number
   ) => {
-    updateSettings({ [key]: value });
-    toast.success('Settings updated successfully');
+    // Update local form state only, not the actual settings
+    setFormValues(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+  
+  const handleSaveSettings = (section: string) => {
+    setIsSaving(true);
+    
+    try {
+      // Create a copy of the values to update
+      let updatedSettings: Partial<typeof settings> = {};
+      
+      if (section === 'general') {
+        // Company information is completely optional, no validation needed
+        updatedSettings = {
+          companyName: formValues.companyName,
+          companyEmail: formValues.companyEmail,
+          companyPhone: formValues.companyPhone,
+          companyAddress: formValues.companyAddress
+        };
+      } else if (section === 'quotes') {
+        updatedSettings = {
+          defaultComplexityCharge: formValues.defaultComplexityCharge,
+          defaultMarkupCharge: formValues.defaultMarkupCharge,
+          defaultTaskPrice: formValues.defaultTaskPrice,
+          defaultMaterialPrice: formValues.defaultMaterialPrice
+        };
+      } else if (section === 'notifications') {
+        updatedSettings = {
+          emailNotifications: formValues.emailNotifications,
+          quoteNotifications: formValues.quoteNotifications,
+          taskNotifications: formValues.taskNotifications
+        };
+      } else if (section === 'appearance') {
+        updatedSettings = {
+          theme: formValues.theme,
+          currency: formValues.currency,
+          currencySymbol: formValues.currencySymbol,
+          dateFormat: formValues.dateFormat,
+          timeFormat: formValues.timeFormat
+        };
+      }
+      
+      // Update the settings
+      updateSettings(updatedSettings);
+      toast.success(`${section.charAt(0).toUpperCase() + section.slice(1)} settings saved successfully`);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -61,12 +122,21 @@ export default function SettingsPage() {
               <CardHeader>General Settings</CardHeader>
               <CardBody>
                 <div className="space-y-4">
+                  <div className="bg-info/10 p-3 rounded-md mb-3">
+                    <p className="text-sm">
+                      <strong>Note:</strong> All company information is completely optional. 
+                      Empty fields will use default values when needed.
+                    </p>
+                  </div>
+                
                   <div>
-                    <label className="mb-2 block text-sm font-medium">Company Name</label>
+                    <label className="mb-2 block text-sm font-medium">
+                      Company Name
+                    </label>
                     <Input
-                      value={settings.companyName}
-                      onChange={(e) => handleSettingChange('companyName', e.target.value)}
-                      placeholder="Your Company Name"
+                      value={formValues.companyName}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      placeholder="Your Company Name (Optional)"
                     />
                   </div>
 
@@ -74,9 +144,9 @@ export default function SettingsPage() {
                     <label className="mb-2 block text-sm font-medium">Company Email</label>
                     <Input
                       type="email"
-                      value={settings.companyEmail}
-                      onChange={(e) => handleSettingChange('companyEmail', e.target.value)}
-                      placeholder="company@example.com"
+                      value={formValues.companyEmail}
+                      onChange={(e) => handleInputChange('companyEmail', e.target.value)}
+                      placeholder="company@example.com (Optional)"
                     />
                   </div>
 
@@ -84,19 +154,30 @@ export default function SettingsPage() {
                     <label className="mb-2 block text-sm font-medium">Company Phone</label>
                     <Input
                       type="tel"
-                      value={settings.companyPhone}
-                      onChange={(e) => handleSettingChange('companyPhone', e.target.value)}
-                      placeholder="(555) 555-5555"
+                      value={formValues.companyPhone}
+                      onChange={(e) => handleInputChange('companyPhone', e.target.value)}
+                      placeholder="(555) 555-5555 (Optional)"
                     />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium">Company Address</label>
                     <Input
-                      value={settings.companyAddress}
-                      onChange={(e) => handleSettingChange('companyAddress', e.target.value)}
-                      placeholder="123 Main St, City, State ZIP"
+                      value={formValues.companyAddress}
+                      onChange={(e) => handleInputChange('companyAddress', e.target.value)}
+                      placeholder="123 Main St, City, State ZIP (Optional)"
                     />
+                  </div>
+                  
+                  <div className="pt-4">
+                    <Button 
+                      color="primary"
+                      startContent={<Save size={18} />}
+                      onPress={() => handleSaveSettings('general')}
+                      isLoading={isSaving}
+                    >
+                      Save General Settings
+                    </Button>
                   </div>
                 </div>
               </CardBody>
@@ -112,8 +193,8 @@ export default function SettingsPage() {
                     <label className="mb-2 block text-sm font-medium">Default Complexity Charge (%)</label>
                     <Input
                       type="number"
-                      value={settings.defaultComplexityCharge}
-                      onChange={(e) => handleSettingChange('defaultComplexityCharge', e.target.value)}
+                      value={formValues.defaultComplexityCharge}
+                      onChange={(e) => handleInputChange('defaultComplexityCharge', e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -122,8 +203,8 @@ export default function SettingsPage() {
                     <label className="mb-2 block text-sm font-medium">Default Markup Charge (%)</label>
                     <Input
                       type="number"
-                      value={settings.defaultMarkupCharge}
-                      onChange={(e) => handleSettingChange('defaultMarkupCharge', e.target.value)}
+                      value={formValues.defaultMarkupCharge}
+                      onChange={(e) => handleInputChange('defaultMarkupCharge', e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -132,8 +213,8 @@ export default function SettingsPage() {
                     <label className="mb-2 block text-sm font-medium">Default Task Price</label>
                     <Input
                       type="number"
-                      value={settings.defaultTaskPrice}
-                      onChange={(e) => handleSettingChange('defaultTaskPrice', e.target.value)}
+                      value={formValues.defaultTaskPrice}
+                      onChange={(e) => handleInputChange('defaultTaskPrice', e.target.value)}
                       placeholder="0"
                     />
                   </div>
@@ -142,10 +223,21 @@ export default function SettingsPage() {
                     <label className="mb-2 block text-sm font-medium">Default Material Price</label>
                     <Input
                       type="number"
-                      value={settings.defaultMaterialPrice}
-                      onChange={(e) => handleSettingChange('defaultMaterialPrice', e.target.value)}
+                      value={formValues.defaultMaterialPrice}
+                      onChange={(e) => handleInputChange('defaultMaterialPrice', e.target.value)}
                       placeholder="0"
                     />
+                  </div>
+                  
+                  <div className="pt-4">
+                    <Button 
+                      color="primary"
+                      startContent={<Save size={18} />}
+                      onPress={() => handleSaveSettings('quotes')}
+                      isLoading={isSaving}
+                    >
+                      Save Quote Settings
+                    </Button>
                   </div>
                 </div>
               </CardBody>
@@ -165,8 +257,8 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <Switch
-                      isSelected={settings.emailNotifications}
-                      onValueChange={(checked) => handleSettingChange('emailNotifications', checked)}
+                      isSelected={formValues.emailNotifications}
+                      onValueChange={(checked) => handleInputChange('emailNotifications', checked)}
                     />
                   </div>
 
@@ -178,8 +270,8 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <Switch
-                      isSelected={settings.quoteNotifications}
-                      onValueChange={(checked) => handleSettingChange('quoteNotifications', checked)}
+                      isSelected={formValues.quoteNotifications}
+                      onValueChange={(checked) => handleInputChange('quoteNotifications', checked)}
                     />
                   </div>
 
@@ -191,9 +283,20 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <Switch
-                      isSelected={settings.taskNotifications}
-                      onValueChange={(checked) => handleSettingChange('taskNotifications', checked)}
+                      isSelected={formValues.taskNotifications}
+                      onValueChange={(checked) => handleInputChange('taskNotifications', checked)}
                     />
+                  </div>
+                  
+                  <div className="pt-4">
+                    <Button 
+                      color="primary"
+                      startContent={<Save size={18} />}
+                      onPress={() => handleSaveSettings('notifications')}
+                      isLoading={isSaving}
+                    >
+                      Save Notification Settings
+                    </Button>
                   </div>
                 </div>
               </CardBody>
@@ -208,10 +311,10 @@ export default function SettingsPage() {
                   <div>
                     <label className="mb-2 block text-sm font-medium">Theme</label>
                     <Select
-                      selectedKeys={[settings.theme]}
+                      selectedKeys={[formValues.theme]}
                       onSelectionChange={(keys) => {
                         const selected = Array.from(keys)[0] as 'light' | 'dark' | 'system';
-                        handleSettingChange('theme', selected);
+                        handleInputChange('theme', selected);
                       }}
                     >
                       <SelectItem key="light">Light</SelectItem>
@@ -223,8 +326,8 @@ export default function SettingsPage() {
                   <div>
                     <label className="mb-2 block text-sm font-medium">Currency</label>
                     <Input
-                      value={settings.currency}
-                      onChange={(e) => handleSettingChange('currency', e.target.value)}
+                      value={formValues.currency}
+                      onChange={(e) => handleInputChange('currency', e.target.value)}
                       placeholder="USD"
                     />
                   </div>
@@ -232,33 +335,21 @@ export default function SettingsPage() {
                   <div>
                     <label className="mb-2 block text-sm font-medium">Currency Symbol</label>
                     <Input
-                      value={settings.currencySymbol}
-                      onChange={(e) => handleSettingChange('currencySymbol', e.target.value)}
+                      value={formValues.currencySymbol}
+                      onChange={(e) => handleInputChange('currencySymbol', e.target.value)}
                       placeholder="$"
                     />
                   </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">Date Format</label>
-                    <Input
-                      value={settings.dateFormat}
-                      onChange={(e) => handleSettingChange('dateFormat', e.target.value)}
-                      placeholder="MM/DD/YYYY"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">Time Format</label>
-                    <Select
-                      selectedKeys={[settings.timeFormat]}
-                      onSelectionChange={(keys) => {
-                        const selected = Array.from(keys)[0] as '12h' | '24h';
-                        handleSettingChange('timeFormat', selected);
-                      }}
+                  
+                  <div className="pt-4">
+                    <Button 
+                      color="primary"
+                      startContent={<Save size={18} />}
+                      onPress={() => handleSaveSettings('appearance')}
+                      isLoading={isSaving}
                     >
-                      <SelectItem key="12h">12-hour</SelectItem>
-                      <SelectItem key="24h">24-hour</SelectItem>
-                    </Select>
+                      Save Appearance Settings
+                    </Button>
                   </div>
                 </div>
               </CardBody>

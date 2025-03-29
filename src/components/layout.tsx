@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
@@ -59,10 +59,10 @@ export function Layout({ children, title, description }: LayoutProps) {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar maxWidth={'full'}>
-          <NavbarBrand className='hidden sm:block'>
-            <Link href="/" className="font-bold text-xl text-foreground/90">
+          <NavbarBrand className="hidden sm:block">
+            <Link href="/" className="text-foreground/90 text-xl font-bold">
               TTXD
             </Link>
           </NavbarBrand>

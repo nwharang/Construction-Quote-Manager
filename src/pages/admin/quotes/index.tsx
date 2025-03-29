@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Plus, Search, MoreVertical } from 'lucide-react';
+import { Plus, Search, MoreVertical, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import {
   Button,
   Table,
@@ -19,12 +19,18 @@ import {
   DropdownItem,
   Pagination,
   Spinner,
+  Select,
+  SelectItem,
+  Card,
+  CardBody,
 } from '@heroui/react';
 import { api } from '~/utils/api';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import { QuoteStatus } from '~/server/db/schema';
 import type { RouterOutputs } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
+import { TRPCClientError } from '@trpc/client';
+import type { AppRouter } from '~/server/api/root';
 
 type Quote = RouterOutputs['quote']['getAll']['quotes'][number];
 type QuoteStatusType = (typeof QuoteStatus)[keyof typeof QuoteStatus];
@@ -50,11 +56,51 @@ const columns: Column[] = [
   { name: 'ACTIONS', uid: 'actions' },
 ];
 
+const QuoteLoadingError = ({ 
+  error, 
+  onRetry 
+}: { 
+  error: unknown; 
+  onRetry: () => void;
+}) => {
+  const errorMessage = error instanceof Error 
+    ? error.message 
+    : typeof error === 'string' 
+      ? error 
+      : 'Failed to load quotes';
+      
+  const isNetworkError = errorMessage.includes('Failed to fetch') || 
+                         errorMessage.includes('network');
+  
+  return (
+    <Card className="w-full bg-danger-50">
+      <CardBody>
+        <div className="flex flex-col items-center justify-center py-8 gap-4">
+          <AlertTriangle size={48} className="text-danger" />
+          <h2 className="text-xl font-semibold">Error Loading Quotes</h2>
+          <p className="text-gray-600">
+            {isNetworkError 
+              ? 'Network error. Please check your internet connection.' 
+              : errorMessage}
+          </p>
+          <Button 
+            color="primary" 
+            startContent={<RefreshCw className="h-4 w-4" />}
+            onClick={onRetry}
+          >
+            Retry
+          </Button>
+        </div>
+      </CardBody>
+    </Card>
+  );
+};
+
 export default function QuotesPage() {
   const router = useRouter();
   const { data: session, status: authStatus } = useSession();
   const [filterValue, setFilterValue] = useState('');
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<QuoteStatusType>>(new Set());
+  const [selectedStatus, setSelectedStatus] = useState<QuoteStatusType | 'all'>('all');
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const toast = useAppToast();
@@ -66,7 +112,7 @@ export default function QuotesPage() {
       page,
       limit: rowsPerPage,
       search: filterValue,
-      status: selectedStatuses.size > 0 ? Array.from(selectedStatuses)[0] : undefined,
+      status: selectedStatus === 'all' ? undefined : selectedStatus,
     },
     { enabled: authStatus === 'authenticated' }
   );
@@ -147,12 +193,13 @@ export default function QuotesPage() {
               variant="flat"
               color="primary"
               onPress={() => router.push(`/admin/quotes/${quote.id}`)}
+              isDisabled={deleteQuoteMutation.isPending}
             >
               View
             </Button>
             <Dropdown>
               <DropdownTrigger>
-                <Button isIconOnly size="sm" variant="light">
+                <Button isIconOnly size="sm" variant="light" isDisabled={deleteQuoteMutation.isPending}>
                   <MoreVertical className="text-default-500" />
                 </Button>
               </DropdownTrigger>
@@ -168,8 +215,16 @@ export default function QuotesPage() {
                   className="text-danger"
                   color="danger"
                   onPress={() => handleDeleteQuote(quote.id)}
+                  isDisabled={deleteQuoteMutation.isPending}
                 >
-                  Delete
+                  {deleteQuoteMutation.isPending ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Deleting...</span>
+                    </div>
+                  ) : (
+                    'Delete'
+                  )}
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
@@ -214,12 +269,39 @@ export default function QuotesPage() {
                 setPage(1);
               }}
             />
+            <Select
+              className="w-full sm:max-w-[44%]"
+              placeholder="Filter by status"
+              selectedKeys={[selectedStatus]}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value as QuoteStatusType | 'all');
+                setPage(1);
+              }}
+            >
+              <SelectItem key="all" textValue="All Statuses">
+                All Statuses
+              </SelectItem>
+              <SelectItem key={QuoteStatus.DRAFT} textValue="Draft">
+                Draft
+              </SelectItem>
+              <SelectItem key={QuoteStatus.SENT} textValue="Sent">
+                Sent
+              </SelectItem>
+              <SelectItem key={QuoteStatus.ACCEPTED} textValue="Accepted">
+                Accepted
+              </SelectItem>
+              <SelectItem key={QuoteStatus.REJECTED} textValue="Rejected">
+                Rejected
+              </SelectItem>
+            </Select>
           </div>
 
           {quotesQuery.isLoading ? (
             <div className="flex justify-center items-center h-64">
               <Spinner />
             </div>
+          ) : quotesQuery.isError ? (
+            <QuoteLoadingError error={quotesQuery.error} onRetry={() => void quotesQuery.refetch()} />
           ) : (
             <>
               <Table
@@ -252,42 +334,28 @@ export default function QuotesPage() {
                 </TableBody>
               </Table>
 
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Rows per page:</span>
-                    <select
-                      className="text-sm border rounded-md px-2 py-1 bg-background text-foreground"
-                      value={rowsPerPage}
-                      onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
-                    >
-                      {[10, 20, 30, 40, 50].map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {quotesQuery.data?.total ?? 0} items
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-center">
-                  <Pagination
-                    total={Math.ceil((quotesQuery.data?.total ?? 0) / rowsPerPage)}
-                    page={page}
-                    onChange={handlePageChange}
-                    showControls
-                    color="primary"
-                    classNames={{
-                      wrapper: 'gap-2',
-                      item: 'w-8 h-8',
-                      cursor: 'bg-primary',
-                    }}
-                  />
-                </div>
+              <div className="flex justify-between items-center">
+                <Pagination
+                  total={Math.ceil((quotesQuery.data?.total ?? 0) / rowsPerPage)}
+                  page={page}
+                  onChange={handlePageChange}
+                  showControls
+                />
+                <Select
+                  className="w-32"
+                  selectedKeys={[rowsPerPage.toString()]}
+                  onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
+                >
+                  <SelectItem key="10" textValue="10 per page">
+                    10 per page
+                  </SelectItem>
+                  <SelectItem key="20" textValue="20 per page">
+                    20 per page
+                  </SelectItem>
+                  <SelectItem key="50" textValue="50 per page">
+                    50 per page
+                  </SelectItem>
+                </Select>
               </div>
             </>
           )}

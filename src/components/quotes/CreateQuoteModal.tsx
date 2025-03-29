@@ -17,7 +17,7 @@ import { api } from "~/utils/api";
 import { useRouter } from "next/navigation";
 
 const createQuoteSchema = z.object({
-  projectName: z.string().min(1, "Project name is required"),
+  title: z.string().min(1, "Project name is required"),
   customerName: z.string().min(1, "Customer name is required"),
   customerEmail: z.string().email().optional().or(z.literal("")),
   customerPhone: z.string().optional().or(z.literal("")),
@@ -64,9 +64,9 @@ export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
           <ModalBody>
             <Input
               label="Project Name"
-              {...register("projectName")}
-              errorMessage={errors.projectName?.message}
-              isInvalid={!!errors.projectName}
+              {...register("title")}
+              errorMessage={errors.title?.message}
+              isInvalid={!!errors.title}
             />
             <Input
               label="Customer Name"

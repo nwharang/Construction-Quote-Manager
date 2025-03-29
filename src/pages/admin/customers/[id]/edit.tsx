@@ -50,7 +50,7 @@ export default function EditCustomerPage() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center justify-center h-64">
           <h1 className="text-2xl font-bold text-foreground mb-2">Customer Not Found</h1>
-          <p className="text-muted-foreground">The customer you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground">The customer you&apos;re looking for doesn&apos;t exist.</p>
           <Button
             color="primary"
             className="mt-4"
@@ -89,7 +89,7 @@ export default function EditCustomerPage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Edit Customer</h1>
-              <p className="text-muted-foreground">Update customer information</p>
+              <p className="text-muted-foreground">Update customer&apos;s information</p>
             </div>
           </div>
 

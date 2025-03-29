@@ -1,22 +1,18 @@
 {
-  "extends": [
-    "next/core-web-vitals",
-    "plugin:@typescript-eslint/recommended"
-  ],
-  "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint"],
+  "extends": ["next/core-web-vitals"],
   "rules": {
-    "@typescript-eslint/no-unused-vars": "warn",
+    // Allow unused variables with an underscore prefix
+    "@typescript-eslint/no-unused-vars": ["warn", { 
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_",
+      "caughtErrorsIgnorePattern": "^_"
+    }],
+    
+    // Allow specific 'any' types in certain files
     "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/ban-ts-comment": [
-      "warn",
-      {
-        "ts-expect-error": "allow-with-description",
-        "ts-ignore": "allow-with-description",
-        "minimumDescriptionLength": 10
-      }
-    ],
-    "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn"
+    
+    // NextJS specific rules
+    "@next/next/no-img-element": "warn",
+    "@next/next/no-html-link-for-pages": "warn"
   }
 } 

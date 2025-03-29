@@ -4,14 +4,15 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Save } from 'lucide-react';
 import { api } from '~/utils/api';
-import { Button, Card, CardBody, Input, Textarea, Spinner, useToast } from '@heroui/react';
+import { Button, Card, CardBody, Input, Textarea, Spinner } from '@heroui/react';
 import { ProductCategory } from '~/server/db/schema';
+import { useAppToast } from '~/components/providers/ToastProvider';
 
 export default function EditProductPage() {
   const router = useRouter();
   const { id } = router.query;
-  const { data: session, status } = useSession();
-  const toast = useToast();
+  const { status } = useSession();
+  const toast = useAppToast();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -51,6 +52,14 @@ export default function EditProductPage() {
       });
     }
   }, [product]);
+
+  // Add error handling with useEffect
+  useEffect(() => {
+    if (isLoadingProduct) return;
+    if (!product && id) {
+      toast.error(`Failed to load product details`);
+    }
+  }, [product, id, isLoadingProduct, toast]);
 
   // Loading state
   if (status === 'loading' || isLoadingProduct) {

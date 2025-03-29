@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Plus, Edit, Trash2, Search, Filter, ChevronDown, MoreVertical } from 'lucide-react';
+import { Plus, MoreVertical, Search, AlertTriangle } from 'lucide-react';
 import {
   Button,
   Input,
@@ -18,18 +18,13 @@ import {
   DropdownItem,
   Pagination,
   Chip,
-  Select,
-  SelectItem,
+  Card,
+  CardBody,
 } from '@heroui/react';
-import type { Selection } from '@heroui/react';
-import { type NextPage } from 'next';
+import type { NextPage } from 'next';
 import Head from 'next/head';
 import { api } from '~/utils/api';
-import { formatCurrency } from '~/utils/format';
-import { ProductCategory } from '~/server/db/schema';
-import { toast } from 'sonner';
-import type { products } from '~/server/db/schema';
-import type { InferModel } from 'drizzle-orm';
+import { type ProductCategory } from '~/server/db/schema';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import type { RouterOutputs } from '~/utils/api';
 
@@ -48,16 +43,24 @@ const columns: Column[] = [
   { name: "ACTIONS", uid: "actions" },
 ];
 
+// Helper to format currency
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value);
+};
+
 const ProductsPage: NextPage = () => {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<ProductCategoryType | 'ALL'>('ALL');
+  const selectedCategory: ProductCategoryType | 'ALL' = 'ALL';
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const toast = useAppToast();
 
-  const { data: products, isLoading } = api.product.getAll.useQuery(
+  const { data: products, isLoading, error, refetch } = api.product.getAll.useQuery(
     {
       search: searchQuery,
       category: selectedCategory === 'ALL' ? undefined : selectedCategory,
@@ -66,31 +69,39 @@ const ProductsPage: NextPage = () => {
     },
     {
       enabled: status === 'authenticated',
+      retry: 1,
     }
   );
+
+  // Handle error with useEffect
+  useEffect(() => {
+    if (error) {
+      toast.error(`Failed to load products: ${error.message}`);
+    }
+  }, [error, toast]);
 
   const deleteMutation = api.product.delete.useMutation({
     onSuccess: () => {
       toast.success('Product deleted successfully');
+      void refetch();
     },
     onError: (error) => {
-      toast.error(error.message);
+      toast.error(`Failed to delete: ${error.message}`);
     },
   });
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
-      await deleteMutation.mutateAsync({ id });
+      try {
+        await deleteMutation.mutateAsync({ id });
+      } catch (err) {
+        // Error is handled in onError callback
+      }
     }
   };
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
-    setPage(1);
-  };
-
-  const handleCategoryChange = (category: ProductCategoryType | 'ALL') => {
-    setSelectedCategory(category);
     setPage(1);
   };
 
@@ -121,6 +132,29 @@ const ProductsPage: NextPage = () => {
   if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <>
+        <Head>
+          <title>Products - Admin Dashboard</title>
+        </Head>
+        <div className="container mx-auto py-8">
+          <Card className="bg-danger-50">
+            <CardBody>
+              <div className="flex flex-col items-center justify-center py-8 gap-4">
+                <AlertTriangle size={48} className="text-danger" />
+                <h2 className="text-xl font-semibold">Error Loading Products</h2>
+                <p className="text-gray-600">{error.message}</p>
+                <Button color="primary" onClick={() => void refetch()}>Retry</Button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </>
+    );
   }
 
   const renderCell = (product: Product, columnKey: string) => {
@@ -199,29 +233,6 @@ const ProductsPage: NextPage = () => {
               value={searchQuery}
               onValueChange={handleSearch}
             />
-            <Dropdown>
-              <DropdownTrigger>
-                <Button variant="flat">
-                  {selectedCategory === 'ALL' ? 'All Categories' : selectedCategory}
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu
-                aria-label="Product categories"
-                selectedKeys={[selectedCategory]}
-                onSelectionChange={(keys) => {
-                  const selected = Array.from(keys)[0] as ProductCategoryType | 'ALL';
-                  handleCategoryChange(selected);
-                }}
-                selectionMode="single"
-              >
-                <>
-                  <DropdownItem key="ALL">All Categories</DropdownItem>
-                  {Object.values(ProductCategory).map((category) => (
-                    <DropdownItem key={category}>{category}</DropdownItem>
-                  ))}
-                </>
-              </DropdownMenu>
-            </Dropdown>
           </div>
 
           <Table

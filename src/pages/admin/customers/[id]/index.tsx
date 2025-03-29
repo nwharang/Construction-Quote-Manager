@@ -16,10 +16,16 @@ import {
   TableRow,
   TableCell,
   Chip,
+  Divider,
+  Link,
 } from '@heroui/react';
 import { api } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
-import { QuoteStatus } from '~/server/db/schema';
+import { type QuoteStatus } from '~/server/db/schema';
+import { useAppToast } from '~/components/providers/ToastProvider';
+
+// Fix: Use import type for type-only imports
+import type { customers } from '~/server/db/schema';
 
 const statusColorMap: Record<keyof typeof QuoteStatus, 'default' | 'primary' | 'success' | 'danger'> = {
   DRAFT: 'default',
@@ -43,7 +49,7 @@ export default function CustomerDetailsPage() {
   // Fetch customer's quotes
   const { data: quotes, isLoading: isLoadingQuotes } = api.quote.getAll.useQuery(
     {
-      customerId: id as string,
+      search: id as string, // Use search parameter instead of customerId
       limit: 10,
     },
     { enabled: !!id && authStatus === 'authenticated' }
@@ -70,7 +76,7 @@ export default function CustomerDetailsPage() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center justify-center h-64">
           <h1 className="text-2xl font-bold text-foreground mb-2">Customer Not Found</h1>
-          <p className="text-muted-foreground">The customer you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground">The customer you&apos;re looking for doesn&apos;t exist.</p>
           <Button
             color="primary"
             className="mt-4"
@@ -91,18 +97,20 @@ export default function CustomerDetailsPage() {
 
       <div className="container mx-auto px-4">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <Button
-              isIconOnly
-              variant="light"
-              onPress={() => router.back()}
-              aria-label="Go back"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{customer.name}</h1>
-              <p className="text-muted-foreground">Customer details and quotes</p>
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-4">
+              <Button
+                isIconOnly
+                variant="light"
+                onPress={() => router.back()}
+                isDisabled={isLoadingCustomer}
+              >
+                <ArrowLeft size={20} />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">{customer.name}</h1>
+                <p className="text-muted-foreground">Customer&apos;s details and quotes</p>
+              </div>
             </div>
           </div>
 
@@ -185,11 +193,11 @@ export default function CustomerDetailsPage() {
                       <TableColumn>TOTAL</TableColumn>
                     </TableHeader>
                     <TableBody>
-                      {quotes?.quotes.map((quote) => (
+                      {(quotes?.quotes || []).map((quote) => (
                         <TableRow
                           key={quote.id}
                           className="cursor-pointer"
-                          onPress={() => router.push(`/admin/quotes/${quote.id}`)}
+                          onClick={() => router.push(`/admin/quotes/${quote.id}`)}
                         >
                           <TableCell>{formatDate(quote.createdAt)}</TableCell>
                           <TableCell>

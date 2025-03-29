@@ -17,7 +17,7 @@ import {
   Divider,
 } from '@heroui/react';
 import { ProductCategory } from '~/server/db/schema';
-import { toast } from 'react-hot-toast';
+import { useAppToast } from '~/components/providers/ToastProvider';
 import { useState } from 'react';
 
 type ProductFormData = {
@@ -34,8 +34,9 @@ type ProductFormData = {
 
 const NewProductPage: NextPage = () => {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useAppToast();
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     description: '',
@@ -54,7 +55,8 @@ const NewProductPage: NextPage = () => {
       router.push('/admin/products');
     },
     onError: (error) => {
-      toast.error(error.message);
+      toast.error(`Failed to create product: ${error.message}`);
+      setIsSubmitting(false);
     },
   });
 
@@ -64,8 +66,8 @@ const NewProductPage: NextPage = () => {
 
     try {
       await createProduct.mutateAsync(formData);
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      // Error handling is done in the onError callback
     }
   };
 

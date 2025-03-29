@@ -20,7 +20,7 @@ export default function NotFoundPage() {
               Page Not Found
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Sorry, the page you are looking for doesn't exist or has been moved.
+              We can&apos;t seem to find the page you&apos;re looking for.
             </p>
           </div>
           

@@ -1,18 +1,20 @@
 import { hash } from "bcryptjs";
-import { db } from "@/server/db";
-import { users } from "@/server/db/schema";
+import { db } from "~/server/db";
+import { users } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import type { InferModel } from "drizzle-orm";
 
 interface CreateUserParams {
-  username: string;
+  name: string;
   email: string;
   password: string;
+  role: string;
+  username?: string;
 }
 
 type User = InferModel<typeof users>;
 
-export async function createUser({ username, email, password }: CreateUserParams) {
+export async function createUser({ name, email, password, role, username }: CreateUserParams) {
   // Check if user already exists
   const existingUser = await db
     .select()
@@ -31,9 +33,11 @@ export async function createUser({ username, email, password }: CreateUserParams
   const [user] = await db
     .insert(users)
     .values({
-      username,
+      name,
       email,
       hashedPassword,
+      role,
+      username,
     })
     .returning();
 

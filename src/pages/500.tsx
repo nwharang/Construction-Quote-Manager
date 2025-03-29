@@ -20,7 +20,7 @@ export default function ServerErrorPage() {
               Server Error
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              We're sorry, something went wrong on our server. Please try again later.
+              We&apos;re sorry, something went wrong on our server. Please try again later.
             </p>
           </div>
           

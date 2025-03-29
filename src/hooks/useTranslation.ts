@@ -1,85 +1,35 @@
 import { useCallback } from 'react';
-import { useSession } from 'next-auth/react';
-import { api } from '~/utils/api';
-import { type Locale, dateFormats, timeFormats, currencyFormats, numberFormats } from '~/i18n/config';
+import { t, type TranslationKey, type NestedTranslationKey } from '~/i18n/locales';
+import { useFormatting } from './useFormatting';
+
+// Mock function to get the current locale
+// In a real app, this would come from a context provider or settings
+const getCurrentLocale = () => {
+  // For now, we'll always return 'en'
+  // This would be replaced with actual locale detection/selection
+  return 'en';
+};
 
 export function useTranslation() {
-  const { data: session } = useSession();
-  const { data: settings } = api.settings.get.useQuery(undefined, {
-    enabled: !!session,
-  });
-
-  const locale = settings?.locale ?? 'en';
-  const dateFormat = settings?.dateFormat ?? dateFormats[locale as Locale];
-  const timeFormat = settings?.timeFormat ?? timeFormats[locale as Locale];
-  const currency = settings?.currency ?? currencyFormats[locale as Locale];
-  const numberFormat = settings?.numberFormat ?? numberFormats[locale as Locale];
-
-  const formatDate = useCallback(
-    (date: Date) => {
-      if (!settings) return date.toLocaleDateString();
-      return new Intl.DateTimeFormat(settings.locale, {
-        dateStyle: 'medium',
-      }).format(date);
-    },
-    [settings]
-  );
-
-  const formatTime = useCallback(
-    (date: Date) => {
-      if (!settings) return date.toLocaleTimeString();
-      return new Intl.DateTimeFormat(settings.locale, {
-        timeStyle: settings.timeFormat === '12h' ? 'short' : 'medium',
-      }).format(date);
-    },
-    [settings]
-  );
-
-  const formatCurrency = useCallback(
-    (amount: number) => {
-      if (!settings) return amount.toLocaleString();
-      return new Intl.NumberFormat(settings.locale, {
-        style: 'currency',
-        currency: settings.currency,
-      }).format(amount);
-    },
-    [settings]
-  );
-
-  const formatNumber = useCallback(
-    (number: number) => {
-      if (!settings) return number.toLocaleString();
-      return new Intl.NumberFormat(settings.locale, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      }).format(number);
-    },
-    [settings]
-  );
-
-  const formatPhone = useCallback(
-    (phone: string) => {
-      // Basic phone number formatting
-      const cleaned = phone.replace(/\D/g, '');
-      const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/);
-      if (match) {
-        return '(' + match[1] + ') ' + match[2] + '-' + match[3];
-      }
-      return phone;
-    },
-    []
-  );
-
+  const locale = getCurrentLocale();
+  const formatting = useFormatting();
+  
+  const translate = useCallback(<T extends TranslationKey, K extends NestedTranslationKey<T>>(
+    section: T,
+    key: K,
+    params?: Record<string, string | number>,
+  ) => {
+    return t(locale, section, key, params);
+  }, [locale]);
+  
   return {
+    t: translate,
     locale,
-    dateFormat,
-    timeFormat,
-    currency,
-    numberFormat,
-    formatDate,
-    formatTime,
-    formatCurrency,
-    formatNumber,
-    formatPhone,
+    // Include formatting functions
+    formatDate: formatting.formatDate,
+    formatTime: formatting.formatTime,
+    formatCurrency: formatting.formatCurrency,
+    formatNumber: formatting.formatNumber,
+    formatPhone: formatting.formatPhone,
   };
 } 
