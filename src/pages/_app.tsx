@@ -1,50 +1,58 @@
 import '@/styles/globals.css';
 import React from 'react';
 import type { AppProps } from 'next/app';
-import { SessionProvider } from 'next-auth/react';
-import { HeroUIProvider } from '@heroui/react';
-import { ThemeProvider } from '@/components/providers/ThemeProvider';
-import { ToastProvider } from '@/components/providers/ToastProvider';
-import { SidebarComponent } from '@/components/SidebarComponent';
-import { NavBar } from '@/components/NavBar';
+import { Providers } from '~/components/providers';
 import { api } from '~/utils/api';
-import { SettingsProvider } from '~/contexts/settings-context';
-import { QuotesProvider } from '~/contexts/QuotesContext';
-import { LocalizationProvider } from '~/contexts/LocalizationContext';
-import { CustomersProvider } from '~/contexts/CustomersContext';
-import { ProductsProvider } from '~/contexts/ProductsContext';
+import { MainLayout, PrintLayout, AuthLayout } from '~/layouts';
 
-function App({ Component, pageProps }: AppProps) {
+// Helper function to determine the layout based on the route
+const getLayout = (pathname: string) => {
+  // Print layout for print routes
+  if (pathname.includes('/print')) {
+    return 'print';
+  }
+
+  // Auth layout for auth routes
+  if (pathname.includes('/auth')) {
+    return 'auth';
+  }
+
+  // Default to main layout
+  return 'main';
+};
+
+// Helper to create a page with the appropriate layout
+const withLayout = (page: React.ReactNode, layout: string) => {
+  switch (layout) {
+    case 'print':
+      return <PrintLayout>{page}</PrintLayout>;
+    case 'auth':
+      return <AuthLayout>{page}</AuthLayout>;
+    default:
+      return <MainLayout>{page}</MainLayout>;
+  }
+};
+
+type AppPropsWithLayout = AppProps & {
+  Component: AppProps['Component'] & {
+    getLayout?: (page: React.ReactNode) => React.ReactNode;
+  };
+};
+
+function App({ Component, pageProps, router }: AppPropsWithLayout) {
+  // Check if the component has a custom getLayout function
+  const getPageLayout = Component.getLayout ?? ((page) => page);
+
+  // Otherwise, use the default layout
+  const currentLayout = getLayout(router.pathname);
+
   return (
-    <SessionProvider session={pageProps.session}>
-      <SettingsProvider>
-        <LocalizationProvider>
-          <ThemeProvider>
-            <HeroUIProvider>
-              <ToastProvider>
-                <QuotesProvider>
-                  <CustomersProvider>
-                    <ProductsProvider>
-                      <div className="flex h-screen divide-x-1 divide-foreground/5">
-                        <SidebarComponent />
-                        <div className="flex flex-col flex-1 overflow-hidden">
-                          <NavBar />
-                          <main className="flex-1 overflow-auto p-4">
-                            <Component {...pageProps} />
-                          </main>
-                        </div>
-                      </div>
-                    </ProductsProvider>
-                  </CustomersProvider>
-                </QuotesProvider>
-              </ToastProvider>
-            </HeroUIProvider>
-          </ThemeProvider>
-        </LocalizationProvider>
-      </SettingsProvider>
-    </SessionProvider>
+    <Providers session={pageProps.session}>
+      {Component.getLayout
+        ? getPageLayout(<Component {...pageProps} />)
+        : withLayout(<Component {...pageProps} />, currentLayout)}
+    </Providers>
   );
 }
 
-// Wrap the App with tRPC
 export default api.withTRPC(App);

@@ -1,51 +1,89 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft } from 'lucide-react';
-import { 
-  Button, 
+import {
+  Button,
   Spinner,
   Card,
   CardHeader,
   CardBody,
   Input,
   Textarea,
-  Divider
+  Divider,
 } from '@heroui/react';
 import { api } from '~/utils/api';
-import { useCustomers } from '~/contexts/CustomersContext';
+import { useToastStore } from '~/store';
 
 export default function EditCustomerPage() {
   const router = useRouter();
   const { id } = router.query;
   const { status } = useSession();
-  const { 
-    customerFormData, 
-    setCustomerFormData, 
-    updateCustomer, 
-    isSubmitting, 
-    fetchCustomerById, 
-    loading 
-  } = useCustomers();
+  const toast = useToastStore();
+  const [customerFormData, setCustomerFormData] = useState<any>({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    notes: '',
+  });
 
-  // Fetch customer when component mounts
-  useEffect(() => {
-    if (id && typeof id === 'string' && status === 'authenticated') {
-      fetchCustomerById(id);
+  // Get tRPC hooks
+  const utils = api.useContext();
+  
+  // Get customer by ID
+  const { data: customer, isLoading: loading } = api.customer.getById.useQuery(
+    { id: id as string },
+    {
+      enabled: !!id && typeof id === 'string' && status === 'authenticated',
     }
-  }, [id, status]);
+  );
+
+  // Set form data when customer data is loaded
+  useEffect(() => {
+    if (customer) {
+      setCustomerFormData({
+        name: customer.name,
+        email: customer.email || '',
+        phone: customer.phone || '',
+        address: customer.address || '',
+        notes: customer.notes || '',
+      });
+    }
+  }, [customer]);
+
+  // Update customer mutation
+  const updateCustomerMutation = api.customer.update.useMutation({
+    onSuccess: () => {
+      utils.customer.getAll.invalidate();
+      utils.customer.getById.invalidate({ id: id as string });
+      toast.success('Customer updated successfully');
+      router.push('/admin/customers');
+    },
+    onError: (error) => {
+      toast.error(`Error updating customer: ${error.message}`);
+    },
+  });
 
   const handleChange = (field: keyof typeof customerFormData, value: string) => {
-    setCustomerFormData({ [field]: value });
+    setCustomerFormData((prev: any) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (id && typeof id === 'string') {
-      const success = await updateCustomer(id);
-      if (success) {
-        router.push('/admin/customers');
+      try {
+        await updateCustomerMutation.mutateAsync({
+          id,
+          ...customerFormData,
+        });
+      } catch (error) {
+        // Error is handled by the mutation
+        console.error('Failed to update customer:', error);
       }
     }
   };
@@ -59,7 +97,7 @@ export default function EditCustomerPage() {
   // Loading customer data
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <Spinner />
       </div>
     );
@@ -74,21 +112,16 @@ export default function EditCustomerPage() {
       <div className="container mx-auto px-4">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
-            <Button
-              isIconOnly
-              variant="light"
-              onPress={() => router.back()}
-              aria-label="Go back"
-            >
+            <Button isIconOnly variant="light" onPress={() => router.back()} aria-label="Go back">
               <ArrowLeft size={20} />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Edit Customer</h1>
+              <h1 className="text-foreground text-2xl font-bold">Edit Customer</h1>
               <p className="text-muted-foreground">Update customer's information</p>
             </div>
           </div>
 
-          <div className="max-w-2xl mx-auto w-full">
+          <div className="mx-auto w-full max-w-2xl">
             <Card className="border-none shadow-none">
               <CardHeader className="flex flex-col gap-1">
                 <h2 className="text-xl font-semibold">Customer Information</h2>
@@ -104,7 +137,7 @@ export default function EditCustomerPage() {
                       required
                       radius="none"
                       classNames={{
-                        inputWrapper: "border-none"
+                        inputWrapper: 'border-none',
                       }}
                     />
 
@@ -112,44 +145,44 @@ export default function EditCustomerPage() {
                       label="Email"
                       type="email"
                       placeholder="Enter customer email"
-                      value={customerFormData.email}
+                      value={customerFormData.email ?? ''}
                       onChange={(e) => handleChange('email', e.target.value)}
                       radius="none"
                       classNames={{
-                        inputWrapper: "border-none"
+                        inputWrapper: 'border-none',
                       }}
                     />
 
                     <Input
                       label="Phone"
                       placeholder="Enter customer phone"
-                      value={customerFormData.phone}
+                      value={customerFormData.phone ?? ''}
                       onChange={(e) => handleChange('phone', e.target.value)}
                       radius="none"
                       classNames={{
-                        inputWrapper: "border-none"
+                        inputWrapper: 'border-none',
                       }}
                     />
 
                     <Input
                       label="Address"
                       placeholder="Enter customer address"
-                      value={customerFormData.address}
+                      value={customerFormData.address ?? ''}
                       onChange={(e) => handleChange('address', e.target.value)}
                       radius="none"
                       classNames={{
-                        inputWrapper: "border-none"
+                        inputWrapper: 'border-none',
                       }}
                     />
 
                     <Textarea
                       label="Notes"
                       placeholder="Enter any additional notes"
-                      value={customerFormData.notes}
+                      value={customerFormData.notes ?? ''}
                       onChange={(e) => handleChange('notes', e.target.value)}
                       radius="none"
                       classNames={{
-                        inputWrapper: "border-none"
+                        inputWrapper: 'border-none',
                       }}
                     />
 
@@ -164,11 +197,7 @@ export default function EditCustomerPage() {
                         Cancel
                       </Button>
 
-                      <Button
-                        color="primary"
-                        type="submit"
-                        isLoading={isSubmitting}
-                      >
+                      <Button color="primary" type="submit" isLoading={updateCustomerMutation.isPending}>
                         Update Customer
                       </Button>
                     </div>
@@ -181,4 +210,4 @@ export default function EditCustomerPage() {
       </div>
     </>
   );
-} 
+}

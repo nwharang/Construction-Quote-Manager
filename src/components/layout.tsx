@@ -18,6 +18,8 @@ import { useSession } from 'next-auth/react';
 import { signOut, signIn } from 'next-auth/react';
 import { routes } from '~/config/routes';
 import { ThemeToggle } from './ThemeToggle';
+import { LanguageMetaData } from './accessibility/LanguageMetaData';
+import { KeyboardFocusIndicator } from './ui/KeyboardFocusIndicator';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -36,6 +38,10 @@ const navigationRoutes: Route[] = [
   { name: 'Products', href: routes.admin.products.list },
 ];
 
+/**
+ * Main layout component for the application
+ * Includes accessibility features like skip to content, semantic landmarks, and aria attributes
+ */
 export function Layout({ children, title, description }: LayoutProps) {
   const { data: session } = useSession();
   const router = useRouter();
@@ -49,7 +55,7 @@ export function Layout({ children, title, description }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen">
+    <KeyboardFocusIndicator className="min-h-screen">
       <Head>
         <title>
           {title ? `${title} | Construction Quote Manager` : 'Construction Quote Manager'}
@@ -58,8 +64,12 @@ export function Layout({ children, title, description }: LayoutProps) {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
+      {/* Language metadata for screen readers */}
+      <LanguageMetaData />
+
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar maxWidth={'full'}>
+        {/* Navigation Header */}
+        <Navbar maxWidth={'full'} as="header" role="navigation" aria-label="Main Navigation">
           <NavbarBrand className="hidden sm:block">
             <Link href="/" className="text-foreground/90 text-xl font-bold">
               TTXD
@@ -79,6 +89,7 @@ export function Layout({ children, title, description }: LayoutProps) {
                       variant="light"
                       startContent={<User size={20} />}
                       endContent={<ChevronDown size={16} />}
+                      aria-label="User account menu"
                     >
                       {session.user?.name}
                     </Button>
@@ -112,7 +123,12 @@ export function Layout({ children, title, description }: LayoutProps) {
               </NavbarItem>
             ) : (
               <NavbarItem>
-                <Button color="primary" startContent={<LogIn size={20} />} onPress={handleSignIn}>
+                <Button
+                  color="primary"
+                  startContent={<LogIn size={20} />}
+                  onPress={handleSignIn}
+                  aria-label="Sign in to your account"
+                >
                   Sign In
                 </Button>
               </NavbarItem>
@@ -121,9 +137,12 @@ export function Layout({ children, title, description }: LayoutProps) {
         </Navbar>
 
         <div className="flex flex-1">
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          {/* Main content area with id for skip link */}
+          <main id="main-content" className="flex-1 overflow-y-auto p-4" tabIndex={-1}>
+            {children}
+          </main>
         </div>
       </div>
-    </div>
+    </KeyboardFocusIndicator>
   );
 }

@@ -17,6 +17,7 @@ import {
 } from '@heroui/react';
 import { ThemeToggle } from './ThemeToggle';
 import { routes } from '~/config/routes';
+import { LanguageSelector } from './LanguageSelector';
 
 export function NavBar() {
   const { data: session } = useSession();
@@ -31,18 +32,7 @@ export function NavBar() {
   return (
     <Navbar maxWidth="full" position="static" isBordered={false} isBlurred={false}>
       <NavbarContent justify="end" className="gap-3">
-        {isQuotesPage && (
-          <Button
-            as={Link}
-            href={routes.admin.quotes.new}
-            color="primary"
-            startContent={<PlusCircle size={18} />}
-            className="mr-2"
-          >
-            New Quote
-          </Button>
-        )}
-
+        <LanguageSelector />
         <ThemeToggle />
 
         <Dropdown placement="bottom-end">

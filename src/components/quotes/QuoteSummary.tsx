@@ -1,100 +1,88 @@
 import React from 'react';
-import { Card, CardBody, CardFooter, Divider, NumberInput } from '@heroui/react';
-import { useTranslation } from '~/hooks/useTranslation';
-import type { QuoteTotals } from '~/types/quote';
+import { Card, CardHeader, CardBody, Divider } from '@heroui/react';
+import { formatCurrency } from '~/utils/currency';
 
-interface QuoteSummaryProps {
-  totals: QuoteTotals;
+interface QuoteSummaryData {
+  subtotal: number;
   complexityCharge: number;
   markupCharge: number;
-  handleNumberChange: (name: string, value: number) => void;
-  handleSubmit: () => void;
-  isSubmitting: boolean;
+  total: number;
+  taxRate?: number;
+  taxAmount?: number;
 }
 
-export function QuoteSummary({
-  totals,
-  complexityCharge,
-  markupCharge,
-  handleNumberChange,
-  handleSubmit,
-  isSubmitting,
-}: QuoteSummaryProps) {
-  const { formatCurrency } = useTranslation();
+interface QuoteSummaryProps {
+  summary: QuoteSummaryData;
+  showTax?: boolean;
+  className?: string;
+}
+
+/**
+ * Component for displaying the quote summary with detailed breakdown
+ */
+export const QuoteSummary: React.FC<QuoteSummaryProps> = ({
+  summary,
+  showTax = false,
+  className = "",
+}) => {
+  const {
+    subtotal,
+    complexityCharge,
+    markupCharge,
+    total,
+    taxRate,
+    taxAmount,
+  } = summary;
+
+  const hasAdjustments = complexityCharge > 0 || markupCharge > 0;
+  const hasTax = showTax && taxRate && taxRate > 0 && taxAmount && taxAmount > 0;
 
   return (
-    <Card className="mb-6">
-      <CardBody>
-        <h2 className="text-xl font-bold mb-4">Quote Summary</h2>
+    <Card className={`w-full ${className}`}>
+      <CardHeader className="flex justify-between items-center px-6 py-4">
+        <h3 className="text-xl font-semibold">Quote Summary</h3>
+      </CardHeader>
+      <Divider />
+      <CardBody className="px-6 py-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground">Subtotal</span>
+          <span>{formatCurrency(subtotal)}</span>
+        </div>
+
+        {hasAdjustments && (
+          <>
+            {complexityCharge > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Complexity Charge</span>
+                <span>{formatCurrency(complexityCharge)}</span>
+              </div>
+            )}
+
+            {markupCharge > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Markup</span>
+                <span>{formatCurrency(markupCharge)}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {hasTax && (
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Tax ({taxRate}%)</span>
+            <span>{formatCurrency(taxAmount)}</span>
+          </div>
+        )}
+
+        <Divider />
         
-        <div className="space-y-3">
-          <div className="flex justify-between">
-            <span>Subtotal (Tasks):</span>
-            <span data-testid="subtotal-tasks">{formatCurrency(totals.subtotalTasks)}</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span>Subtotal (Materials):</span>
-            <span data-testid="subtotal-materials">{formatCurrency(totals.subtotalMaterials)}</span>
-          </div>
-          
-          <div className="flex items-center justify-between mt-2">
-            <span>Complexity Charge:</span>
-            <div className="w-32">
-              <NumberInput
-                value={complexityCharge}
-                onValueChange={(value) => handleNumberChange('complexityCharge', value as number)}
-                id="complexityCharge"
-                name="complexityCharge"
-                formatOptions={{ style: 'currency', currency: 'USD' }}
-                min={0}
-                step={1}
-                data-testid="complexity-charge-input"
-                aria-label="Complexity Charge"
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between mt-2">
-            <span>Markup Charge:</span>
-            <div className="w-32">
-              <NumberInput
-                value={markupCharge}
-                onValueChange={(value) => handleNumberChange('markupCharge', value as number)}
-                id="markupCharge"
-                name="markupCharge"
-                formatOptions={{ style: 'currency', currency: 'USD' }}
-                min={0}
-                step={1}
-                data-testid="markup-charge-input"
-                aria-label="Markup Charge"
-              />
-            </div>
-          </div>
+        <div className="flex justify-between items-center font-semibold">
+          <span>Total</span>
+          <span className="text-lg">{formatCurrency(total)}</span>
         </div>
       </CardBody>
-      
-      <Divider />
-      
-      <CardFooter className="flex flex-col">
-        <div className="flex justify-between items-center w-full">
-          <span className="text-lg font-bold">Grand Total:</span>
-          <span className="text-lg font-bold" data-testid="grand-total">
-            {formatCurrency(totals.grandTotal)}
-          </span>
-        </div>
-        
-        <div className="mt-4 flex justify-end w-full">
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="bg-primary text-white px-6 py-3 rounded-md font-medium flex items-center gap-2 disabled:opacity-70"
-            data-testid="submit-quote-button"
-          >
-            {isSubmitting ? 'Creating Quote...' : 'Create Quote'}
-          </button>
-        </div>
-      </CardFooter>
     </Card>
   );
-} 
+};
+
+export type { QuoteSummaryData }; 

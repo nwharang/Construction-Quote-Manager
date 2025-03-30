@@ -1,20 +1,33 @@
-import React, { useEffect } from 'react';
-import { Input, Textarea, RadioGroup, Radio, Button, Card, CardBody, NumberInput } from '@heroui/react';
+import React from 'react';
+import { 
+  Card, 
+  CardBody, 
+  NumberInput, 
+  Textarea, 
+  RadioGroup, 
+  Radio, 
+  Button,
+  Divider
+} from '@heroui/react';
 import { Trash2, Edit, Plus } from 'lucide-react';
-import { useTranslation } from '~/hooks/useTranslation';
+import { formatCurrency } from '~/utils/currency';
 import type { Material, Product, Task } from '~/types/quote';
-import { api } from '~/utils/api';
 
 interface TaskItemProps {
   task: Task;
   index: number;
   products: Product[];
-  handleTaskChange: (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  handleTaskChange: (
+    index: number, 
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> | string,
+    value?: string | number
+  ) => void;
+  handleNumberChange: (index: number, name: string, value: number) => void;
   removeTask: (index: number) => void;
   openMaterialModal: (taskIndex: number, materialIndex?: number) => void;
   removeMaterial: (taskIndex: number, materialIndex: number) => void;
-  getMaterialDisplay: (material: Material) => { name: string; total: string };
-  formatCurrency: (amount: number) => string;
+  getMaterialDisplay?: (material: Material) => { name: string; total: string };
+  formatCurrency?: (amount: number | string) => string;
 }
 
 export const TaskItem: React.FC<TaskItemProps> = ({
@@ -22,28 +35,20 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   index,
   products,
   handleTaskChange,
+  handleNumberChange,
   removeTask,
   openMaterialModal,
   removeMaterial,
   getMaterialDisplay,
-  formatCurrency,
+  formatCurrency: formatCurrencyProp,
 }) => {
-  const { t } = useTranslation();
-  
+  const currencyFormatter = formatCurrencyProp || formatCurrency;
+
   const handleRadioChange = (value: string) => {
     handleTaskChange(index, {
       target: {
         name: 'materialType',
         value,
-      },
-    } as React.ChangeEvent<HTMLInputElement>);
-  };
-
-  const handleNumberInputChange = (name: string, value: number) => {
-    handleTaskChange(index, {
-      target: {
-        name,
-        value: value.toString(),
       },
     } as React.ChangeEvent<HTMLInputElement>);
   };
@@ -61,8 +66,31 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       }, 0);
     }
     
-    return formatCurrency(taskPrice + materialsTotal);
-  }, [task, formatCurrency]);
+    return taskPrice + materialsTotal;
+  }, [task]);
+
+  // Add materials rendering logic that uses getMaterialDisplay if provided
+  const renderMaterialDisplay = (material: Material) => {
+    if (getMaterialDisplay) {
+      const display = getMaterialDisplay(material);
+      return (
+        <div>
+          <div className="font-medium">{display.name}</div>
+          <div className="text-sm text-muted-foreground">{display.total}</div>
+        </div>
+      );
+    } else {
+      const materialTotal = material.quantity * material.unitPrice;
+      return (
+        <div>
+          <div className="font-medium">{material.name}</div>
+          <div className="text-sm text-muted-foreground">
+            {material.quantity} x {currencyFormatter(material.unitPrice)} = {currencyFormatter(materialTotal)}
+          </div>
+        </div>
+      );
+    }
+  };
 
   return (
     <Card className="mb-4 border border-border/40">
@@ -81,26 +109,27 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           
           <div className="mb-4 space-y-4">
             <Textarea
-              name="description"
               label="Task Description"
+              name="description"
               placeholder="Describe the work to be done"
               value={task.description}
               onChange={(e) => handleTaskChange(index, e)}
               className="w-full"
+              minRows={2}
             />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <NumberInput
-                name="price"
                 label="Task Price"
+                name="price"
                 placeholder="0.00"
                 value={task.price}
-                onValueChange={(value) => handleNumberInputChange('price', value as number)}
+                onValueChange={(value) => handleNumberChange(index, 'price', value as number)}
                 startContent="$"
                 min={0}
                 step={0.01}
                 formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
-                aria-label="Task Price"
+                className="w-full"
               />
             </div>
           </div>
@@ -120,17 +149,16 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           {task.materialType === 'lumpsum' ? (
             <div className="mb-4">
               <NumberInput
-                name="estimatedMaterialsCostLumpSum"
                 label="Estimated Materials Cost"
+                name="estimatedMaterialsCostLumpSum"
                 placeholder="0.00"
                 value={task.estimatedMaterialsCostLumpSum}
-                onValueChange={(value) => handleNumberInputChange('estimatedMaterialsCostLumpSum', value as number)}
+                onValueChange={(value) => handleNumberChange(index, 'estimatedMaterialsCostLumpSum', value as number)}
                 startContent="$"
                 min={0}
                 step={0.01}
                 formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
                 className="max-w-md"
-                aria-label="Estimated Materials Cost"
               />
             </div>
           ) : (
@@ -154,49 +182,43 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2 mt-2">
-                  {task.materials.map((material, materialIndex) => {
-                    const { name, total } = getMaterialDisplay(material);
-                    return (
-                      <div key={material.id} className="flex justify-between items-center p-3 bg-background rounded-lg border border-border/40">
-                        <div>
-                          <div className="font-medium">{name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {material.quantity} x {formatCurrency(material.unitPrice)} = {total}
-                          </div>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            isIconOnly
-                            variant="light"
-                            size="sm"
-                            onPress={() => openMaterialModal(index, materialIndex)}
-                            aria-label="Edit material"
-                          >
-                            <Edit size={16} />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            color="danger"
-                            variant="light"
-                            size="sm"
-                            onPress={() => removeMaterial(index, materialIndex)}
-                            aria-label="Remove material"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
+                  {task.materials.map((material, materialIndex) => (
+                    <div key={material.id} className="flex justify-between items-center p-3 bg-background rounded-lg border border-border/40">
+                      {renderMaterialDisplay(material)}
+                      <div className="flex space-x-2">
+                        <Button
+                          isIconOnly
+                          variant="light"
+                          size="sm"
+                          onPress={() => openMaterialModal(index, materialIndex)}
+                          aria-label="Edit material"
+                        >
+                          <Edit size={16} />
+                        </Button>
+                        <Button
+                          isIconOnly
+                          color="danger"
+                          variant="light"
+                          size="sm"
+                          onPress={() => removeMaterial(index, materialIndex)}
+                          aria-label="Remove material"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           )}
           
-          <div className="flex justify-end border-t border-border pt-3 mt-4">
+          <Divider className="my-4" />
+          
+          <div className="flex justify-end">
             <div className="text-right">
               <div className="text-sm text-muted-foreground">Task Total:</div>
-              <div className="text-lg font-semibold">{taskTotal}</div>
+              <div className="text-lg font-semibold">{currencyFormatter(taskTotal)}</div>
             </div>
           </div>
         </div>

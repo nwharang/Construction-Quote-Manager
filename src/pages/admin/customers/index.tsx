@@ -1,281 +1,291 @@
-import React, { useState } from 'react';
-import Head from 'next/head';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useSession } from 'next-auth/react';
-import { Plus, Search, MoreVertical, User } from 'lucide-react';
+import Link from 'next/link';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
-  Button,
+  Spinner,
+  Pagination,
   Table,
   TableHeader,
   TableColumn,
   TableBody,
   TableRow,
   TableCell,
-  Input,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Pagination,
-  Spinner,
-  Select,
-  SelectItem,
+  Button,
+  Card,
+  CardHeader,
+  CardBody,
+  useDisclosure,
 } from '@heroui/react';
-import { api } from '~/utils/api';
-import { useAppToast } from '~/components/providers/ToastProvider';
-import type { RouterOutputs } from '~/utils/api';
-import { useTranslation } from '~/hooks/useTranslation';
+import type { SortDescriptor } from '@heroui/react';
 
-type Customer = RouterOutputs['customer']['getAll']['customers'][number];
+import type { Customer, CustomerWithQuotes } from '@/types/customer';
+import { useQuery } from '@/hooks/useQuery';
+import { useDeleteItem } from '@/hooks/useDeleteItem';
+import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
+import { useEntityStore } from '@/store/entityStore';
+import { formatDate } from '@/lib/utils';
+import { usePagination } from '@/hooks/usePagination';
 
-interface Column {
-  name: string;
-  uid: string;
-}
-
-const columns: Column[] = [
-  { name: 'NAME', uid: 'name' },
-  { name: 'EMAIL', uid: 'email' },
-  { name: 'PHONE', uid: 'phone' },
-  { name: 'ADDRESS', uid: 'address' },
-  { name: 'QUOTES', uid: 'quotes' },
-  { name: 'ACTIONS', uid: 'actions' },
-];
-
+/**
+ * Customer list page component that follows the shared CRUD pattern
+ */
 export default function CustomersPage() {
   const router = useRouter();
-  const { data: session, status: authStatus } = useSession();
-  const [filterValue, setFilterValue] = useState('');
-  const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const toast = useAppToast();
-  const { formatPhone } = useTranslation();
+  const { t } = useTranslation();
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
-  // Fetch customers with pagination
-  const customersQuery = api.customer.getAll.useQuery(
-    {
-      page,
-      limit: rowsPerPage,
-      search: filterValue,
-    },
-    { enabled: authStatus === 'authenticated' }
-  );
+  // Set the entity settings for consistent UX
+  const setEntitySettings = useEntityStore((state) => state.setEntitySettings);
 
-  // Delete customer mutation
-  const deleteCustomerMutation = api.customer.delete.useMutation({
+  useEffect(() => {
+    setEntitySettings({
+      entityName: 'customer',
+      entityType: 'customer',
+      baseUrl: '/admin/customers',
+      displayNameField: 'name',
+      listPath: '/admin/customers',
+      createPath: '/admin/customers/new',
+      editPath: '/admin/customers/[id]/edit',
+      viewPath: '/admin/customers/[id]',
+    });
+  }, [setEntitySettings]);
+
+  // Setup pagination
+  const { page, limit } = usePagination({
+    defaultLimit: 10,
+    syncWithUrl: true,
+    total: 0, // Will be updated when data is fetched
+  });
+
+  // Setup sorting
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+    column: 'name',
+    direction: 'ascending',
+  });
+
+  // Query customers
+  const { data, isLoading } = useQuery<{
+    customers: CustomerWithQuotes[];
+    total: number;
+  }>('/api/customers', {
+    page,
+    limit,
+    sortBy: sortDescriptor.column,
+    sortDirection: sortDescriptor.direction === 'ascending' ? 'asc' : 'desc',
+  });
+
+  // Update pagination when total changes
+  const paginationInfo = usePagination({
+    defaultLimit: limit,
+    total: data?.total || 0,
+    syncWithUrl: true,
+  });
+
+  // Delete customer handler
+  const { mutate: deleteCustomer, isLoading: isDeleting } = useDeleteItem<Customer>({
+    endpoint: '/api/customers',
     onSuccess: () => {
-      toast.success('Customer deleted successfully');
-      // Refetch the customers after deletion
-      void customersQuery.refetch();
-    },
-    onError: (err) => {
-      toast.error(`Error deleting customer: ${err.message}`);
+      onDeleteClose();
+      setCustomerToDelete(null);
     },
   });
 
-  const handleDeleteCustomer = (id: string) => {
-    if (confirm('Are you sure you want to delete this customer?')) {
-      deleteCustomerMutation.mutate({ id });
+  const handleDeleteClick = (customer: Customer) => {
+    setCustomerToDelete(customer);
+    onDeleteOpen();
+  };
+
+  const handleDeleteConfirm = () => {
+    if (customerToDelete) {
+      deleteCustomer({ id: customerToDelete.id });
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
+  // Handler for sorting changes
+  const handleSortChange = (descriptor: SortDescriptor) => {
+    setSortDescriptor(descriptor);
   };
 
-  const handleRowsPerPageChange = (newRowsPerPage: number) => {
-    setRowsPerPage(newRowsPerPage);
-    setPage(1);
-  };
+  // Columns for the HeroUI table
+  const columns = [
+    {
+      key: 'displayId',
+      label: t('customers.fields.id'),
+    },
+    {
+      key: 'name',
+      label: t('customers.fields.name'),
+      sortable: true,
+    },
+    {
+      key: 'email',
+      label: t('customers.fields.email'),
+      sortable: true,
+    },
+    {
+      key: 'createdAt',
+      label: t('customers.fields.created_at'),
+      sortable: true,
+    },
+    {
+      key: 'actions',
+      label: t('common.actions'),
+    },
+  ];
 
-  // Not authenticated
-  if (authStatus === 'unauthenticated') {
-    router.push('/auth/signin');
-    return null;
-  }
-
-  const renderCell = (customer: Customer, columnKey: string) => {
+  // Render cell content based on column key
+  const renderCell = (customer: CustomerWithQuotes, columnKey: React.Key) => {
     switch (columnKey) {
+      case 'displayId':
+        return <span>{customer.displayId || customer.id.substring(0, 8)}</span>;
+
       case 'name':
         return (
-          <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-muted-foreground" />
-            <div className="flex flex-col">
-              <p className="text-bold text-small capitalize text-foreground">{customer.name}</p>
-              <p className="text-bold text-tiny capitalize text-muted-foreground">#{customer.id}</p>
-            </div>
-          </div>
+          <Link
+            href={`/admin/customers/${customer.id}`}
+            className="text-blue-600 hover:text-blue-900"
+          >
+            {customer.name}
+          </Link>
         );
+
       case 'email':
-        return customer.email || '-';
-      case 'phone':
-        return customer.phone ? formatPhone(customer.phone) : '-';
-      case 'address':
-        return customer.address || '-';
-      case 'quotes':
-        return customer._count?.quotes || 0;
+        return <span>{customer.email}</span>;
+
+      case 'createdAt':
+        return <span>{formatDate(customer.createdAt)}</span>;
+
       case 'actions':
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex justify-end gap-2">
             <Button
               size="sm"
-              variant="flat"
               color="primary"
-              onPress={() => router.push(`/admin/customers/${customer.id}`)}
+              variant="flat"
+              as={Link}
+              href={`/admin/customers/${customer.id}/edit`}
             >
-              View
+              {t('common.edit')}
             </Button>
-            <Dropdown>
-              <DropdownTrigger>
-                <Button isIconOnly size="sm" variant="light">
-                  <MoreVertical className="text-default-500" />
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu aria-label="Customer actions">
-                <DropdownItem
-                  key="edit"
-                  onPress={() => router.push(`/admin/customers/${customer.id}/edit`)}
-                >
-                  Edit
-                </DropdownItem>
-                <DropdownItem
-                  key="quotes"
-                  onPress={() => router.push(`/admin/customers/${customer.id}/quotes`)}
-                >
-                  View Quotes
-                </DropdownItem>
-                <DropdownItem
-                  key="delete"
-                  className="text-danger"
-                  color="danger"
-                  onPress={() => handleDeleteCustomer(customer.id)}
-                >
-                  Delete
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
+            <Button
+              size="sm"
+              color="danger"
+              variant="flat"
+              onPress={() => handleDeleteClick(customer)}
+            >
+              {t('common.delete')}
+            </Button>
           </div>
         );
+
       default:
-        return null;
+        // Safe fallback that returns a React node
+        return <span>{String(customer[columnKey as keyof CustomerWithQuotes] || '')}</span>;
     }
   };
 
   return (
-    <>
-      <Head>
-        <title>Customers | Construction Quote Manager</title>
-      </Head>
+    <div className="space-y-4">
+      <Card className="shadow-sm">
+        <CardHeader className="flex items-center justify-between px-6 py-4">
+          <h1 className="text-xl font-bold">{t('customers.title')}</h1>
+          <Button
+            color="primary"
+            as={Link}
+            href={'/admin/customers/new'}
+            startContent={<span>+</span>}
+          >
+            {t('customers.new')}
+          </Button>
+        </CardHeader>
 
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Customers</h1>
-              <p className="text-muted-foreground">Manage your customers</p>
-            </div>
-            <Button
-              color="primary"
-              startContent={<Plus size={20} />}
-              onPress={() => router.push('/admin/customers/new')}
-            >
-              New Customer
-            </Button>
-          </div>
-
-          <div className="flex justify-between items-center gap-3">
-            <Input
-              isClearable
-              className="w-full sm:max-w-[44%]"
-              placeholder="Search by name or email..."
-              startContent={<Search size={18} />}
-              value={filterValue}
-              onValueChange={(value) => {
-                setFilterValue(value);
-                setPage(1);
-              }}
-            />
-          </div>
-
-          {customersQuery.isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Spinner />
-            </div>
-          ) : (
-            <>
-              <Table
-                aria-label="Customers table"
-                isHeaderSticky
-                classNames={{
-                  wrapper: 'max-h-[600px]',
-                  th: 'bg-background/50 backdrop-blur-lg text-foreground',
-                  td: 'text-foreground',
-                }}
-              >
-                <TableHeader columns={columns}>
-                  {(column) => (
-                    <TableColumn key={column.uid} align={column.uid === 'actions' ? 'center' : 'start'}>
-                      {column.name}
-                    </TableColumn>
-                  )}
-                </TableHeader>
-                <TableBody
-                  items={customersQuery.data?.customers ?? []}
-                  emptyContent="No customers found"
-                  isLoading={customersQuery.isLoading}
-                  loadingContent={<Spinner />}
-                >
-                  {(customer) => (
-                    <TableRow key={customer.id}>
-                      {(columnKey) => <TableCell>{renderCell(customer, String(columnKey))}</TableCell>}
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Rows per page:</span>
-                    <Select
-                      aria-label="Rows per page"
-                      selectedKeys={[rowsPerPage.toString()]}
-                      onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
-                      className="w-20 min-w-0"
-                      size="sm"
-                    >
-                      {[10, 20, 30, 40, 50].map((value) => (
-                        <SelectItem key={value.toString()} textValue={value.toString()}>
-                          {value}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {customersQuery.data?.total ?? 0} items
-                    </span>
-                  </div>
-                </div>
+        <CardBody className="p-4">
+          <Table
+            aria-label="Customers table"
+            sortDescriptor={sortDescriptor}
+            onSortChange={handleSortChange}
+            bottomContent={
+              data?.total && data.total > 0 ? (
                 <div className="flex justify-center">
                   <Pagination
-                    total={Math.ceil((customersQuery.data?.total ?? 0) / rowsPerPage)}
-                    page={page}
-                    onChange={handlePageChange}
+                    page={paginationInfo.page}
+                    total={paginationInfo.totalPages}
+                    onChange={paginationInfo.setPage}
                     showControls
+                    showShadow
                     color="primary"
-                    classNames={{
-                      wrapper: 'gap-2',
-                      item: 'w-8 h-8',
-                      cursor: 'bg-primary',
-                    }}
                   />
                 </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </>
+              ) : null
+            }
+            classNames={{
+              wrapper: 'shadow-none',
+            }}
+          >
+            <TableHeader columns={columns}>
+              {(column) => (
+                <TableColumn
+                  key={column.key}
+                  allowsSorting={column.sortable}
+                  align={column.key === 'actions' ? 'end' : 'start'}
+                >
+                  {column.label}
+                </TableColumn>
+              )}
+            </TableHeader>
+            <TableBody
+              items={data?.customers || []}
+              emptyContent={
+                isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Spinner size="md" color="primary" />
+                    <span className="ml-2">{t('common.loading')}</span>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <p className="text-gray-500">{t('customers.empty')}</p>
+                    <Button
+                      color="primary"
+                      className="mt-4"
+                      onPress={() => router.push('/admin/customers/new')}
+                    >
+                      {t('customers.actions.create_first')}
+                    </Button>
+                  </div>
+                )
+              }
+              isLoading={isLoading}
+              loadingContent={
+                <div className="flex items-center justify-center py-8">
+                  <Spinner size="md" color="primary" />
+                  <span className="ml-2">{t('common.loading')}</span>
+                </div>
+              }
+            >
+              {(customer) => (
+                <TableRow
+                  key={customer.id}
+                  onClick={() => router.push(`/admin/customers/${customer.id}`)}
+                >
+                  {(columnKey) => <TableCell>{renderCell(customer, columnKey)}</TableCell>}
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardBody>
+      </Card>
+
+      {customerToDelete && (
+        <DeleteCustomerDialog
+          isOpen={isDeleteOpen}
+          customer={customerToDelete}
+          isDeleting={isDeleting}
+          onClose={onDeleteClose}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
+    </div>
   );
-} 
+}

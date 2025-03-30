@@ -1,243 +1,172 @@
-# Construction Quotes App
+**Guiding Principle:** Build the **simplest, fastest, most reliable** quoting tool imaginable for small construction contractors, ensuring **absolute consistency and correctness** at every step.
 
-**Objective:** Build a simple, fast web app for construction workers to create job quotes. Prioritize ease of use.
+**Objective:** Create a web app for generating quotes based on **Tasks** (Labor) + **Materials** (Lump Sum OR Itemized). Core goals are ease of use, speed, **strict consistency**, robust security, and **error-free implementation**.
 
----
+**Core Workflow (Quote Creation/Edit - Standardized Flow):**
 
-## 1. Core Concept & Workflow
+1.  **Quote Header:** Project Name (`Input`), Address (`Textarea`), Customer (`Select`/New via standard modal/inline form). **(Uses Standardized Form Layout)**
+2.  **Add Tasks:** Dynamically add `TaskInputRow` components. Each **MUST consistently** contain:
+    - `description` (`Textarea`).
+    - `Task Price` (Currency `NumberInput`).
+    - Materials Choice (Radio/Select): **Lump Sum OR Itemized** (Enforce exclusivity per task).
+      - **Lump Sum:** `estimatedMaterialsCostLumpSum` (Currency `NumberInput`).
+      - **Itemized:** Add `MaterialInputRow`s: `name` (`Input`), `quantity` (Int `NumberInput`), `unitPrice` (Currency `NumberInput`), optional `Product` lookup (`Autocomplete`/`Select`).
+3.  **Review Totals (Real-time UI):** Display `subtotalTasks`, `subtotalMaterials`, `subtotalCombined`. **(Clear & Immediate Feedback)**
+4.  **Adjustments:** `complexityCharge` (%), `markupCharge` (%) via Percentage `NumberInput`. Display calculated amounts. **(Simple & Understandable)**
+5.  **Final Total:** Prominently display `grandTotal`.
+6.  **Save/Output:** "Save" button persists data. "View"/"Print" buttons navigate via **standard patterns**.
 
-### Goal
+**Mandatory Tech Stack (Strictly Enforced - No Deviations):**
 
-Replace slow, error-prone manual quoting with a streamlined tool reflecting worker intuition (pricing by **Tasks** + estimated **Materials**).
-
-### Workflow
-
-1. **Start:** Basic Quote Info (Project/Customer)
-2. **Add Task(s):**
-   - Description
-   - `Task Price` (Labor/Skill cost)
-   - `Materials Cost`:
-     - Option A: Lump Sum (`estimatedMaterialsCostLumpSum`)
-     - Option B: 1-3 Key Items via `quoteMaterials`, optionally from `Product List`
-3. **Repeat** for all major tasks
-4. **Review Totals:** App calculates `subtotalTasks`, `subtotalMaterials`
-5. **Optional Adjust:** Apply global `Complexity/Contingency` & `Markup/Profit` (stored as `complexityCharge`, `markupCharge`)
-6. **View Final:** Display `grandTotal`
-7. **Save/Output:** Save quote (`DRAFT` status), view summary
-
----
-
-## 2. Key Data & Schema
-
-### Key Terms
-
-- `Task Price`: Labor/skill cost
-- `Materials Cost`: Lump sum or itemized
-- `Product List`: Reusable items
-- `Adjustments`: Complexity charge and markup
-
-### Schema (Drizzle ORM - PostgreSQL)
-
-| Table          | Purpose                            |
-| -------------- | ---------------------------------- |
-| `users`        | User management and authentication |
-| `quotes`       | Main quote information             |
-| `tasks`        | Individual tasks within quotes     |
-| `materials`    | Materials used in tasks            |
-| `products`     | Reusable product catalog           |
-| `customers`    | Customer information               |
-| `settings`     | User preferences and app settings  |
-| `transactions` | Financial tracking                 |
-
-**Relations:** Standard links between tables with proper foreign key constraints and cascading deletes where appropriate.
-
-### ID Display and Numbering System
-
-To make IDs more user-friendly for construction workers:
-
-- **Sequential Numbering:** Each item (quote, product, etc.) has a database-assigned sequential ID 
-- **Implementation:** 
-  - Added `sequentialId: serial('sequential_id')` field to database tables
-  - Display format: `#123 (ae42b8f2...)` shows both sequential ID and shortened UUID
-  - Workers can verbally reference quotes/products by their sequential number
-  - Database still uses UUIDs internally for relationships and technical purposes
-  - Sequential IDs are automatically incremented when new items are created
-
-This approach bridges the gap between technical requirements (unique UUIDs) and practical usability for workers who need simple references while ensuring each item has a permanent, reliable identifier in the database.
-
----
-
-## 3. UI/Tech Requirements
-
-### Tech Stack
-
-- **Frontend:** Next.js (Page Router), TypeScript
+- **Frontend:** Next.js (Pages Router), TypeScript, React
 - **API:** tRPC
-- **UI Components:** @heroui/react V2, @heroui/toast
-- **Styling:** Tailwind CSS v4 (Alpha/Beta)
-- **Authentication:** next-auth
-- **Database:** Drizzle ORM with PostgreSQL
+- **UI:** `@heroui/react` V2, `@heroui/toast` (**Exclusive use for prescribed patterns**)
+- **Styling:** Tailwind CSS v4 (**Utilities only**. No CSS files except globals/print, no inline `style` prop)
+- **Auth:** `next-auth`
+- **DB:** PostgreSQL
+- **ORM:** Drizzle ORM
 
-### UI Features
+**Data Model & Schema (Drizzle/Postgres - Foundational Rules):**
 
-- **Responsive Design:** Mobile-first approach
-- **Theme Support:** Dark/Light mode with system preference detection
-- **Internationalization:** Multiple languages, currencies, date formats
-- **Accessibility:** WCAG 2.1 compliance
-- **Notifications:** Consistent, themeable toast notifications
+- **Tables:** `users`, `quotes`, `tasks`, `quoteMaterials`, `products`, `customers`, `settings`. (Implement schema exactly as previously detailed).
+- **Types & Keys:** Use UUID `id`s, **`NUMERIC(10, 2)` for ALL currency**, `timestamptz` for dates. Enforce `NOT NULL`, Defaults, Foreign Keys precisely.
+- **User-Friendly IDs:** **Universal UI Display Format:** `"#<sequentialId> (<short_uuid>)"` (e.g., `#123 (ae42b8...)`) for Quotes, Products, Customers. Internal logic **MUST** use full UUID (`id`). `sequentialId` is `SERIAL`.
+- **Ownership:** Link `quotes`, `customers`, `products` to `userId` via Foreign Key. **Crucial for data scoping.**
 
-### Component Usage Guidelines
+**Backend Logic & Validation (tRPC - `/server/api/routers/` - Authoritative & Secure Core):**
 
-- **Input Types:**
-  - **Numeric Values:** Always use `NumberInput` from HeroUI with appropriate configuration:
-    - `min`, `max`, and `step` values tailored to the field
-    - `formatOptions` customized for currency, percentages, or plain numbers
-    - Default values to prevent NaN issues (e.g., `value={parseFloat(value) || 0}`)
-  - **Dates:** Use `DateInput` from HeroUI for date fields with appropriate localization
-  - **Text:** Regular `Input` component for text fields
-  - **Long Text:** `Textarea` for descriptions and notes
+- **Backend Authority:** All core business logic, calculations, and validation **MUST** reside in backend tRPC resolvers. **This is non-negotiable.**
+- **Zero Trust Client:** Treat ALL client input as untrusted and potentially invalid/malicious.
+- **MANDATORY ZOD VALIDATION:**
+  - **Rigorously validate ALL incoming data** in _every_ tRPC mutation using Zod schemas **before** any DB interaction or calculation.
+  - Validation **MUST** cover: Types, Required Fields, Constraints (`min`/`max`, lengths), Formats (UUID), **Ownership & Relationships (using `ctx.session.user.id`)**, and Business Rules (e.g., Lump Sum vs. Itemized exclusivity).
+  - Validation occurs at procedure entry; throw `BAD_REQUEST` on failure. Backend validation is the **single source of truth**.
+- **CALCULATIONS:** Implement quote totals precisely per formulas in the backend using **reusable, testable backend functions**.
+- **Rounding:** Backend **MUST** round final monetary values to 2 decimal places (`Math.round(num * 100) / 100`) before storage/return.
+- **User Scoping:** All DB queries/mutations **MUST** filter results based on the authenticated `userId` from the context (`ctx.session.user.id`).
 
-- **Monetary Values:**
-  - Use `NumberInput` with `formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}`
-  - Include `startContent="$"` (or appropriate currency symbol)
-  - Set `min={0}` and `step={0.01}` for proper decimal handling
+**UI/UX Principles & Defined Consistency (Strictly Enforced):**
 
-- **Quantities:**
-  - Use `NumberInput` with `min={1}` and `step={1}` for integer inputs
-  - No decimal places for quantity values
+- **Consistency Above All:** Uniform layout, spacing, typography, colors, interactions across the _entire_ app. Aim for an intuitive, error-free experience.
+- **Responsive Design:** Consistent mobile-first implementation across all pages using Tailwind modifiers.
 
-### Key Views
+- **7.1. Defining Strict UI Consistency (Mandatory Rules):**
+  The following rules **MUST** be applied universally across all relevant pages and components within the `/admin/*` section:
+  1.  **Master Layout:** All authenticated pages (`/admin/*`) **MUST** use the primary `Layout.tsx` component rendering standard `NavBar.tsx` and `SidebarComponent.tsx`.
+  2.  **Component Standardization:**
+      - **Exclusive Use:** Only `@heroui/react` V2 components (or explicitly defined reusable components matching HeroUI style) are permitted. No one-off styled divs where a standard equivalent exists.
+      - **Purposeful Usage:** Use the _same_ HeroUI component for the _same_ function everywhere (e.g., `<Button color="primary">` for primary actions, `<Button color="danger">` for delete, consistent Table structure, consistent Modal usage). Inputs **MUST** strictly follow Section 8 rules.
+      - **Use Official Components First:** Always check if an official `@heroui/react` component exists before creating a custom implementation. Official HeroUI components like Table, Spinner, Pagination, etc. **MUST** be used instead of custom implementations when available.
+  3.  **Styling Uniformity (Tailwind & Theme):**
+      - **Theme Colors:** Use _only_ colors from the configured Tailwind theme. No arbitrary values.
+      - **Spacing & Sizing:** Use Tailwind's scale consistently (`p-2`, `m-4`, `w-full`). No arbitrary pixels.
+      - **Typography:** Use theme-defined fonts/sizes/weights consistently.
+      - **Borders & Shadows:** Use consistent theme-defined Tailwind utilities.
+  4.  **Interaction Pattern Consistency:**
+      - **Forms:** Validate inline below input (consistent style). Provide feedback via **standardized** `@heroui/toast`. Use consistent loading indicators (e.g., button spinner).
+      - **Loading States:** **MUST** use `@heroui/react` Skeleton components matching content shape.
+      - **Notifications:** **MUST** use `@heroui/toast` with standard appearance for all feedback.
+      - **Navigation:** CRUD operations **MUST** follow consistent flows (List -> Detail -> Edit, etc.).
+  5.  **Data Presentation Consistency:** All currency, dates, percentages, User-Friendly IDs (`#123 (abc...)`) **MUST** be formatted using the **exact same** centralized utility functions/hooks.
 
-- **Auth:** Login/signup forms
-- **Dashboard:** Overview of quotes, stats, recent activity
-- **Quotes:** List, create, edit, view details
-- **Customers:** Management interface
-- **Products:** Catalog management
-- **Settings:** User and Global preferences
-- **Reports:** Financial and customer analytics
+**7.2. HeroUI Component Reference:**
+  The following is a comprehensive list of official HeroUI components available in the library. **Always consult this list before creating custom implementations**:
 
-### Data Handling
+  1. **Layout Components:**
+     - Card, CardHeader, CardBody, CardFooter
+     - Divider
+     - Spacer
+     - Navbar
+     - Container
+     - Layout
 
-- **Loading States:** Skeleton loaders, spinners
-- **Error Handling:**
-  - Centralized handling for client and server-side errors
-  - User-friendly toast notifications
-  - Type-safe error classification
-  - Automatic error recovery (e.g., auth redirects)
-  - Custom hooks for consistent implementation
-- **Form Validation:** Client and server-side
-- **Caching:** Efficient tRPC data caching with strategic invalidation
+  2. **Form Components:**
+     - Input
+     - Textarea
+     - Select
+     - Checkbox, CheckboxGroup
+     - Radio, RadioGroup
+     - Switch
+     - NumberInput
+     - DateInput
+     - DatePicker, DateRangePicker
+     - TimeInput
+     - Form
+     - InputOTP
 
-### Accessibility
+  3. **Data Display Components:**
+     - Table, TableHeader, TableColumn, TableBody, TableRow, TableCell
+     - Tabs, Tab
+     - Badge
+     - Chip
+     - Avatar
+     - Tooltip
+     - User
+     - Progress (linear)
+     - CircularProgress
+     - Skeleton
+     - Kbd
+     - Code, Snippet
 
-- **Input Components:**
-  - Always provide either a visible label or an `aria-label` attribute for screen readers
-  - For `NumberInput` components, use the following pattern:
-    ```tsx
-    <NumberInput
-      label="Price"
-      value={price}
-      onValueChange={setPrice}
-      aria-label="Price"
-      // other props...
-    />
-    ```
-  - For inputs that relate to specific items (like tasks or materials), make the aria-label contextual:
-    ```tsx
-    <NumberInput
-      label="Price"
-      value={material.price}
-      aria-label={`Price for material ${material.name}`}
-      // other props...
-    />
-    ```
-  - Error messages should be properly linked to inputs using `aria-describedby`
-  - All interactive elements must be keyboard accessible
-  - Color should not be the only means of conveying information (include text or icons)
+  4. **Navigation Components:**
+     - Pagination, PaginationItem, PaginationCursor
+     - Breadcrumbs
+     - Link
+     - Dropdown (DropdownTrigger, DropdownMenu, DropdownItem)
+     - Listbox
 
-- **Other Components:**
-  - Buttons should have descriptive text or aria-labels
-  - Use semantic HTML elements when possible (`<button>`, `<input>`, etc.)
-  - Maintain proper heading hierarchy (`h1`, `h2`, etc.)
-  - Ensure sufficient color contrast (WCAG AA compliance)
+  5. **Feedback Components:**
+     - Modal (ModalContent, ModalHeader, ModalBody, ModalFooter)
+     - Drawer
+     - Alert
+     - Toast
+     - Spinner
+     - Popover
 
----
+  6. **Media Components:**
+     - Image
+     - ScrollShadow
 
-## 4. Current Implementation Status
+  7. **Utility Hooks:**
+     - useDisclosure
+     - useMediaQuery
+     - useInfiniteScroll
 
-### In Progress
+**Component Usage Standards (Linked to UI Consistency):**
 
-- Basic project structure
-- Database schema
-- Authentication system
-- Quote management
-- Customer management
-- Settings system
-- Localization framework
-- Toast notifications
-- Basic UI components
-- Financial reporting
-- Product management
-- Advanced quote features
-- Dark mode implementation
-- Additional language support
-- Advanced analytics
-- PDF generation
-- Email notifications
+- **HeroUI Exclusivity & Precision:** Use `@heroui/react` components **only**.
+- **`NumberInput` Configuration (Mandatory & Consistent):**
+  - **Currency:** `min=0, step=0.01, formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}, startContent="$"` (or dynamic symbol).
+  - **Percentage:** `min=0, step={0.1 or 1}, formatOptions={{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 1 }}, endContent="%"`.
+  - **Integer Quantity:** `min=1, step=1, formatOptions={{ style: 'decimal', maximumFractionDigits: 0 }}`.
+- **Other Inputs:** Use `Input`, `Textarea`, `DateInput`, `Select` appropriately per data type.
+- **Labels:** **MUST** use `label` prop or (rarely, with justification) `aria-label` consistently for all inputs.
 
----
+**Development Guidelines & Constraints (Process, Quality & Correctness)**
 
-## 5. Development Guidelines
+- **Code Quality & Correctness:**
+  - **MUST Generate Type-Safe Code:** Output **MUST** strictly adhere to TypeScript rules and defined types.
+  - **NO KNOWN ERRORS Rule:** Generated code **MUST NOT** contain obvious `TypeErrors`, null reference errors (where nullability defined), or logical inconsistencies.
+  - **Internal Validation REQUIRED:** AI **MUST** internally check generated code for type safety and rule adherence _before_ finalizing output for a unit/file/task. **Do not output code known to be flawed.**
+  - Strict TypeScript; Pass Linters (ESLint/Prettier); TSDoc Clarity.
+- **UI Consistency Enforcement:** Generated UI code **MUST strictly adhere to ALL rules defined in Section 7.1.** Internal check required before output.
+- **Structure & Naming:** Adhere strictly to defined structure and consistent naming.
+- **Reusability:** **Aggressively reuse** components/hooks/functions (frontend & backend). DRY principle.
+- **Backend Focus:** Prioritize correct, **secure**, robust backend implementation.
+- **Caching:** Implement correct tRPC cache invalidation (`utils.invalidate()`) after successful mutations.
+- **Process & Workflow:**
+  - **MANDATORY DOCUMENTATION LOOKUP (New Packages):** Recognize knowledge gap for `@heroui/react` V2, Tailwind v4, Drizzle, tRPC. **MUST** consult current official docs via web search during planning. Plan **MUST** show how findings (APIs, patterns) will be applied _contextually_ within these project rules.
+  - **Acknowledge Documentation Request:** Fulfill documentation/planning requests directly _first_.
+- **AI Role & Constraints:**
+  - **Correctness & Consistency Prerequisite:** Treat generation as complete _only when_ validated as type-safe, logically consistent, adhering to the plan (incl. doc lookup findings), **AND strictly conforming to UI consistency rules (Sec 7.1).** **Do not move on if known errors or inconsistencies exist.**
+  - **Strictly Context-Bound:** Generate based **strictly and solely** on these rules/plan.
+  - **No Execution Environment:** **Do not** run code, install packages, build. Validation is static analysis against these rules.
+  - **Flag Blocking Issues:** Clearly state if rules conflict or prevent correct generation/planning.
 
-### Technical Requirements
+**How to Use This Document (For AI Assistant):**
 
-1. Implement dark mode support
-2. Add more language translations
-3. Enhance financial reporting
-4. Add PDF quote generation
-5. Add advanced analytics
-6. Optimize performance
-7. Add more test coverage
-8. Improve accessibility
-9. Using JSDoc or TSDoc for clarification
-
-### Code Quality
-
-10. Use TypeScript strictly
-11. Follow ESLint rules
-12. Write meaningful code comments
-13. Document complex logic
-14. Test new features
-15. Review code before finishing
-16. Keep dependencies updated
-17. Monitor performance
-18. Break down large files (500+ lines) into smaller, reusable components
-
-### Consistency
-
-19. Follow accessibility guidelines
-20. Maintain consistent code style
-21. Maintain consistent UI style
-22. Maintain consistent package documentation
-23. Ensure localization for each page
-24. Use appropriate input components for data types (NumberInput for numbers, DateInput for dates)
-
-### Best Practices
-
-25. Avoid deprecated methods
-26. Use Tailwind CSS (no inline styling)
-27. Keep project clean (no useless files/packages)
-28. Ensure no lint errors, even during build
-29. Maintain high standard for code, logic, and testing
-30. Centralize localization
-31. Update changelog for every code update
-32. Document all features and packages
-33. Use consistent naming conventions for page notes
-34. Always validate form inputs through proper components
-35. Ensure proper cache invalidation when data changes
-
-### Code Review
-
-36. Perform thorough code reviews on all non-ignored directories and files to ensure consistent organization, naming conventions, and adherence to project standards.
-
-37. Dont run the project for me.
+- **Mandatory Reading & Adherence:** Every detail is strict. **UI Consistency (Sec 7.1)**, correctness, secure backend, and adherence to **Process (Sec 13)** are paramount.
+- **Follow the Process:** Explicitly follow planning, documentation lookup, UI consistency checks, and internal validation _before_ outputting code.
+- **Prioritize Correctness & Consistency:** Ensure generated code is type-safe, follows the plan/docs, _and_ matches UI patterns exactly. **Do not proceed if known flaws exist.**
+- **Ask for Clarification:** State ambiguities preventing correct implementation.
+- **Reference Sections:** Refer to sections explicitly (e.g., "Following UI rules in Sec 7.1...", "Implementing backend validation per Sec 6...") to demonstrate adherence.

@@ -1,2 +1,2 @@
 // Components exports
-export { Layout } from './layout';
+export { Layout } from './Layout';

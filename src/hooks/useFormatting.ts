@@ -1,110 +1,37 @@
-import { useCallback, useMemo } from 'react';
-import { useSession } from 'next-auth/react';
-import { api } from '~/utils/api';
-import { type Locale, dateFormats, timeFormats, currencyFormats, numberFormats } from '~/i18n/config';
-import { useSettings } from '~/contexts/settings-context';
-import type { SupportedLocale } from '~/i18n/locales';
+/**
+ * @deprecated Use the useTranslation hook from '~/utils/i18n' directly
+ * This is a compatibility layer for old code that still uses useFormatting
+ */
+
+import { useTranslation } from '~/utils/i18n';
 
 export function useFormatting() {
-  const { data: session } = useSession();
-  const { data: settings } = api.settings.get.useQuery(undefined, {
-    enabled: !!session,
-  });
-
-  return useMemo(() => {
-    // Get locale from settings or default to English
-    const locale = (settings?.locale || 'en') as SupportedLocale;
-    const currencyCode = settings?.currency || (locale === 'en' ? 'USD' : 'EUR');
-    const currencySymbol = settings?.currencySymbol || (currencyCode === 'USD' ? '$' : '€');
-    
-    // Format a date according to the locale
-    const formatDate = (date: Date | string | null | undefined): string => {
+  const { formatDate, formatCurrency, formatPhone, t } = useTranslation();
+  
+  // Compatibility with old API
+  return {
+    formatDate: (date: Date | string | null | undefined): string => {
       if (!date) return '';
-      
-      const dateObj = typeof date === 'string' ? new Date(date) : date;
-      
-      try {
-        const options: Intl.DateTimeFormatOptions = {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        };
-        
-        return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-ES', options).format(dateObj);
-      } catch (error) {
-        console.error('Date formatting error:', error);
-        return String(date);
-      }
-    };
+      return formatDate(date as Date, 'short');
+    },
     
-    // Format currency according to locale and settings
-    const formatCurrency = (amount: number | string | null | undefined): string => {
+    formatCurrency: (amount: number | string | null | undefined): string => {
       if (amount === null || amount === undefined) return '';
-      
       const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-      
-      // Handle NaN
       if (isNaN(numAmount)) return '';
-      
-      try {
-        return new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-ES', {
-          style: 'currency',
-          currency: currencyCode,
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(numAmount);
-      } catch (error) {
-        console.error('Currency formatting error:', error);
-        return `${currencySymbol}${numAmount.toFixed(2)}`;
-      }
-    };
+      return formatCurrency(numAmount);
+    },
     
-    // Format a number according to locale
-    const formatNumber = (num: number | string | null | undefined): string => {
+    formatNumber: (num: number | string | null | undefined): string => {
       if (num === null || num === undefined) return '';
-      
       const number = typeof num === 'string' ? parseFloat(num) : num;
-      
-      // Handle NaN
       if (isNaN(number)) return '';
-      
-      try {
-        return new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-ES').format(number);
-      } catch (error) {
-        console.error('Number formatting error:', error);
-        return String(number);
-      }
-    };
-
-    // Format a phone number according to locale
-    const formatPhone = (phone: string | null | undefined): string => {
-      if (!phone) return '';
-      
-      // Remove all non-numeric characters
-      const cleaned = phone.replace(/\D/g, '');
-      
-      // Format based on length and locale
-      if (locale === 'en') {
-        // US format: (XXX) XXX-XXXX
-        if (cleaned.length === 10) {
-          return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-        }
-      } else {
-        // Spanish format (simplified): XXX XX XX XX
-        if (cleaned.length === 9) {
-          return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 5)} ${cleaned.slice(5, 7)} ${cleaned.slice(7)}`;
-        }
-      }
-      
-      // If no formatting rules match, return the original string
-      return phone;
-    };
+      return number.toLocaleString();
+    },
     
-    return {
-      formatDate,
-      formatCurrency,
-      formatNumber,
-      formatPhone,
-    };
-  }, [settings]);
+    formatPhone: (phone: string | null | undefined): string => {
+      if (!phone) return '';
+      return formatPhone(phone);
+    }
+  };
 } 

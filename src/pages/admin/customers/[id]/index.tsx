@@ -2,31 +2,14 @@ import React, { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Edit, Mail, Phone, MapPin, FileText, Plus, CalendarDays, Search } from 'lucide-react';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Spinner,
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  Chip,
-  Divider,
-  Link,
-  Pagination,
-  Tabs,
-  Tab,
-  Input,
-} from '@heroui/react';
+import { ArrowLeft, Mail, Phone, MapPin, FileText, Plus, CalendarDays } from 'lucide-react';
+import { Button, Spinner, Chip, Badge } from '@heroui/react';
 import { api } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
 import { type QuoteStatus } from '~/server/db/schema';
 import { useAppToast } from '~/components/providers/ToastProvider';
+import { Layout } from '~/components/Layout';
+import { EntityList, type EntityColumn } from '~/components/shared/EntityList';
 
 // Fix: Use import type for type-only imports
 import type { customers } from '~/server/db/schema';
@@ -34,7 +17,10 @@ import type { RouterOutputs } from '~/utils/api';
 
 type Quote = RouterOutputs['quote']['getAll']['quotes'][number];
 
-const statusColorMap: Record<keyof typeof QuoteStatus, 'default' | 'primary' | 'success' | 'danger'> = {
+const statusColorMap: Record<
+  keyof typeof QuoteStatus,
+  'default' | 'primary' | 'success' | 'danger'
+> = {
   DRAFT: 'default',
   SENT: 'primary',
   ACCEPTED: 'success',
@@ -44,11 +30,12 @@ const statusColorMap: Record<keyof typeof QuoteStatus, 'default' | 'primary' | '
 export default function CustomerDetailsPage() {
   const router = useRouter();
   const { id } = router.query;
-  const { data: session, status: authStatus } = useSession();
+  const { status: authStatus } = useSession();
   const { formatDate, formatCurrency } = useTranslation();
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchQuery, setSearchQuery] = useState('');
+  const toast = useAppToast();
 
   // Fetch customer data
   const { data: customer, isLoading: isLoadingCustomer } = api.customer.getById.useQuery(
@@ -57,23 +44,91 @@ export default function CustomerDetailsPage() {
   );
 
   // Fetch customer's quotes with pagination
-  const { data: quotesData, isLoading: isLoadingQuotes } = api.quote.getAll.useQuery(
+  const {
+    data: quotesData,
+    isLoading: isLoadingQuotes,
+    refetch: refetchQuotes,
+  } = api.quote.getAll.useQuery(
     {
-      search: id as string,
+      search: customer?.name || (id as string),
       page,
       limit: rowsPerPage,
     },
     { enabled: !!id && authStatus === 'authenticated' }
   );
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-  };
+  // Define quote columns
+  const quoteColumns: EntityColumn<Quote>[] = [
+    {
+      key: 'title',
+      label: 'Quote Title',
+      render: (quote) => (
+        <div className="flex flex-col">
+          <span className="font-medium">{quote.title}</span>
+          <span className="text-muted-foreground text-xs">#{quote.id.substring(0, 8)}...</span>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (quote) => (
+        <Badge color={statusColorMap[quote.status as keyof typeof statusColorMap]}>
+          {quote.status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'grandTotal',
+      label: 'Amount',
+      render: (quote) => formatCurrency(quote.grandTotal),
+    },
+    {
+      key: 'createdAt',
+      label: 'Created On',
+      render: (quote) => formatDate(quote.createdAt),
+    },
+  ];
 
+  // Handle search
   const handleSearch = (value: string) => {
     setSearchQuery(value);
     setPage(1);
   };
+
+  // Handle quote deletion
+  const deleteQuoteMutation = api.quote.delete.useMutation({
+    onSuccess: () => {
+      toast.success('Quote deleted successfully');
+      void refetchQuotes();
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete quote: ${error.message}`);
+    },
+  });
+
+  const handleDeleteQuote = (quote: Quote) => {
+    if (confirm(`Are you sure you want to delete quote: ${quote.title}?`)) {
+      deleteQuoteMutation.mutate({ id: quote.id });
+    }
+  };
+
+  // Safely get quotes from the response
+  const getQuotes = () => {
+    if (!quotesData) return [];
+    // Check if we have items property
+    if ('items' in quotesData && Array.isArray(quotesData.items)) {
+      return quotesData.items;
+    }
+    // Check if we have quotes property
+    if ('quotes' in quotesData && Array.isArray(quotesData.quotes)) {
+      return quotesData.quotes;
+    }
+    return [];
+  };
+
+  const quotes = getQuotes();
+  const totalQuotes = quotesData?.total || 0;
 
   // Not authenticated
   if (authStatus === 'unauthenticated') {
@@ -84,40 +139,46 @@ export default function CustomerDetailsPage() {
   // Loading customer data
   if (isLoadingCustomer) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Spinner />
-      </div>
+      <Layout>
+        <div className="flex h-96 items-center justify-center">
+          <Spinner size="lg" color="primary" />
+        </div>
+      </Layout>
     );
   }
 
   // Customer not found
   if (!customer) {
     return (
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center justify-center h-64">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Customer Not Found</h1>
-          <p className="text-muted-foreground">The customer you&apos;re looking for doesn&apos;t exist.</p>
-          <Button
-            color="primary"
-            className="mt-4"
-            onPress={() => router.push('/admin/customers')}
-          >
-            Back to Customers
-          </Button>
+      <Layout>
+        <div className="p-6">
+          <div className="flex h-64 flex-col items-center justify-center">
+            <h1 className="text-foreground mb-2 text-2xl font-bold">Customer Not Found</h1>
+            <p className="text-muted-foreground">
+              The customer you&apos;re looking for doesn&apos;t exist.
+            </p>
+            <Button
+              color="primary"
+              className="mt-4"
+              onPress={() => router.push('/admin/customers')}
+            >
+              Back to Customers
+            </Button>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <>
+    <Layout>
       <Head>
         <title>{customer.name} | Customer Details</title>
       </Head>
 
-      <div className="container mx-auto px-4">
+      <div className="p-6">
         <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
                 isIconOnly
@@ -128,7 +189,7 @@ export default function CustomerDetailsPage() {
                 <ArrowLeft size={20} />
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">{customer.name}</h1>
+                <h1 className="text-foreground text-2xl font-bold">{customer.name}</h1>
                 <p className="text-muted-foreground">Customer&apos;s details and history</p>
               </div>
             </div>
@@ -151,20 +212,17 @@ export default function CustomerDetailsPage() {
           </div>
 
           {/* Customer Information Panel */}
-          <div className="bg-background/50 p-6 rounded-lg">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Contact Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-background/50 rounded-lg p-6">
+            <h2 className="text-foreground mb-4 text-lg font-semibold">Contact Information</h2>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {customer.email && (
                 <div className="flex items-center gap-3">
-                  <div className="bg-primary/10 p-2 rounded-full">
-                    <Mail className="h-5 w-5 text-primary" />
+                  <div className="bg-primary/10 rounded-full p-2">
+                    <Mail className="text-primary h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <a
-                      href={`mailto:${customer.email}`}
-                      className="text-primary hover:underline"
-                    >
+                    <p className="text-muted-foreground text-sm">Email</p>
+                    <a href={`mailto:${customer.email}`} className="text-primary hover:underline">
                       {customer.email}
                     </a>
                   </div>
@@ -172,15 +230,12 @@ export default function CustomerDetailsPage() {
               )}
               {customer.phone && (
                 <div className="flex items-center gap-3">
-                  <div className="bg-primary/10 p-2 rounded-full">
-                    <Phone className="h-5 w-5 text-primary" />
+                  <div className="bg-primary/10 rounded-full p-2">
+                    <Phone className="text-primary h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Phone</p>
-                    <a
-                      href={`tel:${customer.phone}`}
-                      className="text-primary hover:underline"
-                    >
+                    <p className="text-muted-foreground text-sm">Phone</p>
+                    <a href={`tel:${customer.phone}`} className="text-primary hover:underline">
                       {customer.phone}
                     </a>
                   </div>
@@ -188,21 +243,21 @@ export default function CustomerDetailsPage() {
               )}
               {customer.address && (
                 <div className="flex items-center gap-3">
-                  <div className="bg-primary/10 p-2 rounded-full">
-                    <MapPin className="h-5 w-5 text-primary" />
+                  <div className="bg-primary/10 rounded-full p-2">
+                    <MapPin className="text-primary h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Address</p>
+                    <p className="text-muted-foreground text-sm">Address</p>
                     <span className="text-foreground">{customer.address}</span>
                   </div>
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-2 rounded-full">
-                  <CalendarDays className="h-5 w-5 text-primary" />
+                <div className="bg-primary/10 rounded-full p-2">
+                  <CalendarDays className="text-primary h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Customer Since</p>
+                  <p className="text-muted-foreground text-sm">Customer Since</p>
                   <span className="text-foreground">{formatDate(customer.createdAt)}</span>
                 </div>
               </div>
@@ -210,137 +265,52 @@ export default function CustomerDetailsPage() {
 
             {customer.notes && (
               <div className="mt-6">
-                <h3 className="text-md font-medium text-foreground mb-2 flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-md text-foreground mb-2 flex items-center gap-2 font-medium">
+                  <FileText className="text-muted-foreground h-4 w-4" />
                   Notes
                 </h3>
-                <p className="text-foreground bg-background/80 p-4 rounded-md">{customer.notes}</p>
+                <p className="text-foreground bg-background/80 rounded-md p-4">{customer.notes}</p>
               </div>
             )}
           </div>
 
-          {/* Customer History Section */}
+          {/* Customer's Quotes Section using EntityList */}
           <div className="mt-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-foreground">Quote History</h2>
-              <div className="flex gap-2">
-                <Input
-                  isClearable
-                  placeholder="Search quotes..."
-                  startContent={<Search size={16} />}
-                  size="sm"
-                  value={searchQuery}
-                  onValueChange={handleSearch}
-                  className="w-64"
-                />
-              </div>
-            </div>
-
-            {isLoadingQuotes ? (
-              <div className="flex justify-center items-center h-48">
-                <Spinner />
-              </div>
-            ) : !quotesData || quotesData.quotes.length === 0 ? (
-              <div className="text-center py-12 bg-background/50 rounded-lg">
-                <p className="text-muted-foreground">No quotes found for this customer</p>
-                <Button
-                  color="primary"
-                  className="mt-4"
-                  startContent={<Plus size={16} />}
-                  onPress={() => router.push(`/admin/quotes/new?customerId=${customer.id}`)}
-                >
-                  Create First Quote
-                </Button>
-              </div>
-            ) : (
-              <div className="bg-background/50 rounded-lg overflow-hidden">
-                <Table aria-label="Customer quotes history">
-                  <TableHeader>
-                    <TableColumn>QUOTE #</TableColumn>
-                    <TableColumn>TITLE</TableColumn>
-                    <TableColumn>DATE</TableColumn>
-                    <TableColumn>STATUS</TableColumn>
-                    <TableColumn>TOTAL</TableColumn>
-                    <TableColumn>ACTIONS</TableColumn>
-                  </TableHeader>
-                  <TableBody>
-                    {quotesData.quotes.map((quote, index) => {
-                      // Calculate quote number based on pagination
-                      const quoteNumber = (page - 1) * rowsPerPage + index + 1;
-                      
-                      return (
-                        <TableRow key={quote.id}>
-                          <TableCell>#{quote.sequentialId}</TableCell>
-                          <TableCell>{quote.title}</TableCell>
-                          <TableCell>{formatDate(quote.createdAt)}</TableCell>
-                          <TableCell>
-                            <Chip
-                              className="capitalize"
-                              color={statusColorMap[quote.status]}
-                              size="sm"
-                              variant="flat"
-                            >
-                              {quote.status.toLowerCase()}
-                            </Chip>
-                          </TableCell>
-                          <TableCell>{formatCurrency(Number(quote.grandTotal))}</TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              color="primary"
-                              variant="flat"
-                              onPress={() => router.push(`/admin/quotes/${quote.id}`)}
-                            >
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-
-                {/* Pagination */}
-                {quotesData.total > rowsPerPage && (
-                  <div className="flex justify-center p-4">
-                    <Pagination
-                      total={Math.ceil(quotesData.total / rowsPerPage)}
-                      page={page}
-                      onChange={handlePageChange}
-                      showControls
-                      color="primary"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Summary Section */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-background/50 p-6 rounded-lg">
-              <h3 className="text-md font-medium text-foreground mb-2">Total Quotes</h3>
-              <p className="text-2xl font-bold">{quotesData?.total || 0}</p>
-            </div>
-            <div className="bg-background/50 p-6 rounded-lg">
-              <h3 className="text-md font-medium text-foreground mb-2">Accepted Quotes</h3>
-              <p className="text-2xl font-bold text-success">
-                {quotesData?.quotes.filter(q => q.status === 'ACCEPTED').length || 0}
-              </p>
-            </div>
-            <div className="bg-background/50 p-6 rounded-lg">
-              <h3 className="text-md font-medium text-foreground mb-2">Revenue</h3>
-              <p className="text-2xl font-bold">
-                {formatCurrency(
-                  quotesData?.quotes
-                    .filter(q => q.status === 'ACCEPTED')
-                    .reduce((sum, quote) => sum + Number(quote.grandTotal), 0) || 0
-                )}
-              </p>
-            </div>
+            <EntityList<Quote>
+              title="Quote History"
+              entities={quotes}
+              columns={quoteColumns}
+              baseUrl="/admin/quotes"
+              isLoading={isLoadingQuotes}
+              enableSearch={true}
+              searchPlaceholder="Search quotes..."
+              onSearchChange={handleSearch}
+              emptyStateMessage="No quotes found for this customer"
+              emptyStateAction={{
+                label: 'Create Quote',
+                onClick: () => router.push(`/admin/quotes/new?customerId=${customer.id}`),
+                icon: <Plus size={16} />,
+              }}
+              pagination={
+                quotesData
+                  ? {
+                      page,
+                      pageSize: rowsPerPage,
+                      total: totalQuotes,
+                      onPageChange: setPage,
+                    }
+                  : undefined
+              }
+              actions={{
+                view: true,
+                edit: true,
+                delete: true,
+              }}
+              onDelete={handleDeleteQuote}
+            />
           </div>
         </div>
       </div>
-    </>
+    </Layout>
   );
-} 
+}

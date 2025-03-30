@@ -11,16 +11,20 @@ import {
   Button,
   Chip,
 } from "@heroui/react";
+import { Eye } from "lucide-react";
 import { api } from "~/utils/api";
+import { formatUserFriendlyId } from "~/utils/formatters";
+import { formatCurrency } from "~/utils/currency";
+import { formatDate } from "~/utils/formatters";
 
 // Define the Quote type based on the structure from the API
 interface Quote {
   id: string;
-  projectName: string;
+  sequentialId: number;
+  title: string;
   customerName: string;
   status: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
-  complexityCharge: string | number;
-  markupPercentage: string | number;
+  grandTotal: number;
   createdAt: Date;
   updatedAt: Date;
   customerEmail?: string | null;
@@ -39,20 +43,10 @@ const statusColors = {
 export default function QuoteList({ quotes }: { quotes: Quote[] }) {
   const router = useRouter();
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString();
-  };
-
-  const formatCurrency = (amount: number | string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(Number(amount));
-  };
-
   return (
     <Table aria-label="Quotes list">
       <TableHeader>
+        <TableColumn>ID</TableColumn>
         <TableColumn>PROJECT</TableColumn>
         <TableColumn>CUSTOMER</TableColumn>
         <TableColumn>STATUS</TableColumn>
@@ -63,7 +57,8 @@ export default function QuoteList({ quotes }: { quotes: Quote[] }) {
       <TableBody>
         {quotes.map((quote) => (
           <TableRow key={quote.id}>
-            <TableCell>{quote.projectName}</TableCell>
+            <TableCell>{formatUserFriendlyId(quote.id, quote.sequentialId)}</TableCell>
+            <TableCell>{quote.title}</TableCell>
             <TableCell>{quote.customerName}</TableCell>
             <TableCell>
               <Chip
@@ -74,14 +69,16 @@ export default function QuoteList({ quotes }: { quotes: Quote[] }) {
               </Chip>
             </TableCell>
             <TableCell>
-              {formatCurrency(Number(quote.complexityCharge))}
+              {formatCurrency(quote.grandTotal)}
             </TableCell>
             <TableCell>{formatDate(quote.createdAt)}</TableCell>
             <TableCell>
               <Button
                 color="primary"
-                
-                onPress={() => router.push(`/quotes/${quote.id}`)}
+                variant="flat"
+                size="sm"
+                startContent={<Eye size={16} />}
+                onPress={() => router.push(`/admin/quotes/${quote.id}`)}
               >
                 View
               </Button>

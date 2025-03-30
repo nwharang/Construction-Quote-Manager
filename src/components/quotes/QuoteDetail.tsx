@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Card,
   CardHeader,
@@ -11,10 +11,10 @@ import {
   Button,
   Chip,
   Input,
-  Spinner,
-  NumberInput
-} from "@heroui/react";
-import { api } from "~/utils/api";
+  Badge,
+  NumberInput,
+} from '@heroui/react';
+import { api } from '~/utils/api';
 
 // Define the Quote type structure
 interface Task {
@@ -41,7 +41,7 @@ interface Quote {
   id: string;
   projectName: string;
   customerName: string;
-  status: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
+  status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED';
   complexityCharge: string | number;
   markupPercentage: string | number;
   createdAt: Date;
@@ -54,19 +54,19 @@ interface Quote {
 
 // Status color mapping
 const statusColors = {
-  DRAFT: "default",
-  SENT: "primary",
-  ACCEPTED: "success",
-  REJECTED: "danger",
+  DRAFT: 'default',
+  SENT: 'primary',
+  ACCEPTED: 'success',
+  REJECTED: 'danger',
 } as const;
 
 export default function QuoteDetail({ quote }: { quote: Quote }) {
   const router = useRouter();
   const utils = api.useContext();
-  
+
   const [complexityCharge, setComplexityCharge] = useState(Number(quote.complexityCharge));
   const [markupPercentage, setMarkupPercentage] = useState(Number(quote.markupPercentage));
-  
+
   const updateCharges = api.quote.updateCharges.useMutation({
     onSuccess: () => {
       utils.quote.getById.invalidate({ id: quote.id });
@@ -81,14 +81,14 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
 
   const deleteQuote = api.quote.delete.useMutation({
     onSuccess: () => {
-      router.push("/quotes");
+      router.push('/quotes');
     },
   });
 
   const formatCurrency = (amount: number | string) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
     }).format(Number(amount));
   };
 
@@ -107,27 +107,24 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
     updateCharges.mutate({
       id: quote.id,
       complexityCharge: complexityCharge,
-      markupCharge: markup
+      markupCharge: markup,
     });
   };
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {/* Project Info */}
         <Card className="md:col-span-2">
           <CardHeader className="flex justify-between">
             <h2 className="text-xl font-bold">{quote.projectName}</h2>
-            <Chip
-              color={statusColors[quote.status as keyof typeof statusColors]}
-              variant="flat"
-            >
+            <Chip color={statusColors[quote.status as keyof typeof statusColors]} variant="flat">
               {quote.status}
             </Chip>
           </CardHeader>
           <Divider />
           <CardBody>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <p className="text-small text-default-500">Customer</p>
                 <p className="font-medium">{quote.customerName}</p>
@@ -169,7 +166,7 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
                     key={status}
                     size="sm"
                     color={statusColors[status as keyof typeof statusColors]}
-                    variant={quote.status === status ? "solid" : "flat"}
+                    variant={quote.status === status ? 'solid' : 'flat'}
                     onPress={() =>
                       updateStatus.mutate({
                         id: quote.id,
@@ -178,7 +175,12 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
                     }
                     isLoading={updateStatus.isPending}
                   >
-                    {status}
+                    <Badge
+                      color={statusColors[status as keyof typeof statusColors]}
+                      variant="solid"
+                    >
+                      {status}
+                    </Badge>
                   </Button>
                 ))}
               </div>
@@ -186,9 +188,8 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
             <Divider />
             <Button
               color="danger"
-              
               onPress={() => {
-                if (window.confirm("Are you sure you want to delete this quote?")) {
+                if (window.confirm('Are you sure you want to delete this quote?')) {
                   deleteQuote.mutate({ id: quote.id });
                 }
               }}
@@ -208,13 +209,13 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
         <Divider />
         <CardBody>
           {quote.tasks.length === 0 ? (
-            <p className="text-center py-4">No tasks added yet</p>
+            <p className="py-4 text-center">No tasks added yet</p>
           ) : (
             <div className="space-y-4">
               {quote.tasks.map((task) => (
                 <Card key={task.id} className="border-1">
                   <CardBody>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="md:col-span-2">
                         <p className="font-medium">{task.description}</p>
                         <p className="text-small text-default-500">
@@ -222,9 +223,7 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-large">
-                          {formatCurrency(Number(task.price))}
-                        </p>
+                        <p className="text-large font-bold">{formatCurrency(Number(task.price))}</p>
                       </div>
                     </div>
                   </CardBody>
@@ -236,14 +235,14 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
       </Card>
 
       {/* Adjustments and Totals */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card className="md:col-span-2">
           <CardHeader>
             <h2 className="text-lg font-bold">Adjustments</h2>
           </CardHeader>
           <Divider />
           <CardBody className="space-y-4">
-            <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex flex-wrap items-end gap-4">
               <NumberInput
                 label="Complexity Charge"
                 value={complexityCharge}
@@ -251,7 +250,11 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
                 startContent="$"
                 min={0}
                 step={0.01}
-                formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                formatOptions={{
+                  style: 'decimal',
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }}
                 className="max-w-xs"
                 aria-label="Complexity Charge"
               />
@@ -263,7 +266,11 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
                 min={0}
                 max={100}
                 step={0.1}
-                formatOptions={{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 1 }}
+                formatOptions={{
+                  style: 'decimal',
+                  minimumFractionDigits: 1,
+                  maximumFractionDigits: 1,
+                }}
                 className="max-w-xs"
                 aria-label="Markup Percentage"
               />
@@ -301,7 +308,7 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
               <span>{formatCurrency(markup)}</span>
             </div>
             <Divider />
-            <div className="flex justify-between font-bold text-lg">
+            <div className="flex justify-between text-lg font-bold">
               <span>Grand Total:</span>
               <span>{formatCurrency(grandTotal)}</span>
             </div>
@@ -310,4 +317,4 @@ export default function QuoteDetail({ quote }: { quote: Quote }) {
       </div>
     </div>
   );
-} 
+}

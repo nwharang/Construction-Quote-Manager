@@ -79,13 +79,13 @@ export const quoteRouter = createTRPCRouter({
         return {
           quotes: quotesWithCustomers.map(({ quote, customer }) => ({
             ...quote,
-            // Convert string values to numbers for the client
-            subtotalTasks: parseFloat(quote.subtotalTasks),
-            subtotalMaterials: parseFloat(quote.subtotalMaterials),
-            complexityCharge: parseFloat(quote.complexityCharge),
-            markupCharge: parseFloat(quote.markupCharge),
-            markupPercentage: parseFloat(quote.markupPercentage),
-            grandTotal: parseFloat(quote.grandTotal),
+            // Currency values are already numeric in the database now - no parsing needed
+            subtotalTasks: Number(quote.subtotalTasks),
+            subtotalMaterials: Number(quote.subtotalMaterials),
+            complexityCharge: Number(quote.complexityCharge),
+            markupCharge: Number(quote.markupCharge),
+            markupPercentage: Number(quote.markupPercentage),
+            grandTotal: Number(quote.grandTotal),
             customer: customer || null,
           })),
           total,
@@ -137,13 +137,13 @@ export const quoteRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        title: z.string(),
-        customerName: z.string(),
-        customerEmail: z.string().email().optional(),
-        customerPhone: z.string().optional(),
-        notes: z.string().optional(),
-        complexityCharge: z.number().default(0),
-        markupCharge: z.number().default(0)
+        title: z.string().min(1, "Title is required"),
+        customerName: z.string().min(1, "Customer name is required"),
+        customerEmail: z.string().email("Invalid email address").optional().nullable(),
+        customerPhone: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        complexityCharge: z.number().min(0).default(0),
+        markupPercentage: z.number().min(0).default(10)
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -183,26 +183,29 @@ export const quoteRouter = createTRPCRouter({
           customerId = existingCustomer[0].id;
         }
 
+        // Calculate initial values for the quote
+        const markupCharge = 0; // Initially zero, will be calculated when tasks/materials are added
+        const quoteId = crypto.randomUUID();
+        
         // Create the quote with the customer ID
         const [quote] = await ctx.db
           .insert(quotes)
           .values({
-            id: crypto.randomUUID(),
+            id: quoteId,
             title: input.title,
             customerId,
             customerName: input.customerName,
-            customerEmail: input.customerEmail,
-            customerPhone: input.customerPhone,
+            customerEmail: input.customerEmail || null,
+            customerPhone: input.customerPhone || null,
             status: QuoteStatus.DRAFT,
             subtotalTasks: '0',
             subtotalMaterials: '0',
             complexityCharge: input.complexityCharge.toString(),
-            markupCharge: input.markupCharge.toString(),
+            markupCharge: markupCharge.toString(),
+            markupPercentage: input.markupPercentage.toString(),
             grandTotal: '0',
-            notes: input.notes,
+            notes: input.notes || null,
             userId: ctx.session.user.id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
           })
           .returning();
 
@@ -213,7 +216,7 @@ export const quoteRouter = createTRPCRouter({
           });
         }
 
-        return { id: quote.id };
+        return quote;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
@@ -227,18 +230,20 @@ export const quoteRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
-        title: z.string(),
-        customerName: z.string(),
-        customerEmail: z.string().email().optional(),
-        customerPhone: z.string().optional(),
-        notes: z.string().optional(),
-        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED]).optional(),
-        subtotalTasks: z.string(),
-        subtotalMaterials: z.string(),
-        complexityCharge: z.string(),
-        markupCharge: z.string(),
-        grandTotal: z.string(),
+        id: z.string().min(1, "Quote ID is required"),
+        title: z.string().min(1, "Title is required"),
+        customerName: z.string().min(1, "Customer name is required"),
+        customerEmail: z.string().email("Invalid email address").optional().nullable(),
+        customerPhone: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED], {
+          errorMap: () => ({ message: "Status must be one of: DRAFT, SENT, ACCEPTED, REJECTED" })
+        }).optional(),
+        subtotalTasks: z.number().min(0),
+        subtotalMaterials: z.number().min(0),
+        complexityCharge: z.number().min(0),
+        markupCharge: z.number().min(0),
+        grandTotal: z.number().min(0),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -292,6 +297,14 @@ export const quoteRouter = createTRPCRouter({
           customerId = existingCustomer[0].id;
         }
 
+        // Apply rounding to all numeric values
+        const subtotalTasks = Math.round(input.subtotalTasks * 100) / 100;
+        const subtotalMaterials = Math.round(input.subtotalMaterials * 100) / 100;
+        const complexityCharge = Math.round(input.complexityCharge * 100) / 100;
+        const markupCharge = Math.round(input.markupCharge * 100) / 100;
+        // Calculate grand total to ensure consistency
+        const grandTotal = Math.round((subtotalTasks + subtotalMaterials + complexityCharge + markupCharge) * 100) / 100;
+
         // Update the quote with the customer ID and financial details
         const [quote] = await ctx.db
           .update(quotes)
@@ -304,11 +317,11 @@ export const quoteRouter = createTRPCRouter({
             notes: input.notes,
             status: input.status,
             // Store numeric values as strings in the database
-            subtotalTasks: input.subtotalTasks,
-            subtotalMaterials: input.subtotalMaterials,
-            complexityCharge: input.complexityCharge,
-            markupCharge: input.markupCharge,
-            grandTotal: input.grandTotal,
+            subtotalTasks: subtotalTasks.toString(),
+            subtotalMaterials: subtotalMaterials.toString(),
+            complexityCharge: complexityCharge.toString(),
+            markupCharge: markupCharge.toString(),
+            grandTotal: grandTotal.toString(),
             updatedAt: new Date(),
           })
           .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
@@ -324,12 +337,12 @@ export const quoteRouter = createTRPCRouter({
         // Convert the string values to numbers for client consumption
         return {
           ...quote,
-          subtotalTasks: parseFloat(quote.subtotalTasks),
-          subtotalMaterials: parseFloat(quote.subtotalMaterials),
-          complexityCharge: parseFloat(quote.complexityCharge),
-          markupCharge: parseFloat(quote.markupCharge),
-          markupPercentage: parseFloat(quote.markupPercentage),
-          grandTotal: parseFloat(quote.grandTotal),
+          subtotalTasks: Number(quote.subtotalTasks),
+          subtotalMaterials: Number(quote.subtotalMaterials),
+          complexityCharge: Number(quote.complexityCharge),
+          markupCharge: Number(quote.markupCharge),
+          markupPercentage: Number(quote.markupPercentage),
+          grandTotal: Number(quote.grandTotal),
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
@@ -342,7 +355,7 @@ export const quoteRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string().min(1, "Quote ID is required") }))
     .mutation(async ({ ctx, input }) => {
       try {
         // First, check if the quote exists and belongs to the user
@@ -355,7 +368,7 @@ export const quoteRouter = createTRPCRouter({
         if (!existingQuote[0]) {
           throw new TRPCError({
             code: 'NOT_FOUND',
-            message: 'Quote not found',
+            message: 'Quote not found or you do not have permission to delete it',
           });
         }
 
@@ -384,7 +397,7 @@ export const quoteRouter = createTRPCRouter({
           await ctx.db.delete(customers).where(eq(customers.id, deletedQuote.customerId));
         }
 
-        return { success: true };
+        return { success: true, id: deletedQuote.id };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
@@ -471,9 +484,9 @@ export const quoteRouter = createTRPCRouter({
   updateCharges: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
-        complexityCharge: z.number(),
-        markupCharge: z.number()
+        id: z.string().min(1, "Quote ID is required"),
+        complexityCharge: z.number().min(0, "Complexity charge must be non-negative"),
+        markupCharge: z.number().min(0, "Markup charge must be non-negative")
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -508,10 +521,10 @@ export const quoteRouter = createTRPCRouter({
         const subtotalMaterials = quoteTasks.reduce((sum, task) => sum + Number(task.estimatedMaterialsCost), 0);
         const subtotal = subtotalTasks + subtotalMaterials;
         
-        // Calculate grand total
-        const complexityCharge = input.complexityCharge;
-        const markupCharge = input.markupCharge;
-        const grandTotal = subtotal + complexityCharge + markupCharge;
+        // Calculate grand total - use Math.round to ensure 2 decimal places
+        const complexityCharge = Math.round(input.complexityCharge * 100) / 100;
+        const markupCharge = Math.round(input.markupCharge * 100) / 100;
+        const grandTotal = Math.round((subtotal + complexityCharge + markupCharge) * 100) / 100;
         
         // Update the quote
         const [updatedQuote] = await ctx.db
@@ -562,8 +575,10 @@ export const quoteRouter = createTRPCRouter({
   updateStatus: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
-        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED]),
+        id: z.string().min(1, "Quote ID is required"),
+        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED], {
+          errorMap: () => ({ message: "Status must be one of: DRAFT, SENT, ACCEPTED, REJECTED" })
+        }),
       })
     )
     .mutation(async ({ ctx, input }) => {

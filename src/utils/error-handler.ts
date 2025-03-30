@@ -99,10 +99,10 @@ export function showErrorToast(error: unknown, defaultMessage?: string): void {
   const { type, message } = handleClientError(error, defaultMessage);
   
   addToast({
-    title: `Error: ${type}`,
-    description: message,
-    color: 'danger',
-    variant: 'bordered',
+    title: "Error",
+    description: `${type}: ${message}`,
+    variant: "bordered",
+    color: "danger",
   });
 }
 

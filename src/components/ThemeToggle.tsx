@@ -1,46 +1,27 @@
-import { useTheme } from '@/components/providers/ThemeProvider';
-import { Button } from '@heroui/react';
-import { Sun, Moon, Monitor } from 'lucide-react';
-import { useAppToast } from '@/components/providers/ToastProvider';
+import React from 'react';
+import { Switch } from '@heroui/react';
+import { useTranslation } from '~/utils/i18n';
+import { useConfigStore } from '~/store';
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const { success } = useAppToast();
-
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme);
-    success(`Theme changed to ${newTheme}`);
+  const { t } = useTranslation();
+  const { isDarkMode, toggleDarkMode } = useConfigStore();
+  
+  const handleToggle = () => {
+    toggleDarkMode();
+    // HeroUI theme is handled by the configStore
   };
-
+  
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        isIconOnly
-        variant={theme === 'light' ? 'solid' : 'ghost'}
-        onPress={() => handleThemeChange('light')}
-        className="p-2"
-        aria-label="Light theme"
-      >
-        <Sun className="h-5 w-5" />
-      </Button>
-      <Button
-        isIconOnly
-        variant={theme === 'dark' ? 'solid' : 'ghost'}
-        onPress={() => handleThemeChange('dark')}
-        className="p-2"
-        aria-label="Dark theme"
-      >
-        <Moon className="h-5 w-5" />
-      </Button>
-      <Button
-        isIconOnly
-        variant={theme === 'system' ? 'solid' : 'ghost'}
-        onPress={() => handleThemeChange('system')}
-        className="p-2"
-        aria-label="System theme"
-      >
-        <Monitor className="h-5 w-5" />
-      </Button>
-    </div>
+    <Switch
+      size="lg"
+      color="primary"
+      isSelected={isDarkMode}
+      onValueChange={handleToggle}
+      aria-label={t('settings.toggleTheme')}
+      endContent={<span>{isDarkMode ? t('theme.dark') : t('theme.light')}</span>}
+    />
   );
-} 
+}
+
+export default ThemeToggle; 

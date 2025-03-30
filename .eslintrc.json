@@ -1,18 +1,20 @@
 {
-  "extends": ["next/core-web-vitals"],
+  "extends": [
+    "next/core-web-vitals",
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
   "rules": {
-    // Allow unused variables with an underscore prefix
-    "@typescript-eslint/no-unused-vars": ["warn", { 
-      "argsIgnorePattern": "^_",
-      "varsIgnorePattern": "^_",
-      "caughtErrorsIgnorePattern": "^_"
-    }],
-    
-    // Allow specific 'any' types in certain files
+    "@next/next/no-html-link-for-pages": "off",
     "@typescript-eslint/no-explicit-any": "warn",
-    
-    // NextJS specific rules
-    "@next/next/no-img-element": "warn",
-    "@next/next/no-html-link-for-pages": "warn"
+    "@typescript-eslint/ban-ts-comment": "warn",
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ]
   }
 } 
