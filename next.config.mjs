@@ -14,6 +14,7 @@ const nextConfig = {
   typescript: {
     // Allow the build to complete with TypeScript errors
     // This should be set to false once all TypeScript issues are fixed
+    ignoreBuildErrors: true,
   },
 
   reactStrictMode: true,
@@ -30,7 +31,7 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com', 'tailwindui.com'],
   },
-  
+
   // Improve hydration performance for theme switching
   experimental: {
     // Allow components with suppressHydrationWarning

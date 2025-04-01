@@ -205,12 +205,12 @@ export const TaskList: React.FC<TaskListProps> = ({ form, field, readOnly = fals
                         </div>
                       )}
                     />
-                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                </div>
+              )}
+            </div>
+          ))}
+            </div>
+          )}
       </CardBody>
       {/* Add Task button is rendered here, controlled by the form context */}
       {!readOnly && (
