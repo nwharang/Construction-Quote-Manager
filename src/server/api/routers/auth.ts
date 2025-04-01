@@ -21,13 +21,22 @@ const loginUserSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+// Schema for profile update
+const updateProfileSchema = z.object({
+  name: z.string().min(1).optional(),
+  image: z.string().url().nullish(),
+  role: z.enum(['contractor', 'subcontractor', 'supplier', 'other']).optional(),
+});
+
 export const authRouter = createTRPCRouter({
   // Get the current user profile (authorized users only)
   getProfile: protectedProcedure.query(async ({ ctx }) => {
     try {
-      const { session, db } = ctx;
-
-      const user = await db
+      // 1. Get user ID from session
+      const userId = ctx.session.user.id;
+      
+      // 2. Fetch user profile from database
+      const user = await ctx.db
         .select({
           id: users.id,
           name: users.name,
@@ -37,9 +46,10 @@ export const authRouter = createTRPCRouter({
           createdAt: users.createdAt,
         })
         .from(users)
-        .where(eq(users.id, session.user.id))
+        .where(eq(users.id, userId))
         .then((rows) => rows[0]);
 
+      // 3. Verify user exists
       if (!user) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -47,8 +57,11 @@ export const authRouter = createTRPCRouter({
         });
       }
 
+      // 4. Return user profile
       return user;
     } catch (error) {
+      // 5. Handle errors
+      console.error('Error fetching user profile:', error);
       if (error instanceof TRPCError) throw error;
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -59,124 +72,135 @@ export const authRouter = createTRPCRouter({
   }),
 
   // Login user (public procedure)
-  login: publicProcedure.input(loginUserSchema).mutation(async ({ input, ctx }) => {
-    try {
-      const { email, password } = input;
+  login: publicProcedure
+    .input(loginUserSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // 1. Extract input data
+        const { email, password } = input;
 
-      // Find user by email
-      const user = await ctx.db
-        .select()
-        .from(users)
-        .where(eq(users.email, email.toLowerCase()))
-        .then((rows) => rows[0]);
+        // 2. Find user by email
+        const user = await ctx.db
+          .select()
+          .from(users)
+          .where(eq(users.email, email.toLowerCase()))
+          .then((rows) => rows[0]);
 
-      if (!user || !user.hashedPassword) {
+        // 3. Verify user exists and has a password
+        if (!user || !user.hashedPassword) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Invalid email or password',
+          });
+        }
+
+        // 4. Verify password
+        const passwordMatches = await compare(password, user.hashedPassword);
+
+        // 5. Handle authentication failure
+        if (!passwordMatches) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid email or password',
+          });
+        }
+
+        // 6. Return successful login response
+        return {
+          status: 'success',
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        };
+      } catch (error) {
+        // 7. Handle errors
+        console.error('Error logging in:', error);
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Invalid email or password',
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to login',
+          cause: error,
         });
       }
-
-      // Verify password
-      const passwordMatches = await compare(password, user.hashedPassword);
-
-      if (!passwordMatches) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Invalid email or password',
-        });
-      }
-
-      return {
-        status: 'success',
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      };
-    } catch (error) {
-      if (error instanceof TRPCError) throw error;
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to login',
-        cause: error,
-      });
-    }
-  }),
+    }),
 
   // Create a new user (public procedure)
-  register: publicProcedure.input(registerUserSchema).mutation(async ({ input, ctx }) => {
-    try {
-      const { name, email, password, role } = input;
+  register: publicProcedure
+    .input(registerUserSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // 1. Extract input data
+        const { name, email, password, role } = input;
 
-      // Check if user already exists
-      const existingUsers = await ctx.db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, email.toLowerCase()));
+        // 2. Check if user already exists
+        const existingUsers = await ctx.db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, email.toLowerCase()));
 
-      if (existingUsers.length > 0) {
+        // 3. Handle existing user case
+        if (existingUsers.length > 0) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'User with this email already exists',
+          });
+        }
+
+        // 4. Hash the password
+        const hashedPassword = await hash(password, 12);
+
+        // 5. Create the user
+        const [newUser] = await ctx.db
+          .insert(users)
+          .values({
+            name,
+            email: email.toLowerCase(),
+            hashedPassword,
+            role,
+          })
+          .returning({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+          });
+
+        // 6. Return successful registration response
+        return {
+          status: 'success',
+          user: newUser,
+        };
+      } catch (error) {
+        // 7. Handle errors
+        console.error('Error registering user:', error);
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'User with this email already exists',
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to register user',
+          cause: error,
         });
       }
-
-      // Hash the password
-      const hashedPassword = await hash(password, 12);
-
-      // Create the user
-      const [newUser] = await ctx.db
-        .insert(users)
-        .values({
-          name,
-          email: email.toLowerCase(),
-          hashedPassword,
-          role,
-        })
-        .returning({
-          id: users.id,
-          name: users.name,
-          email: users.email,
-          role: users.role,
-        });
-
-      return {
-        status: 'success',
-        user: newUser,
-      };
-    } catch (error) {
-      if (error instanceof TRPCError) throw error;
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to register user',
-        cause: error,
-      });
-    }
-  }),
+    }),
 
   // Update user profile (authorized users only)
   updateProfile: protectedProcedure
-    .input(
-      z.object({
-        name: z.string().min(1).optional(),
-        image: z.string().url().nullish(),
-        role: z.enum(['contractor', 'subcontractor', 'supplier', 'other']).optional(),
-      })
-    )
+    .input(updateProfileSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const { session, db } = ctx;
-
+        // 1. Get user ID from session
+        const userId = ctx.session.user.id;
+        
+        // 2. Prepare data to update
         const dataToUpdate: Record<string, unknown> = {};
 
         if (input.name) dataToUpdate.name = input.name;
         if (input.image !== undefined) dataToUpdate.image = input.image;
         if (input.role) dataToUpdate.role = input.role;
 
-        // Only proceed if there are fields to update
+        // 3. Validate update data
         if (Object.keys(dataToUpdate).length === 0) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -184,11 +208,14 @@ export const authRouter = createTRPCRouter({
           });
         }
 
-        // Update the user
-        const [updatedUser] = await db
+        // 4. Update the user profile
+        const [updatedUser] = await ctx.db
           .update(users)
-          .set(dataToUpdate)
-          .where(eq(users.id, session.user.id))
+          .set({
+            ...dataToUpdate,
+            // Don't set updatedAt if the schema doesn't support it
+          })
+          .where(eq(users.id, userId))
           .returning({
             id: users.id,
             name: users.name,
@@ -197,6 +224,7 @@ export const authRouter = createTRPCRouter({
             role: users.role,
           });
 
+        // 5. Verify update was successful
         if (!updatedUser) {
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -204,11 +232,14 @@ export const authRouter = createTRPCRouter({
           });
         }
 
+        // 6. Return updated profile
         return {
           status: 'success',
           user: updatedUser,
         };
       } catch (error) {
+        // 7. Handle errors
+        console.error('Error updating profile:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

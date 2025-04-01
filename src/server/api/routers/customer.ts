@@ -27,23 +27,20 @@ export const customerRouter = createTRPCRouter({
         const { page, limit, search } = input;
         const offset = (page - 1) * limit;
 
-        // Build search condition
-        const baseCondition = eq(customers.userId, ctx.session.user.id);
-        
-        let whereClause;
-        if (search) {
-          whereClause = and(
-            baseCondition,
-            or(
-              ilike(customers.name, `%${search}%`),
-              ilike(customers.email, `%${search}%`)
-            )
-          );
-        } else {
-          whereClause = baseCondition;
-        }
+        // 1. Build search condition
+        const whereClause = and(
+          eq(customers.userId, ctx.session.user.id),
+          ...(search
+            ? [
+                or(
+                  ilike(customers.name, `%${search}%`),
+                  ilike(customers.email, `%${search}%`)
+                )
+              ]
+            : [])
+        );
 
-        // Get total count
+        // 2. Get total count
         const countResult = await ctx.db
           .select({ count: sql<number>`count(*)` })
           .from(customers)
@@ -51,7 +48,7 @@ export const customerRouter = createTRPCRouter({
 
         const total = Number(countResult[0]?.count ?? 0);
 
-        // Get customers with pagination
+        // 3. Get customers with pagination
         const customerList = await ctx.db
           .select({
             id: customers.id,
@@ -69,7 +66,7 @@ export const customerRouter = createTRPCRouter({
           .limit(limit)
           .offset(offset);
 
-        // Add empty count field to maintain API compatibility
+        // 4. Add empty count field to maintain API compatibility
         const customersWithCounts = customerList.map(customer => ({
           ...customer,
           _count: {
@@ -80,6 +77,8 @@ export const customerRouter = createTRPCRouter({
         return {
           customers: customersWithCounts,
           total,
+          page,
+          limit,
         };
       } catch (error) {
         console.error("Error fetching customers:", error);
@@ -92,9 +91,10 @@ export const customerRouter = createTRPCRouter({
     }),
 
   getById: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid('Invalid customer ID format') }))
     .query(async ({ ctx, input }) => {
       try {
+        // 1. Verify ownership and get customer data
         const customer = await ctx.db
           .select()
           .from(customers)
@@ -109,12 +109,13 @@ export const customerRouter = createTRPCRouter({
         if (!customer[0]) {
           throw new TRPCError({
             code: 'NOT_FOUND',
-            message: 'Customer not found',
+            message: 'Customer not found or does not belong to user',
           });
         }
 
         return customer[0];
       } catch (error) {
+        console.error("Error fetching customer:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -128,7 +129,8 @@ export const customerRouter = createTRPCRouter({
     .input(customerInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        const [customer] = await ctx.db
+        // 1. Create the customer
+        const [createdCustomer] = await ctx.db
           .insert(customers)
           .values({
             ...input,
@@ -136,8 +138,17 @@ export const customerRouter = createTRPCRouter({
           })
           .returning();
 
-        return customer;
+        if (!createdCustomer) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create customer',
+          });
+        }
+
+        return createdCustomer;
       } catch (error) {
+        console.error("Error creating customer:", error);
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to create customer',
@@ -149,7 +160,7 @@ export const customerRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string().uuid(),
+        id: z.string().uuid('Invalid customer ID format'),
         ...customerInput.shape,
       })
     )
@@ -157,7 +168,7 @@ export const customerRouter = createTRPCRouter({
       try {
         const { id, ...data } = input;
 
-        // Check if customer exists and belongs to user
+        // 1. Verify customer exists and belongs to user
         const existingCustomer = await ctx.db
           .select()
           .from(customers)
@@ -172,10 +183,11 @@ export const customerRouter = createTRPCRouter({
         if (!existingCustomer[0]) {
           throw new TRPCError({
             code: 'NOT_FOUND',
-            message: 'Customer not found',
+            message: 'Customer not found or does not belong to user',
           });
         }
 
+        // 2. Update the customer
         const [updatedCustomer] = await ctx.db
           .update(customers)
           .set({
@@ -190,8 +202,16 @@ export const customerRouter = createTRPCRouter({
           )
           .returning();
 
+        if (!updatedCustomer) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update customer',
+          });
+        }
+
         return updatedCustomer;
       } catch (error) {
+        console.error("Error updating customer:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -202,10 +222,10 @@ export const customerRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid('Invalid customer ID format') }))
     .mutation(async ({ ctx, input }) => {
       try {
-        // Check if customer exists and belongs to user
+        // 1. Verify customer exists and belongs to user
         const existingCustomer = await ctx.db
           .select()
           .from(customers)
@@ -220,10 +240,11 @@ export const customerRouter = createTRPCRouter({
         if (!existingCustomer[0]) {
           throw new TRPCError({
             code: 'NOT_FOUND',
-            message: 'Customer not found',
+            message: 'Customer not found or does not belong to user',
           });
         }
 
+        // 2. Delete the customer
         await ctx.db
           .delete(customers)
           .where(
@@ -235,6 +256,7 @@ export const customerRouter = createTRPCRouter({
 
         return { success: true };
       } catch (error) {
+        console.error("Error deleting customer:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

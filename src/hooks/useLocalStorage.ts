@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Custom hook to persist state in localStorage
@@ -9,9 +9,13 @@ import { useState, useEffect } from 'react';
 export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
   // State to store our value
   const [storedValue, setStoredValue] = useState<T>(initialValue);
+  const isInitialized = useRef(false);
+  const lastUpdate = useRef<number>(0);
 
   // Initialize the state on first render
   useEffect(() => {
+    if (isInitialized.current) return;
+    
     try {
       if (typeof window === 'undefined') {
         return;
@@ -24,6 +28,8 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
       if (item) {
         setStoredValue(JSON.parse(item));
       }
+      
+      isInitialized.current = true;
     } catch (error) {
       console.error('Error reading from localStorage:', error);
     }
@@ -37,8 +43,20 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
         return;
       }
       
+      // Throttle updates to prevent rapid consecutive calls
+      const now = Date.now();
+      if (now - lastUpdate.current < 100) {
+        return;
+      }
+      lastUpdate.current = now;
+      
       // Allow value to be a function so we have the same API as useState
       const valueToStore = value instanceof Function ? value(storedValue) : value;
+      
+      // Don't update if the value hasn't changed
+      if (JSON.stringify(valueToStore) === JSON.stringify(storedValue)) {
+        return;
+      }
       
       // Save state
       setStoredValue(valueToStore);

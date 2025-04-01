@@ -1,6 +1,20 @@
 import { useState, useCallback, useMemo } from 'react';
 import { roundCurrency, calculateQuoteTotals } from '~/server/utils/calculations';
-import type { Task, QuoteSummaryData } from '~/types/quote';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import type { AppRouter } from '~/server/api/root';
+
+type RouterInput = inferRouterInputs<AppRouter>;
+type RouterOutput = inferRouterOutputs<AppRouter>;
+type QuoteResponse = NonNullable<RouterOutput['quote']['getById']>;
+type Task = NonNullable<QuoteResponse['tasks']>[number];
+
+export interface QuoteSummaryData {
+  subtotalTasks: number;
+  subtotalMaterials: number;
+  complexityCharge: number;
+  markupCharge: number;
+  grandTotal: number;
+}
 
 interface UseQuoteCalculationsProps {
   initialTasks?: Task[];
@@ -129,6 +143,47 @@ export function useQuoteCalculations({
     setMarkupPercentage(roundCurrency(percentage));
   }, []);
 
+  // Calculate task total
+  const getTaskTotal = useCallback((task: Task) => {
+    const laborCost = task.price || 0;
+    const materialsCost = task.materialType === 'ITEMIZED' 
+      ? task.materials?.reduce((sum, material) => 
+          sum + (material.quantity || 0) * (material.unitPrice || 0), 0) || 0
+      : task.estimatedMaterialsCost || 0;
+    return laborCost + materialsCost;
+  }, []);
+
+  // Calculate materials total
+  const getMaterialsTotal = useCallback((task: Task) => {
+    if (task.materialType === 'ITEMIZED') {
+      return task.materials?.reduce((sum, material) => 
+        sum + (material.quantity || 0) * (material.unitPrice || 0), 0) || 0;
+    }
+    return task.estimatedMaterialsCost || 0;
+  }, []);
+
+  // Calculate labor total
+  const getLaborTotal = useCallback((task: Task) => {
+    return task.price || 0;
+  }, []);
+
+  // Calculate quote totals
+  const calculateTotals = useCallback((tasks: Task[]): QuoteSummaryData => {
+    const subtotalTasks = tasks.reduce((sum, task) => sum + getLaborTotal(task), 0);
+    const subtotalMaterials = tasks.reduce((sum, task) => sum + getMaterialsTotal(task), 0);
+    const complexityCharge = 0; // TODO: Implement complexity charge calculation
+    const markupCharge = 0; // TODO: Implement markup charge calculation
+    const grandTotal = subtotalTasks + subtotalMaterials + complexityCharge + markupCharge;
+
+    return {
+      subtotalTasks,
+      subtotalMaterials,
+      complexityCharge,
+      markupCharge,
+      grandTotal,
+    };
+  }, [getLaborTotal, getMaterialsTotal]);
+
   return {
     tasks,
     complexityPercentage,
@@ -142,5 +197,9 @@ export function useQuoteCalculations({
     removeMaterial,
     updateComplexityPercentage,
     updateMarkupPercentage,
+    getTaskTotal,
+    getMaterialsTotal,
+    getLaborTotal,
+    calculateTotals,
   };
 } 

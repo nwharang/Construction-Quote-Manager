@@ -1,22 +1,22 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { tasks, quotes, materials } from "~/server/db/schema";
-import { and, eq } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
-import { type InferInsertModel } from "drizzle-orm";
+import { z } from 'zod';
+import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
+import { tasks, quotes } from '~/server/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { type InferInsertModel } from 'drizzle-orm';
 
 // Define the insert type for the tasks table
 type InsertTask = InferInsertModel<typeof tasks>;
 
 export const taskRouter = createTRPCRouter({
   getByQuoteId: protectedProcedure
-    .input(z.object({ quoteId: z.string() }))
+    .input(z.object({ quoteId: z.string().uuid('Invalid quote ID format') }))
     .query(async ({ ctx, input }) => {
       try {
-        // Check if quote belongs to user
+        // 1. Verify quote exists and belongs to user
         const quote = await ctx.db.query.quotes.findFirst({
           where: and(
-            eq(quotes.id, input.quoteId),
+            eq(quotes.id, input.quoteId), 
             eq(quotes.userId, ctx.session.user.id)
           ),
         });
@@ -24,11 +24,11 @@ export const taskRouter = createTRPCRouter({
         if (!quote) {
           throw new TRPCError({
             code: 'FORBIDDEN',
-            message: "You don't have permission to view tasks for this quote",
+            message: "Quote not found or you don't have permission to view its tasks",
           });
         }
 
-        // Get tasks for the quote with proper numeric type handling
+        // 2. Get tasks for the quote with materials included
         const taskList = await ctx.db.query.tasks.findMany({
           where: eq(tasks.quoteId, input.quoteId),
           with: {
@@ -37,19 +37,20 @@ export const taskRouter = createTRPCRouter({
           orderBy: tasks.order,
         });
 
-        // Convert string values to numbers for client consumption
-        return taskList.map(task => {
+        // 3. Convert string values to numbers for client consumption
+        return taskList.map((task) => {
           return {
             ...task,
             price: parseFloat(task.price.toString()),
             estimatedMaterialsCost: parseFloat(task.estimatedMaterialsCost.toString()),
-            materials: task.materials.map(material => ({
+            materials: task.materials.map((material) => ({
               ...material,
               unitPrice: parseFloat(material.unitPrice.toString()),
             })),
           };
         });
       } catch (error) {
+        console.error("Error fetching tasks:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -62,19 +63,19 @@ export const taskRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        quoteId: z.string(),
-        description: z.string(),
-        price: z.number().min(0),
-        estimatedMaterialsCost: z.number().min(0).optional(),
+        quoteId: z.string().uuid('Invalid quote ID format'),
+        description: z.string().min(1, 'Description is required'),
+        price: z.number().min(0, 'Price must be a non-negative number'),
+        estimatedMaterialsCost: z.number().min(0, 'Estimated materials cost must be a non-negative number').optional(),
         order: z.number().min(0).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // Check if quote belongs to user
+        // 1. Verify quote exists and belongs to user
         const quote = await ctx.db.query.quotes.findFirst({
           where: and(
-            eq(quotes.id, input.quoteId),
+            eq(quotes.id, input.quoteId), 
             eq(quotes.userId, ctx.session.user.id)
           ),
         });
@@ -82,34 +83,35 @@ export const taskRouter = createTRPCRouter({
         if (!quote) {
           throw new TRPCError({
             code: 'FORBIDDEN',
-            message: "You don't have permission to add tasks to this quote",
+            message: "Quote not found or you don't have permission to add tasks to it",
           });
         }
 
-        // Create the task
-        const [task] = await ctx.db
+        // 2. Create the task
+        const [createdTask] = await ctx.db
           .insert(tasks)
           .values({
             id: crypto.randomUUID(),
             quoteId: input.quoteId,
             description: input.description,
             price: input.price.toString(),
-            estimatedMaterialsCost: input.estimatedMaterialsCost?.toString() ?? "0",
+            estimatedMaterialsCost: input.estimatedMaterialsCost?.toString() ?? '0',
             order: input.order ?? 0,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
           .returning();
 
-        if (!task) {
+        if (!createdTask) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to create task',
           });
         }
 
-        return { id: task.id };
+        return createdTask;
       } catch (error) {
+        console.error("Error creating task:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -122,16 +124,16 @@ export const taskRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
-        description: z.string().optional(),
-        price: z.number().min(0).optional(),
-        estimatedMaterialsCost: z.number().min(0).optional(),
+        id: z.string().uuid('Invalid task ID format'),
+        description: z.string().min(1, 'Description is required').optional(),
+        price: z.number().min(0, 'Price must be a non-negative number').optional(),
+        estimatedMaterialsCost: z.number().min(0, 'Estimated materials cost must be a non-negative number').optional(),
         order: z.number().min(0).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // First, get the task to verify ownership
+        // 1. Verify task exists and belongs to user
         const task = await ctx.db.query.tasks.findFirst({
           where: eq(tasks.id, input.id),
           with: {
@@ -146,7 +148,7 @@ export const taskRouter = createTRPCRouter({
           });
         }
 
-        // Check if quote belongs to user
+        // 2. Check if quote belongs to user
         if (task.quote.userId !== ctx.session.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -154,7 +156,7 @@ export const taskRouter = createTRPCRouter({
           });
         }
 
-        // Prepare update data
+        // 3. Prepare update data
         const updateData: Partial<InsertTask> = {
           updatedAt: new Date(),
         };
@@ -175,7 +177,7 @@ export const taskRouter = createTRPCRouter({
           updateData.order = input.order;
         }
 
-        // Update the task
+        // 4. Update the task
         const [updatedTask] = await ctx.db
           .update(tasks)
           .set(updateData)
@@ -189,8 +191,9 @@ export const taskRouter = createTRPCRouter({
           });
         }
 
-        return { success: true };
+        return updatedTask;
       } catch (error) {
+        console.error("Error updating task:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -201,10 +204,10 @@ export const taskRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string().uuid('Invalid task ID format') }))
     .mutation(async ({ ctx, input }) => {
       try {
-        // First, get the task to verify ownership
+        // 1. Verify task exists and belongs to user
         const task = await ctx.db.query.tasks.findFirst({
           where: eq(tasks.id, input.id),
           with: {
@@ -219,7 +222,7 @@ export const taskRouter = createTRPCRouter({
           });
         }
 
-        // Check if quote belongs to user
+        // 2. Check if quote belongs to user
         if (task.quote.userId !== ctx.session.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -227,21 +230,14 @@ export const taskRouter = createTRPCRouter({
           });
         }
 
-        // Delete the task
-        const [deletedTask] = await ctx.db
+        // 3. Delete the task
+        await ctx.db
           .delete(tasks)
-          .where(eq(tasks.id, input.id))
-          .returning();
-
-        if (!deletedTask) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to delete task',
-          });
-        }
+          .where(eq(tasks.id, input.id));
 
         return { success: true };
       } catch (error) {
+        console.error("Error deleting task:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -250,4 +246,4 @@ export const taskRouter = createTRPCRouter({
         });
       }
     }),
-}); 
+});

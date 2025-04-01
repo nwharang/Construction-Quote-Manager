@@ -20,6 +20,7 @@ export const TextField: React.FC<{
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
   fullWidth?: boolean;
@@ -30,6 +31,7 @@ export const TextField: React.FC<{
   label,
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
   fullWidth = true,
@@ -42,10 +44,11 @@ export const TextField: React.FC<{
         value={value}
         onChange={(e) => onChange(e.target.value)}
         isRequired={required}
-        isDisabled={disabled}
+        isDisabled={disabled || readOnly}
         description={helpText}
         className={fullWidth ? 'w-full' : ''}
         isInvalid={!!error}
+        isReadOnly={readOnly}
       />
       {error && (
         <p className="text-xs text-danger mt-1">
@@ -66,6 +69,7 @@ export const TextAreaField: React.FC<{
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
   rows?: number;
@@ -76,6 +80,7 @@ export const TextAreaField: React.FC<{
   label,
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
   rows = 3,
@@ -87,12 +92,13 @@ export const TextAreaField: React.FC<{
       value={value}
       onChange={(e) => onChange(e.target.value)}
       isRequired={required}
-      isDisabled={disabled}
+      isDisabled={disabled || readOnly}
       errorMessage={error}
       description={helpText}
       minRows={rows}
       className="w-full"
       isInvalid={!!error}
+      isReadOnly={readOnly}
     />
   );
 };
@@ -107,6 +113,7 @@ export const CurrencyField: React.FC<{
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
   min?: number;
@@ -117,6 +124,7 @@ export const CurrencyField: React.FC<{
   label,
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
   min = 0,
@@ -136,11 +144,12 @@ export const CurrencyField: React.FC<{
         maximumFractionDigits: 2 
       }}
       isRequired={required}
-      isDisabled={disabled}
+      isDisabled={disabled || readOnly}
       errorMessage={error}
       description={helpText}
       className={fullWidth ? 'w-full' : ''}
       isInvalid={!!error}
+      isReadOnly={readOnly}
     />
   );
 };
@@ -155,6 +164,7 @@ export const PercentageField: React.FC<{
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
   min?: number;
@@ -167,6 +177,7 @@ export const PercentageField: React.FC<{
   label,
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
   min = 0,
@@ -189,11 +200,12 @@ export const PercentageField: React.FC<{
         maximumFractionDigits: 1 
       }}
       isRequired={required}
-      isDisabled={disabled}
+      isDisabled={disabled || readOnly}
       errorMessage={error}
       description={helpText}
       className={fullWidth ? 'w-full' : ''}
       isInvalid={!!error}
+      isReadOnly={readOnly}
     />
   );
 };
@@ -208,6 +220,7 @@ export const QuantityField: React.FC<{
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
   min?: number;
@@ -218,6 +231,7 @@ export const QuantityField: React.FC<{
   label,
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
   min = 1,
@@ -232,11 +246,12 @@ export const QuantityField: React.FC<{
       step={1}
       formatOptions={{ style: 'decimal', maximumFractionDigits: 0 }}
       isRequired={required}
-      isDisabled={disabled}
+      isDisabled={disabled || readOnly}
       errorMessage={error}
       description={helpText}
       className={fullWidth ? 'w-full' : ''}
       isInvalid={!!error}
+      isReadOnly={readOnly}
     />
   );
 };
@@ -252,6 +267,7 @@ export const SelectField: React.FC<{
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
   fullWidth?: boolean;
@@ -263,6 +279,7 @@ export const SelectField: React.FC<{
   placeholder,
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
   fullWidth = true,
@@ -279,7 +296,7 @@ export const SelectField: React.FC<{
         }
       }}
       isRequired={required}
-      isDisabled={disabled}
+      isDisabled={disabled || readOnly}
       errorMessage={error}
       description={helpText}
       className={fullWidth ? 'w-full' : ''}
@@ -304,6 +321,7 @@ export const RadioGroupField: React.FC<{
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
   orientation?: 'horizontal' | 'vertical';
@@ -314,6 +332,7 @@ export const RadioGroupField: React.FC<{
   label,
   required = false,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
   orientation = 'horizontal',
@@ -330,7 +349,7 @@ export const RadioGroupField: React.FC<{
         value={value}
         onValueChange={onChange}
         orientation={orientation}
-        isDisabled={disabled}
+        isDisabled={disabled || readOnly}
         description={helpText}
         errorMessage={error}
         isInvalid={!!error}
@@ -353,6 +372,7 @@ export const CheckboxField: React.FC<{
   onChange: (checked: boolean) => void;
   label?: string;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   helpText?: string;
 }> = ({
@@ -360,6 +380,7 @@ export const CheckboxField: React.FC<{
   onChange,
   label,
   disabled = false,
+  readOnly = false,
   error,
   helpText,
 }) => {
@@ -368,7 +389,7 @@ export const CheckboxField: React.FC<{
       <Checkbox
         isSelected={checked}
         onValueChange={onChange}
-        isDisabled={disabled}
+        isDisabled={disabled || readOnly}
       >
         {label}
       </Checkbox>

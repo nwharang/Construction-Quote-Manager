@@ -1,473 +1,496 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Spinner, Button } from '@heroui/react';
-import { useTranslation } from '~/hooks/useTranslation';
+import {
+  Button,
+  Spinner,
+  Card,
+  CardBody,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@heroui/react';
+import { Download, Printer } from 'lucide-react';
 import { api } from '~/utils/api';
-import { Printer, FileDown } from 'lucide-react';
-import styles from './print.module.css';
-import Script from 'next/script';
-import type { Material, Task } from '~/types/quote';
 import { useToastStore } from '~/store';
+import { useTranslation } from '~/hooks/useTranslation';
+import {
+  formatCurrency,
+  formatDate,
+  formatUserFriendlyId,
+  formatPercentage,
+} from '~/utils/formatters';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import type { AppRouter } from '~/server/api/root';
+import type { NextPageWithLayout } from '~/types/next';
+import PrintLayout from '~/layouts/PrintLayout';
 
-// Function to dynamically load jsPDF - placed outside of component to avoid re-creation
-const loadJsPDF = async () => {
-  try {
-    // Dynamically import the libraries only when needed
-    const jspdfModule = await import('jspdf');
-    const html2canvasModule = await import('html2canvas');
-    return {
-      jsPDF: jspdfModule.default,
-      html2canvas: html2canvasModule.default,
-    };
-  } catch (error) {
-    console.error('Failed to load PDF libraries:', error);
-    return null;
-  }
-};
+type RouterInput = inferRouterInputs<AppRouter>;
+type RouterOutput = inferRouterOutputs<AppRouter>;
+type QuoteResponse = NonNullable<RouterOutput['quote']['getById']>;
+type Task = NonNullable<QuoteResponse['tasks']>[number];
+type MaterialItem = NonNullable<Task['materials']>[number];
 
-// This will be our standalone print template
-export default function QuotePrintPage() {
+interface PrintPageProps {}
+
+const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
   const router = useRouter();
-  const { id } = router.query;
+  const { id: quoteId } = router.query;
   const { status } = useSession();
-  const { formatCurrency, formatDate } = useTranslation();
-  const [mounted, setMounted] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [loading, setLoading] = useState(false);
   const toast = useToastStore();
-
-  // State for quote data
-  const [quote, setQuote] = useState<any>(null);
+  const { formatCurrency, formatDate, t } = useTranslation();
+  const [mounted, setMounted] = useState(false);
+  const [quoteData, setQuoteData] = useState<QuoteResponse | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  
-  // Fetch a quote by ID
-  const fetchQuoteById = useCallback(async (quoteId: string) => {
-    try {
-      setLoading(true);
-      const response = await api.quote.getById.useQuery({ id: quoteId }).data;
-      
-      if (response) {
-        setQuote(response);
-        
-        // Populate tasks if available
-        if (response.tasks && Array.isArray(response.tasks)) {
-          setTasks(response.tasks);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching quote:', error);
-      toast.error('Failed to load quote');
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const printRef = useRef<HTMLDivElement>(null);
 
-  // Fetch quote data when component mounts - using a ref to prevent re-renders
-  const hasFetchedRef = useRef(false);
-
-  useEffect(() => {
-    // Only fetch if we have an ID, we're authenticated, and we haven't already fetched
-    if (id && typeof id === 'string' && status === 'authenticated' && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchQuoteById(id);
-    }
-    // Include bare minimum dependencies
-  }, [id, status, fetchQuoteById]);
-
-  // Set mounted state - keep this separate from data fetching
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Get customer details with a stable dependency
-  const customerId = quote?.customerId || '';
-  const { data: customerData } = api.customer.getById.useQuery(
-    { id: customerId },
+  const { data: fetchedQuoteData, isLoading } = api.quote.getById.useQuery(
+    { id: typeof quoteId === 'string' ? quoteId : '' },
     {
-      enabled: !!customerId && status === 'authenticated',
+      enabled: typeof quoteId === 'string' && status === 'authenticated',
       refetchOnWindowFocus: false,
     }
   );
 
-  // Determine customer info from either the customer record or the quote
-  const customerInfo = customerData || {
-    name: quote?.customerName || '',
-    email: quote?.customerEmail || '',
-    phone: quote?.customerPhone || '',
-    address: quote?.customerAddress || '',
-  };
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  // Get status display name
-  const getStatusDisplay = (status: string): string => {
-    const statusMap: Record<string, string> = {
-      draft: 'Draft',
-      sent: 'Sent',
-      accepted: 'Accepted',
-      rejected: 'Rejected',
-    };
-    return statusMap[status.toLowerCase()] || status;
-  };
+  useEffect(() => {
+    if (fetchedQuoteData) {
+      try {
+        setQuoteData(fetchedQuoteData);
 
-  // Handle print button click
-  const handlePrint = () => {
-    window.print();
-  };
+        if (fetchedQuoteData.tasks && Array.isArray(fetchedQuoteData.tasks)) {
+          setTasks(fetchedQuoteData.tasks);
+        }
+        
+      } catch (error) {
+        console.error('Error processing quote data:', error);
+        toast.error('Error loading quote data');
+      }
+    }
+  }, [fetchedQuoteData, toast]);
 
-  // Handle export to PDF with fixed types and variable declarations
-  const handleExportPDF = async () => {
-    if (!quote) return;
+  const handleDownloadPDF = async () => {
+    if (!printRef.current || !quoteData) return;
 
     try {
-      setExporting(true);
-
-      // Dynamically load jsPDF and html2canvas
-      const pdfModules = await loadJsPDF();
-
-      // Check if modules were loaded successfully
-      if (!pdfModules) {
-        throw new Error('PDF libraries could not be loaded');
-      }
-
-      const { jsPDF, html2canvas } = pdfModules;
-
-      // Get the content element with proper type casting
-      const contentElement = document.querySelector(`.${styles.container}`) as HTMLElement;
-      if (!contentElement) {
-        throw new Error('Print content not found');
-      }
-
-      // Create canvas from the content
-      const canvas = await html2canvas(contentElement, {
-        scale: 2, // Higher scale for better quality
-        useCORS: true,
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
         logging: false,
-        backgroundColor: '#FFFFFF',
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
       });
 
-      // Create PDF with A4 dimensions
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const data = canvas.toDataURL('image/png');
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      const imgProps = pdf.getImageProperties(data);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      // Calculate aspect ratio to fit the content to page
-      const imageWidth = canvas.width;
-      const imageHeight = canvas.height;
-      const aspectRatio = Math.min(pdfWidth / imageWidth, pdfHeight / imageHeight);
-      const xPosition = (pdfWidth - imageWidth * aspectRatio) / 2;
-      const yPosition = 0;
-
-      // Generate image data
-      const imageData = canvas.toDataURL('image/jpeg', 1.0);
-
-      // Add the image to the PDF
-      pdf.addImage(
-        imageData,
-        'JPEG',
-        xPosition,
-        yPosition,
-        imageWidth * aspectRatio,
-        imageHeight * aspectRatio
-      );
-
-      // Generate a filename and save the PDF
-      const filename = `quote-${quote.sequentialId || quote.id}-${quote.title.replace(/\s+/g, '-').toLowerCase()}.pdf`;
-      pdf.save(filename);
+      pdf.addImage(data, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`quote-${quoteData.sequentialId || quoteData.id}.pdf`);
     } catch (error) {
-      console.error('Failed to export PDF:', error);
-      toast.error('Failed to export PDF');
-    } finally {
-      setExporting(false);
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF');
     }
   };
 
-  // Helper function to get task total
-  const getTaskTotal = (task: Task): number => {
-    let taskTotal = parseFloat(task.price.toString());
-
-    // Add materials cost
-    if (task.materialType === 'lumpsum') {
-      taskTotal += task.estimatedMaterialsCostLumpSum || 0;
-    } else {
-      taskTotal += task.materials.reduce((sum: number, material: Material) => {
-        return sum + material.quantity * material.unitPrice;
-      }, 0);
-    }
-
-    return taskTotal;
+  const getLaborTotal = (tasks: Task[]): number => {
+    return tasks.reduce((sum: number, task: Task) => {
+      const price = typeof task.price === 'string' ? parseFloat(task.price) : task.price;
+      return sum + (price || 0);
+    }, 0);
   };
 
-  // Renders a single task row for the quote
-  const renderTaskRow = (task: Task, index: number) => {
-    const taskTotal = getTaskTotal(task);
-    
-    return (
-      <tr key={task.id} className="border-b">
-        <td className="p-4">{index + 1}</td>
-        <td className="p-4">{task.description}</td>
-        <td className="p-4 text-right">{formatCurrency(taskTotal)}</td>
-      </tr>
-    );
+  const getMaterialsTotal = (materials: MaterialItem[] = []): number => {
+    return materials.reduce((sum: number, material: MaterialItem) => {
+      const quantity = material.quantity ?? 0;
+      const unitPrice =
+        typeof material.unitPrice === 'string'
+          ? parseFloat(material.unitPrice)
+          : (material.unitPrice ?? 0);
+      return sum + quantity * unitPrice;
+    }, 0);
   };
 
-  // Loading state
-  if (!mounted || status === 'loading' || loading) {
+  const calculatedTotals = useMemo(() => {
+    if (!quoteData?.tasks || quoteData.tasks.length === 0)
+      return {
+        subtotalTasks: 0,
+        subtotalMaterials: 0,
+        grandTotal: 0,
+      };
+
+    const subtotalTasks = getLaborTotal(quoteData.tasks);
+    const subtotalMaterials = quoteData.tasks.reduce((sum: number, task: Task) => {
+      if (task.materialType === 'lumpsum') {
+        return sum + (Number(task.estimatedMaterialsCost) || 0);
+      } else {
+        return sum + getMaterialsTotal(task.materials || []);
+      }
+    }, 0);
+
+    const grandTotal = Number(quoteData.grandTotal) || 0;
+
+    return {
+      subtotalTasks,
+      subtotalMaterials,
+      grandTotal,
+    };
+  }, [quoteData]);
+
+  if (!mounted || status === 'loading' || isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-full items-center justify-center p-8">
         <Spinner size="lg" />
       </div>
     );
   }
 
-  // Redirect if not authenticated
   if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
 
-  // Render not found state
-  if (!quote) {
+  if (!isLoading && !quoteData) {
     return (
       <div className="container mx-auto p-4">
         <div className="py-12 text-center">
           <h2 className="mb-4 text-2xl font-bold">Quote Not Found</h2>
-          <p className="mb-6">The quote you're looking for doesn't exist or has been removed.</p>
+          <p className="mb-6 text-gray-500">
+            The quote you're looking for doesn't exist or has been removed.
+          </p>
+          <Button color="primary" onPress={() => router.push('/admin/quotes')}>
+            Back to Quotes
+          </Button>
         </div>
       </div>
     );
   }
 
+  if (!quoteData) return null;
+
   return (
-    <div className={styles.printbody}>
+    <>
       <Head>
-        <title>
-          Quote #{quote.sequentialId || quote.id}: {quote.title}
-        </title>
-        <Script
-          src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
-          async
-        ></Script>
-        <Script
-          src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
-          async
-        ></Script>
+        <title>Quote #{quoteData.sequentialId || ''} | Print View</title>
       </Head>
 
-      {/* Action buttons (only visible on screen) */}
-      <div className={styles.actionsBar}>
-        <Button color="primary" startContent={<Printer size={18} />} onClick={handlePrint}>
-          Print Document
-        </Button>
-        <Button
-          color="secondary"
-          startContent={<FileDown size={18} />}
-          onClick={handleExportPDF}
-          isLoading={exporting}
-          disabled={exporting}
-        >
-          Save as PDF
-        </Button>
+      <div className="no-print fixed top-0 right-0 left-0 z-10 bg-white p-4 shadow-md print:hidden">
+        <div className="container mx-auto flex justify-between">
+          <Button variant="flat" onPress={() => router.back()}>
+            Back
+          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="flat"
+              color="primary"
+              startContent={<Download size={16} />}
+              onPress={handleDownloadPDF}
+            >
+              Download PDF
+            </Button>
+            <Button
+              color="primary"
+              startContent={<Printer size={16} />}
+              onPress={() => window.print()}
+            >
+              Print
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Printable content */}
-      <div className={styles.container} id="quote-printable">
-        {/* Header with company info and quote details */}
-        <div className={styles.header}>
-          <div className={styles.companyInfo}>
-            <h2>Construction Quote Manager</h2>
-            <p>123 Builder Avenue</p>
-            <p>Construction City, ST 12345</p>
-            <p>Phone: (555) 123-4567</p>
+      <div
+        id="printable-area"
+        ref={printRef}
+        className="container mx-auto bg-white p-8 print:p-4 print:shadow-none"
+      >
+        <div className="mb-8 flex flex-col items-center justify-between border-b border-gray-300 pb-4 print:flex-row print:items-start print:border-b-2 print:border-black">
+          <div>
+            <h1 className="text-xl font-bold print:text-2xl">Construction Quote Manager</h1>
+            <div className="text-sm text-gray-500 print:text-xs">
+              <p>123 Construction Avenue, Builder City, State 12345</p>
+              <p>Phone: (555) 123-4567 | Email: info@constructionquote.com</p>
+            </div>
           </div>
-          <div className={styles.quoteInfo}>
-            <h1>QUOTE</h1>
-            <table>
-              <tbody>
-                <tr>
-                  <td className={styles.label}>Quote #:</td>
-                  <td>{quote.sequentialId || quote.id}</td>
-                </tr>
-                <tr>
-                  <td className={styles.label}>Date:</td>
-                  <td>{formatDate(quote.createdAt)}</td>
-                </tr>
-                <tr>
-                  <td className={styles.label}>Valid Until:</td>
-                  <td>{quote.validUntil ? formatDate(quote.validUntil) : '30 days from issue'}</td>
-                </tr>
-                <tr>
-                  <td className={styles.label}>Status:</td>
-                  <td>{getStatusDisplay(quote.status)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Title and customer info */}
-        <div className={styles.titleSection}>
-          <h2 className={styles.quoteTitle}>{quote.title}</h2>
-        </div>
-
-        <div className={styles.customerSection}>
-          <div className={styles.sectionTitle}>Customer Information</div>
-          <div className={styles.customerDetails}>
-            <p className={styles.customerName}>{customerInfo.name}</p>
-            {customerInfo.email && <p>{customerInfo.email}</p>}
-            {customerInfo.phone && <p>{customerInfo.phone}</p>}
-            {customerInfo.address && <p>{customerInfo.address}</p>}
-          </div>
-        </div>
-
-        {/* Notes section if available */}
-        {quote.notes && (
-          <div className={styles.notesSection}>
-            <div className={styles.sectionTitle}>Quote Notes</div>
-            <p className={styles.notes}>{quote.notes}</p>
-          </div>
-        )}
-
-        {/* Quote details - tasks table */}
-        <div className={styles.tasksSection}>
-          <div className={styles.sectionTitle}>Quote Details</div>
-
-          <table className={styles.tasksTable}>
-            <thead>
-              <tr>
-                <th className="w-16 p-4">#</th>
-                <th className="p-4 text-left">Description</th>
-                <th className="p-4 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>{tasks.map((task, index) => renderTaskRow(task, index))}</tbody>
-          </table>
-        </div>
-
-        {/* Itemized materials if any tasks have them */}
-        {tasks.some((task) => task.materialType === 'itemized' && task.materials.length > 0) && (
-          <div className={styles.materialsSection}>
-            <div className={styles.sectionTitle}>Materials Detail</div>
-            {tasks.map(
-              (task, taskIndex) =>
-                task.materialType === 'itemized' &&
-                task.materials.length > 0 && (
-                  <div key={taskIndex} className={styles.taskMaterials}>
-                    <h3>{task.name || `Task ${taskIndex + 1}`}</h3>
-                    <table className={styles.materialsTable}>
-                      <thead>
-                        <tr>
-                          <th className="p-2 text-left">Item</th>
-                          <th className="p-2 text-right">Quantity</th>
-                          <th className="p-2 text-right">Unit Price</th>
-                          <th className="p-2 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {task.materials.map((material, materialIndex) => (
-                          <tr key={materialIndex}>
-                            <td className="p-2">{material.name}</td>
-                            <td className="p-2 text-right">{material.quantity}</td>
-                            <td className="p-2 text-right">{formatCurrency(material.unitPrice)}</td>
-                            <td className="p-2 text-right">
-                              {formatCurrency(material.quantity * material.unitPrice)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )
+          <div className="mt-4 text-center print:mt-0 print:text-right">
+            <h2 className="mb-1 text-2xl font-bold text-gray-700 print:text-3xl">QUOTE</h2>
+            <p className="text-sm text-gray-500 print:text-base">
+              <span className="font-semibold">Quote #:</span> {quoteData.sequentialId}
+            </p>
+            <p className="text-sm text-gray-500 print:text-base">
+              <span className="font-semibold">Date:</span> {formatDate(quoteData.createdAt)}
+            </p>
+            {quoteData.validUntil && (
+              <p className="text-sm text-gray-500 print:text-base">
+                <span className="font-semibold">Valid Until:</span>{' '}
+                {formatDate(quoteData.validUntil)}
+              </p>
             )}
+            <p className="mt-2 text-sm font-medium uppercase print:mt-1 print:text-xs">
+              STATUS: {quoteData.status}
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-8 border-b border-gray-300 pb-4 print:border-b-2 print:border-black">
+          <h1 className="text-xl font-bold print:text-2xl">{quoteData.title}</h1>
+        </div>
+
+        <div className="mb-8 grid grid-cols-1 gap-6 print:grid-cols-2">
+          {quoteData?.customer && (
+            <div>
+              <h3 className="mb-2 text-base font-bold text-gray-700 print:text-lg">
+                Customer Information
+              </h3>
+              <div className="rounded-md border bg-gray-50 p-4 print:border-gray-300 print:bg-transparent print:p-0">
+                <p className="font-semibold print:font-bold">{quoteData.customer.name}</p>
+                {quoteData.customer.email && (
+                  <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.email}</p>
+                )}
+                {quoteData.customer.phone && (
+                  <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.phone}</p>
+                )}
+                {quoteData.customer.address && (
+                  <p className="mt-1 text-sm whitespace-pre-line text-gray-600 print:text-sm">
+                    {quoteData.customer.address}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          <div>
+            <h3 className="mb-2 text-base font-bold text-gray-700 print:text-lg">Quote Summary</h3>
+            <div className="rounded-md border bg-gray-50 p-4 print:border-none print:bg-transparent print:p-0">
+              <div className="mb-1 flex justify-between print:mb-0.5">
+                <span className="text-sm text-gray-600 print:text-sm">Labor:</span>
+                <span className="text-sm print:text-sm">
+                  {formatCurrency(calculatedTotals.subtotalTasks)}
+                </span>
+              </div>
+              <div className="mb-1 flex justify-between print:mb-0.5">
+                <span className="text-sm text-gray-600 print:text-sm">Materials:</span>
+                <span className="text-sm print:text-sm">
+                  {formatCurrency(calculatedTotals.subtotalMaterials)}
+                </span>
+              </div>
+
+              {quoteData.markupCharge > 0 && (
+                <div className="mb-1 flex justify-between print:mb-0.5">
+                  <span className="text-sm text-gray-600 print:text-sm">
+                    Markup ({formatPercentage(quoteData.markupPercentage)}):
+                  </span>
+                  <span className="text-sm print:text-sm">
+                    {formatCurrency(quoteData.markupCharge)}
+                  </span>
+                </div>
+              )}
+
+              <div className="mt-2 border-t border-gray-300 pt-1 print:mt-1 print:border-t-2 print:border-black">
+                <div className="flex justify-between font-bold print:text-lg">
+                  <span>Total:</span>
+                  <span>{formatCurrency(quoteData.grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <h3 className="mb-4 text-lg font-bold text-gray-700 print:mt-6 print:border-t print:border-black print:pt-4 print:text-xl">
+            {t('quotes.tasksSectionTitle')}
+          </h3>
+          {quoteData.tasks && quoteData.tasks.length > 0 ? (
+            <div className="space-y-4 print:space-y-3">
+              {quoteData.tasks.map((task: Task, index: number) => (
+                <div
+                  key={task.id || index}
+                  className="break-inside-avoid border-b border-gray-200 pb-3 print:border-none print:pb-2"
+                >
+                  <div className="mb-1 print:mb-0.5">
+                    <p className="font-semibold print:text-base print:font-bold">
+                      {task.description}
+                    </p>
+                  </div>
+                  <div className="flex justify-between text-sm print:text-xs">
+                    <p>
+                      {t('quotes.taskPriceLabel')}: {formatCurrency(task.price)}
+                    </p>
+                    <p>
+                      {t('quotes.materialTypeLabel')}:{' '}
+                      <span className="capitalize">{task.materialType || '-'}</span>
+                    </p>
+                  </div>
+
+                  {task.materialType === 'lumpsum' && (
+                    <div className="text-sm print:text-xs">
+                      <p>
+                        {t('quotes.estimatedMaterialCostLumpSumLabel')}:{' '}
+                        {formatCurrency(task.estimatedMaterialsCost ?? 0)}
+                      </p>
+                    </div>
+                  )}
+
+                  {task.materialType === 'itemized' &&
+                    task.materials &&
+                    task.materials.length > 0 && (
+                      <div className="mt-2 pl-4 print:mt-1 print:pl-2">
+                        <Table
+                          removeWrapper
+                          aria-label={`Materials for task ${index + 1}`}
+                          className="print:text-xs"
+                          classNames={{ th: 'print:p-1 print:bg-transparent', td: 'print:p-1' }}
+                        >
+                          <TableHeader>
+                            <TableColumn className="print:font-semibold">
+                              {t('quotes.materialProductIdHeader')}
+                            </TableColumn>
+                            <TableColumn className="print:font-semibold">
+                              {t('quotes.materialNotesHeader')}
+                            </TableColumn>
+                            <TableColumn className="text-right print:font-semibold">
+                              {t('quotes.materialQuantityHeader')}
+                            </TableColumn>
+                            <TableColumn className="text-right print:font-semibold">
+                              {t('quotes.materialUnitPriceHeader')}
+                            </TableColumn>
+                            <TableColumn className="text-right print:font-semibold">
+                              {t('quotes.materialLineTotalHeader')}
+                            </TableColumn>
+                          </TableHeader>
+                          <TableBody items={task.materials as MaterialItem[]}>
+                            {(material) => (
+                              <TableRow key={material.id}>
+                                <TableCell>
+                                  {material.productId || t('common.notAvailable')}
+                                </TableCell>
+                                <TableCell>{material.notes || '-'}</TableCell>
+                                <TableCell className="text-right">{material.quantity}</TableCell>
+                                <TableCell className="text-right">
+                                  {formatCurrency(material.unitPrice)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatCurrency(material.quantity * material.unitPrice)}
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  {task.materialType === 'itemized' &&
+                    (!task.materials || task.materials.length === 0) && (
+                      <p className="mt-1 pl-4 text-xs text-gray-500 italic print:pl-2">
+                        {t('quotes.noMaterialsAdded')}
+                      </p>
+                    )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 italic">{t('quotes.noTasksAddedReadOnly')}</p>
+          )}
+        </div>
+
+        {quoteData.notes && (
+          <div className="mb-8 print:mt-4">
+            <h3 className="mb-2 text-lg font-bold text-gray-700 print:mt-3 print:border-t print:border-black print:pt-2 print:text-xl">
+              Notes
+            </h3>
+            <div className="rounded-md bg-gray-50 p-4 print:bg-transparent print:p-0 print:text-sm">
+              <p className="whitespace-pre-line">{quoteData.notes}</p>
+            </div>
           </div>
         )}
 
-        {/* Totals and summary */}
-        <div className={styles.summarySection}>
-          <table className={styles.summaryTable}>
-            <tbody>
-              <tr>
-                <td className={styles.summaryLabel}>Labor Total:</td>
-                <td className={styles.summaryValue}>
-                  {formatCurrency(
-                    tasks.reduce((sum, task) => sum + parseFloat(task.price.toString()), 0)
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.summaryLabel}>Materials Total:</td>
-                <td className={styles.summaryValue}>
-                  {formatCurrency(
-                    tasks.reduce((sum, task) => {
-                      if (task.materialType === 'lumpsum') {
-                        return sum + (task.estimatedMaterialsCostLumpSum || 0);
-                      } else {
-                        return (
-                          sum +
-                          task.materials.reduce(
-                            (materialSum, material) =>
-                              materialSum + material.quantity * material.unitPrice,
-                            0
-                          )
-                        );
-                      }
-                    }, 0)
-                  )}
-                </td>
-              </tr>
-              {quote.complexityCharge > 0 && (
-                <tr>
-                  <td className={styles.summaryLabel}>Complexity/Contingency Charge:</td>
-                  <td className={styles.summaryValue}>
-                    {formatCurrency(quote.complexityCharge)}
-                  </td>
-                </tr>
-              )}
-              {quote.markupCharge > 0 && (
-                <tr>
-                  <td className={styles.summaryLabel}>Markup/Profit:</td>
-                  <td className={styles.summaryValue}>{formatCurrency(quote.markupCharge)}</td>
-                </tr>
-              )}
-              <tr className={styles.totalRow}>
-                <td className={styles.totalLabel}>TOTAL:</td>
-                <td className={styles.totalValue}>
-                  {formatCurrency(quote.grandTotal)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Terms and signature */}
-        <div className={styles.termsSection}>
-          <div className={styles.sectionTitle}>Terms and Conditions</div>
-          <ul className={styles.termsList}>
-            <li>This quote is valid for 30 days from the date of issue.</li>
-            <li>A 50% deposit is required before work begins.</li>
-            <li>Final payment is due upon completion of the project.</li>
-            <li>Any changes to the scope of work must be agreed upon in writing.</li>
-          </ul>
-        </div>
-
-        <div className={styles.signatureSection}>
-          <div className={styles.signatureLine}>
-            <div className={styles.signLabel}>Accepted By:</div>
-            <div className={styles.signSpace}></div>
-          </div>
-          <div className={styles.signatureLine}>
-            <div className={styles.signLabel}>Date:</div>
-            <div className={styles.signSpace}></div>
+        <div className="mb-8 print:mt-4">
+          <h3 className="mb-2 text-lg font-bold text-gray-700 print:mt-3 print:border-t print:border-black print:pt-2 print:text-xl">
+            Terms & Conditions
+          </h3>
+          <div className="rounded-md bg-gray-50 p-4 text-sm text-gray-600 print:bg-transparent print:p-0 print:text-xs">
+            <p className="mb-1 print:mb-0.5">
+              <strong>1. Acceptance:</strong> This quote is valid for 30 days from the date of issue
+              unless otherwise stated. Acceptance of this quote constitutes an agreement to the
+              terms and conditions stated herein.
+            </p>
+            <p className="mb-1 print:mb-0.5">
+              <strong>2. Payment:</strong> A 50% deposit is required to begin work, with the
+              remaining balance due upon completion. All payments must be made within 15 days of
+              invoice receipt.
+            </p>
+            <p className="mb-1 print:mb-0.5">
+              <strong>3. Changes:</strong> Any changes to the scope of work may result in additional
+              charges. Changes must be agreed upon in writing before implementation.
+            </p>
+            <p>
+              <strong>4. Warranty:</strong> All work is guaranteed for a period of one year from the
+              date of completion, covering defects in workmanship or materials.
+            </p>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className={styles.footer}>
+        {/* Signature Section - Adjust spacing for print */}
+        <div className="mt-12 grid grid-cols-1 gap-8 border-t border-gray-300 pt-8 print:mt-8 print:grid-cols-2 print:gap-12 print:border-t-2 print:border-black print:pt-4">
+          <div>
+            <p className="mb-4 text-sm text-gray-600 print:mb-2 print:text-xs">
+              To accept this quote, please sign and date below:
+            </p>
+            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
+              <p className="text-xs text-gray-500 print:text-sm">Customer Signature</p>
+            </div>
+            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
+              <p className="text-xs text-gray-500 print:text-sm">Date</p>
+            </div>
+            <div className="mb-2 border-b border-gray-300 pb-1 print:mb-4 print:pb-2">
+              <p className="text-xs text-gray-500 print:text-sm">Print Name</p>
+            </div>
+          </div>
+          <div>
+            <p className="mb-4 text-sm text-gray-600 print:mb-2 print:text-xs">Approved by:</p>
+            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
+              <p className="text-xs text-gray-500 print:text-sm">Company Representative</p>
+            </div>
+            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
+              <p className="text-xs text-gray-500 print:text-sm">Date</p>
+            </div>
+            <div className="mb-2 border-b border-gray-300 pb-1 print:mb-4 print:pb-2">
+              <p className="text-xs text-gray-500 print:text-sm">Title</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer - Simplify for print */}
+        <div className="mt-12 border-t border-gray-300 pt-4 text-center text-sm text-gray-500 print:mt-6 print:border-t-2 print:border-black print:pt-2 print:text-xs">
           <p>Thank you for your business!</p>
+          <p>For any questions regarding this quote, please contact us at (555) 123-4567.</p>
         </div>
       </div>
-    </div>
+    </>
   );
-}
+};
+
+// Assign the PrintLayout to the page
+PrintQuotePage.getLayout = function getLayout(page: React.ReactElement) {
+  return <PrintLayout>{page}</PrintLayout>;
+};
+
+export default PrintQuotePage;

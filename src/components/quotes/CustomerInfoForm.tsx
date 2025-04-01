@@ -1,18 +1,20 @@
 import React from 'react';
 import { Card, CardBody, CardHeader, Input, Textarea } from '@heroui/react';
 import { useTranslation } from '~/hooks/useTranslation';
+import { useQuoteStore } from '~/store/quoteStore';
 import type { QuoteFormData } from '~/types/quote';
 
 interface CustomerInfoFormProps {
-  formData: QuoteFormData;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  readOnly?: boolean;
 }
 
-export const CustomerInfoForm: React.FC<CustomerInfoFormProps> = ({
-  formData,
-  handleInputChange,
-}) => {
+export const CustomerInfoForm: React.FC<CustomerInfoFormProps> = ({ readOnly = false }) => {
   const { t } = useTranslation();
+  const { formData, updateField } = useQuoteStore();
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    updateField(e.target.name as keyof QuoteFormData, e.target.value);
+  };
   
   return (
     <Card className="mb-6">
@@ -29,40 +31,29 @@ export const CustomerInfoForm: React.FC<CustomerInfoFormProps> = ({
             value={formData.title}
             onChange={handleInputChange}
             required
+            isReadOnly={readOnly}
+            isDisabled={readOnly}
           />
           
           <Input
-            name="customerName"
-            label="Customer Name"
-            placeholder="Enter customer name"
-            value={formData.customerName}
+            name="customerId"
+            label="Customer ID"
+            placeholder="Enter customer ID"
+            value={formData.customerId}
             onChange={handleInputChange}
             required
-          />
-          
-          <Input
-            name="customerEmail"
-            label="Customer Email"
-            type="email"
-            placeholder="customer@example.com"
-            value={formData.customerEmail}
-            onChange={handleInputChange}
-          />
-          
-          <Input
-            name="customerPhone"
-            label="Customer Phone"
-            placeholder="(555) 555-5555"
-            value={formData.customerPhone}
-            onChange={handleInputChange}
+            isReadOnly={readOnly}
+            isDisabled={readOnly}
           />
           
           <Textarea
             name="notes"
             label="Notes"
             placeholder="Add any additional notes about this quote"
-            value={formData.notes}
+            value={formData.notes || ''}
             onChange={handleInputChange}
+            isReadOnly={readOnly}
+            isDisabled={readOnly}
           />
         </div>
       </CardBody>

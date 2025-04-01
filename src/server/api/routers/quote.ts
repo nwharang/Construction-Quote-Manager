@@ -1,19 +1,9 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { quotes, tasks, materials, QuoteStatus, customers } from '~/server/db/schema';
-import { and, eq, ilike, or, sql, desc, type SQL } from 'drizzle-orm';
+import { and, eq, ilike, or, sql, desc, type SQL, ne, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { type InferInsertModel } from 'drizzle-orm';
-
-// Define the insert type for the quotes table
-type InsertQuote = InferInsertModel<typeof quotes>;
-
-const getAllInput = z.object({
-  page: z.number().min(1).default(1),
-  limit: z.number().min(1).max(100).default(10),
-  search: z.string().optional(),
-  statuses: z.array(z.nativeEnum(QuoteStatus)).optional(),
-});
+import { createServices } from '~/server/services';
 
 export const quoteRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -23,201 +13,129 @@ export const quoteRouter = createTRPCRouter({
         status: z
           .enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
           .optional(),
+        customerId: z.string().uuid('Invalid customer ID format').optional(),
         page: z.number().min(1).default(1),
         limit: z.number().min(1).max(100).default(10),
+        sortBy: z.string().optional(),
+        sortOrder: z.enum(['asc', 'desc']).optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       try {
-        const offset = (input.page - 1) * input.limit;
-
-        // Build the where clause safely
-        let whereClause = eq(quotes.userId, ctx.session.user.id);
-
-        if (input.search) {
-          const searchPattern = `%${input.search}%`;
-          // For email that can be null, create a safe condition
-          const titleCondition = ilike(quotes.title, searchPattern);
-          const nameCondition = ilike(quotes.customerName, searchPattern);
-          const emailCondition = sql`${quotes.customerEmail} ILIKE ${searchPattern}`;
-          
-          // Combine with OR for the search terms
-          const searchCondition = sql`(${titleCondition} OR ${nameCondition} OR ${emailCondition})`;
-          
-          // Combine with AND for the user ID filter
-          whereClause = sql`${whereClause} AND ${searchCondition}`;
-        }
+        const services = createServices();
         
-        if (input.status) {
-          // Add status filter using the same pattern
-          const statusCondition = eq(quotes.status, input.status);
-          whereClause = sql`${whereClause} AND ${statusCondition}`;
-        }
-
-        // Get total count
-        const countResult = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(quotes)
-          .where(whereClause);
-
-        const total = countResult[0]?.count ?? 0;
-
-        // Get quotes with customer information
-        const quotesWithCustomers = await ctx.db
-          .select({
-            quote: quotes,
-            customer: customers,
-          })
-          .from(quotes)
-          .leftJoin(customers, eq(quotes.customerId, customers.id))
-          .where(whereClause)
-          .orderBy(desc(quotes.createdAt))
-          .limit(input.limit)
-          .offset(offset);
-
-        // Transform the data to use numeric types for front-end consumption
-        return {
-          quotes: quotesWithCustomers.map(({ quote, customer }) => ({
-            ...quote,
-            // Currency values are already numeric in the database now - no parsing needed
-            subtotalTasks: Number(quote.subtotalTasks),
-            subtotalMaterials: Number(quote.subtotalMaterials),
-            complexityCharge: Number(quote.complexityCharge),
-            markupCharge: Number(quote.markupCharge),
-            markupPercentage: Number(quote.markupPercentage),
-            grandTotal: Number(quote.grandTotal),
-            customer: customer || null,
-          })),
-          total,
-          page: input.page,
-          limit: input.limit,
-        };
+        // Pass input WITHOUT userId
+        const quotes = await services.quote.getAllQuotes({
+          ...input, 
+          // userId removed from this call
+        });
+        
+        return quotes;
       } catch (error) {
+        console.error("Error getting quotes:", error);
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch quotes',
+          message: 'Failed to get quotes',
           cause: error,
         });
       }
     }),
 
-  getById: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-    try {
-      const quoteWithCustomer = await ctx.db
-        .select({
-          quote: quotes,
-          customer: customers,
-        })
-        .from(quotes)
-        .leftJoin(customers, eq(quotes.customerId, customers.id))
-        .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
-        .limit(1);
-
-      if (!quoteWithCustomer[0]) {
+  getById: protectedProcedure
+    .input(z.object({
+      id: z.string().min(1, 'Quote ID is required'),
+    }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const services = createServices();
+        
+        // Pass input WITHOUT userId
+        const quote = await services.quote.getQuoteById({
+          id: input.id,
+          includeRelated: true,
+          // userId removed from this call
+        });
+        
+        return quote;
+      } catch (error) {
+        console.error("Error getting quote:", error);
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Quote not found',
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get quote',
+          cause: error,
         });
       }
-
-      return {
-        ...quoteWithCustomer[0].quote,
-        customer: quoteWithCustomer[0].customer || null,
-      };
-    } catch (error) {
-      if (error instanceof TRPCError) throw error;
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to fetch quote',
-        cause: error,
-      });
-    }
-  }),
+    }),
 
   create: protectedProcedure
     .input(
       z.object({
-        title: z.string().min(1, "Title is required"),
-        customerName: z.string().min(1, "Customer name is required"),
-        customerEmail: z.string().email("Invalid email address").optional().nullable(),
-        customerPhone: z.string().optional().nullable(),
+        title: z.string().min(1, 'Title is required'),
+        customerId: z.string().uuid('Valid customer ID is required'),
         notes: z.string().optional().nullable(),
-        complexityCharge: z.number().min(0).default(0),
-        markupPercentage: z.number().min(0).default(10)
+        markupPercentage: z.number().min(0).default(10),
+        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
+          .optional(),
+        tasks: z
+          .array(
+            z.object({
+              description: z.string().min(1, 'Task description is required'),
+              price: z.number().min(0, 'Price must be a positive number'),
+              materialType: z.enum(['lumpsum', 'itemized']),
+              estimatedMaterialsCost: z.number().min(0).optional(),
+              materials: z
+                .array(
+                  z.object({
+                    quantity: z.number().min(1, 'Quantity must be at least 1'),
+                    unitPrice: z.number().min(0, 'Unit price must be a positive number'),
+                    productId: z.string().uuid('Product ID must be a valid UUID'),
+                    notes: z.string().optional().nullable(),
+                  })
+                )
+                .optional()
+                .default([]),
+            })
+          )
+          .optional()
+          .default([]),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // First, try to find an existing customer
-        const existingCustomer = await ctx.db
-          .select()
-          .from(customers)
-          .where(
-            and(eq(customers.userId, ctx.session.user.id), eq(customers.name, input.customerName))
-          )
-          .limit(1);
-
-        let customerId: string;
-
-        // If no customer found, create one
-        if (!existingCustomer[0]) {
-          const [newCustomer] = await ctx.db
-            .insert(customers)
-            .values({
-              name: input.customerName,
-              email: input.customerEmail,
-              phone: input.customerPhone,
-              userId: ctx.session.user.id,
-            })
-            .returning();
-
-          if (!newCustomer) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Failed to create customer',
-            });
-          }
-
-          customerId = newCustomer.id;
-        } else {
-          customerId = existingCustomer[0].id;
-        }
-
-        // Calculate initial values for the quote
-        const markupCharge = 0; // Initially zero, will be calculated when tasks/materials are added
-        const quoteId = crypto.randomUUID();
+        const services = createServices();
         
-        // Create the quote with the customer ID
-        const [quote] = await ctx.db
-          .insert(quotes)
-          .values({
-            id: quoteId,
-            title: input.title,
-            customerId,
-            customerName: input.customerName,
-            customerEmail: input.customerEmail || null,
-            customerPhone: input.customerPhone || null,
-            status: QuoteStatus.DRAFT,
-            subtotalTasks: '0',
-            subtotalMaterials: '0',
-            complexityCharge: input.complexityCharge.toString(),
-            markupCharge: markupCharge.toString(),
-            markupPercentage: input.markupPercentage.toString(),
-            grandTotal: '0',
-            notes: input.notes || null,
-            userId: ctx.session.user.id,
-          })
-          .returning();
+        // Explicitly map input to service data structure
+        const serviceData = {
+          customerId: input.customerId,
+          title: input.title,
+          status: input.status,
+          markupPercentage: input.markupPercentage,
+          notes: input.notes ?? undefined, // Map null to undefined
+          tasks: input.tasks?.map(task => ({
+            description: task.description,
+            price: task.price,
+            materialType: task.materialType,
+            estimatedMaterialsCost: task.estimatedMaterialsCost,
+            materials: task.materials?.map(mat => ({
+              // name/description removed
+              productId: mat.productId,
+              quantity: mat.quantity,
+              unitPrice: mat.unitPrice,
+              notes: mat.notes ?? undefined, // Map null to undefined
+            })),
+          })),
+        };
 
-        if (!quote) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to create quote',
-          });
-        }
-
+        const quote = await services.quote.createQuote({
+          data: serviceData, 
+          userId: 'system-user', 
+        });
+        
         return quote;
       } catch (error) {
+        console.error("Error creating quote:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -230,121 +148,77 @@ export const quoteRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string().min(1, "Quote ID is required"),
-        title: z.string().min(1, "Title is required"),
-        customerName: z.string().min(1, "Customer name is required"),
-        customerEmail: z.string().email("Invalid email address").optional().nullable(),
-        customerPhone: z.string().optional().nullable(),
+        id: z.string().uuid('Invalid quote ID format'),
+        title: z.string().min(1, 'Title is required').optional(),
+        customerId: z.string().uuid('Valid customer ID is required').optional(),
         notes: z.string().optional().nullable(),
-        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED], {
-          errorMap: () => ({ message: "Status must be one of: DRAFT, SENT, ACCEPTED, REJECTED" })
-        }).optional(),
-        subtotalTasks: z.number().min(0),
-        subtotalMaterials: z.number().min(0),
-        complexityCharge: z.number().min(0),
-        markupCharge: z.number().min(0),
-        grandTotal: z.number().min(0),
+        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
+          .optional(),
+        markupPercentage: z.number().min(0).optional(),
+        tasks: z
+          .array(
+            z.object({
+              id: z.string().uuid().optional(),
+              description: z.string().min(1, 'Task description is required').optional(),
+              price: z.number().min(0, 'Price must be a positive number').optional(),
+              quantity: z.number().min(1, 'Quantity must be at least 1').optional(),
+              materialType: z.enum(['lumpsum', 'itemized']).optional(),
+              estimatedMaterialsCostLumpSum: z.number().min(0).optional().nullable(),
+              materials: z
+                .array(
+                  z.object({
+                    id: z.string().uuid().optional(),
+                    name: z.string().min(1, 'Material name is required').optional(),
+                    description: z.string().optional().nullable(),
+                    quantity: z.number().min(1, 'Quantity must be at least 1').optional(),
+                    unitPrice: z.number().min(0, 'Unit price must be a positive number').optional(),
+                    productId: z.string().uuid().optional().nullable(),
+                    notes: z.string().optional().nullable(),
+                  })
+                )
+                .optional(),
+              })
+            )
+            .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // First, check if the quote exists and belongs to the user
-        const existingQuote = await ctx.db
-          .select()
-          .from(quotes)
-          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
-          .limit(1);
-
-        if (!existingQuote[0]) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Quote not found',
-          });
-        }
-
-        // Try to find an existing customer
-        const existingCustomer = await ctx.db
-          .select()
-          .from(customers)
-          .where(
-            and(eq(customers.userId, ctx.session.user.id), eq(customers.name, input.customerName))
-          )
-          .limit(1);
-
-        let customerId: string;
-
-        // If no customer found, create one
-        if (!existingCustomer[0]) {
-          const [newCustomer] = await ctx.db
-            .insert(customers)
-            .values({
-              name: input.customerName,
-              email: input.customerEmail,
-              phone: input.customerPhone,
-              userId: ctx.session.user.id,
-            })
-            .returning();
-
-          if (!newCustomer) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Failed to create customer',
-            });
-          }
-
-          customerId = newCustomer.id;
-        } else {
-          customerId = existingCustomer[0].id;
-        }
-
-        // Apply rounding to all numeric values
-        const subtotalTasks = Math.round(input.subtotalTasks * 100) / 100;
-        const subtotalMaterials = Math.round(input.subtotalMaterials * 100) / 100;
-        const complexityCharge = Math.round(input.complexityCharge * 100) / 100;
-        const markupCharge = Math.round(input.markupCharge * 100) / 100;
-        // Calculate grand total to ensure consistency
-        const grandTotal = Math.round((subtotalTasks + subtotalMaterials + complexityCharge + markupCharge) * 100) / 100;
-
-        // Update the quote with the customer ID and financial details
-        const [quote] = await ctx.db
-          .update(quotes)
-          .set({
-            title: input.title,
-            customerId,
-            customerName: input.customerName,
-            customerEmail: input.customerEmail,
-            customerPhone: input.customerPhone,
-            notes: input.notes,
-            status: input.status,
-            // Store numeric values as strings in the database
-            subtotalTasks: subtotalTasks.toString(),
-            subtotalMaterials: subtotalMaterials.toString(),
-            complexityCharge: complexityCharge.toString(),
-            markupCharge: markupCharge.toString(),
-            grandTotal: grandTotal.toString(),
-            updatedAt: new Date(),
-          })
-          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
-          .returning();
-
-        if (!quote) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to update quote',
-          });
-        }
-
-        // Convert the string values to numbers for client consumption
-        return {
-          ...quote,
-          subtotalTasks: Number(quote.subtotalTasks),
-          subtotalMaterials: Number(quote.subtotalMaterials),
-          complexityCharge: Number(quote.complexityCharge),
-          markupCharge: Number(quote.markupCharge),
-          markupPercentage: Number(quote.markupPercentage),
-          grandTotal: Number(quote.grandTotal),
+        const services = createServices();
+        
+        // Explicitly map input to service data structure
+        const serviceData = {
+          customerId: input.customerId,
+          title: input.title,
+          status: input.status,
+          markupPercentage: input.markupPercentage,
+          notes: input.notes ?? undefined, // Map null to undefined
+          tasks: input.tasks?.map(task => ({
+            id: task.id,
+            description: task.description,
+            price: task.price,
+            materialType: task.materialType,
+            estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum,
+            materials: task.materials?.map(mat => ({
+              id: mat.id,
+              // name/description removed
+              productId: mat.productId ?? undefined, // Map null to undefined for optional DB field?
+              quantity: mat.quantity,
+              unitPrice: mat.unitPrice,
+              notes: mat.notes ?? undefined, // Map null to undefined
+            })),
+          })),
         };
+
+        const quote = await services.quote.updateQuote({
+          id: input.id,
+          data: serviceData, 
+          userId: 'system-user', 
+        });
+
+        return quote;
       } catch (error) {
+        console.error("Error updating quote:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -355,50 +229,22 @@ export const quoteRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string().min(1, "Quote ID is required") }))
+    .input(z.object({
+      id: z.string().min(1, 'Quote ID is required'),
+    }))
     .mutation(async ({ ctx, input }) => {
       try {
-        // First, check if the quote exists and belongs to the user
-        const existingQuote = await ctx.db
-          .select()
-          .from(quotes)
-          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
-          .limit(1);
-
-        if (!existingQuote[0]) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Quote not found or you do not have permission to delete it',
-          });
-        }
-
-        // Delete the quote
-        const [deletedQuote] = await ctx.db
-          .delete(quotes)
-          .where(and(eq(quotes.id, input.id), eq(quotes.userId, ctx.session.user.id)))
-          .returning();
-
-        if (!deletedQuote) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to delete quote',
-          });
-        }
-
-        // Check if this was the last quote for this customer
-        const remainingQuotes = await ctx.db
-          .select()
-          .from(quotes)
-          .where(eq(quotes.customerId, deletedQuote.customerId))
-          .limit(1);
-
-        // If no remaining quotes, delete the customer
-        if (!remainingQuotes[0]) {
-          await ctx.db.delete(customers).where(eq(customers.id, deletedQuote.customerId));
-        }
-
-        return { success: true, id: deletedQuote.id };
+        const services = createServices();
+        
+        // Keep passing userId (placeholder)
+        const result = await services.quote.deleteQuote({
+          id: input.id,
+          userId: 'system-user', 
+        });
+        
+        return result;
       } catch (error) {
+        console.error("Error deleting quote:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -410,69 +256,14 @@ export const quoteRouter = createTRPCRouter({
 
   getDashboardStats: protectedProcedure.query(async ({ ctx }) => {
     try {
-      // Get all stats in a single query
-      const stats = await ctx.db
-        .select({
-          totalQuotes: sql<number>`count(*)`,
-          acceptedQuotes: sql<number>`count(*) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED})`,
-          totalCustomers: sql<number>`count(distinct ${quotes.customerId})`,
-          totalRevenue: sql<string>`coalesce(sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED}), '0')`,
-        })
-        .from(quotes)
-        .where(eq(quotes.userId, ctx.session.user.id));
-
-      // Get recent quotes with customer information
-      const recentQuotes = await ctx.db
-        .select({
-          quote: quotes,
-          customer: customers,
-        })
-        .from(quotes)
-        .leftJoin(customers, eq(quotes.customerId, customers.id))
-        .where(eq(quotes.userId, ctx.session.user.id))
-        .orderBy(desc(quotes.createdAt))
-        .limit(5);
-
-      // Get top customers by revenue
-      const topCustomers = await ctx.db
-        .select({
-          customer: customers,
-          totalRevenue: sql<string>`coalesce(sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED}), '0')`,
-          quoteCount: sql<number>`count(*)`,
-        })
-        .from(quotes)
-        .leftJoin(customers, eq(quotes.customerId, customers.id))
-        .where(eq(quotes.userId, ctx.session.user.id))
-        .groupBy(customers.id, customers.name, customers.email, customers.phone)
-        .orderBy(
-          sql`sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = ${QuoteStatus.ACCEPTED}) desc`
-        )
-        .limit(5);
-
-      if (!stats[0]) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch dashboard stats',
-        });
-      }
-
-      return {
-        totalQuotes: Number(stats[0].totalQuotes ?? 0),
-        acceptedQuotes: Number(stats[0].acceptedQuotes ?? 0),
-        totalCustomers: Number(stats[0].totalCustomers ?? 0),
-        totalRevenue: stats[0].totalRevenue ?? '0',
-        recentQuotes: recentQuotes.map(({ quote, customer }) => ({
-          ...quote,
-          customer: customer || null,
-        })),
-        topCustomers: topCustomers.map(({ customer, totalRevenue, quoteCount }) => ({
-          ...customer,
-          totalRevenue: totalRevenue ?? '0',
-          quoteCount: Number(quoteCount ?? 0),
-        })),
-      };
+      const services = createServices();
+      
+      const stats = await services.dashboard.getDashboardStats('system-user'); // Use a consistent system user
+      
+      return stats;
     } catch (error) {
       console.error('Dashboard stats error:', error);
+      if (error instanceof TRPCError) throw error;
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to fetch dashboard stats',
@@ -484,85 +275,26 @@ export const quoteRouter = createTRPCRouter({
   updateCharges: protectedProcedure
     .input(
       z.object({
-        id: z.string().min(1, "Quote ID is required"),
-        complexityCharge: z.number().min(0, "Complexity charge must be non-negative"),
-        markupCharge: z.number().min(0, "Markup charge must be non-negative")
+        id: z.string().uuid('Invalid quote ID format'),
+        complexityCharge: z.number().min(0, 'Complexity charge must be non-negative'),
+        markupCharge: z.number().min(0, 'Markup charge must be non-negative'),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // Check if the quote exists and belongs to the user
-        const quoteData = await ctx.db
-          .select()
-          .from(quotes)
-          .where(
-            and(
-              eq(quotes.id, input.id),
-              eq(quotes.userId, ctx.session?.user.id || '')
-            )
-          )
-          .limit(1);
-          
-        if (!quoteData[0]) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Quote not found',
-          });
-        }
+        const services = createServices();
         
-        // Get all tasks to calculate subtotals
-        const quoteTasks = await ctx.db
-          .select()
-          .from(tasks)
-          .where(eq(tasks.quoteId, input.id));
-          
-        // Calculate subtotals
-        const subtotalTasks = quoteTasks.reduce((sum, task) => sum + Number(task.price), 0);
-        const subtotalMaterials = quoteTasks.reduce((sum, task) => sum + Number(task.estimatedMaterialsCost), 0);
-        const subtotal = subtotalTasks + subtotalMaterials;
+        // Keep passing userId (placeholder)
+        const updatedQuote = await services.quote.updateCharges({
+          id: input.id,
+          complexityCharge: input.complexityCharge,
+          markupCharge: input.markupCharge,
+          userId: 'system-user', 
+        });
         
-        // Calculate grand total - use Math.round to ensure 2 decimal places
-        const complexityCharge = Math.round(input.complexityCharge * 100) / 100;
-        const markupCharge = Math.round(input.markupCharge * 100) / 100;
-        const grandTotal = Math.round((subtotal + complexityCharge + markupCharge) * 100) / 100;
-        
-        // Update the quote
-        const [updatedQuote] = await ctx.db
-          .update(quotes)
-          .set({
-            complexityCharge: complexityCharge.toString(),
-            subtotalTasks: subtotalTasks.toString(),
-            subtotalMaterials: subtotalMaterials.toString(),
-            markupCharge: markupCharge.toString(),
-            grandTotal: grandTotal.toString(),
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(quotes.id, input.id), 
-              eq(quotes.userId, ctx.session?.user.id || '')
-            )
-          )
-          .returning();
-          
-        if (!updatedQuote) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to update quote charges',
-          });
-        }
-        
-        // Convert the string values to numbers for client consumption
-        return {
-          ...updatedQuote,
-          subtotalTasks: parseFloat(updatedQuote.subtotalTasks),
-          subtotalMaterials: parseFloat(updatedQuote.subtotalMaterials),
-          complexityCharge: parseFloat(updatedQuote.complexityCharge),
-          markupCharge: parseFloat(updatedQuote.markupCharge),
-          markupPercentage: parseFloat(updatedQuote.markupPercentage),
-          grandTotal: parseFloat(updatedQuote.grandTotal),
-        };
+        return updatedQuote;
       } catch (error) {
+        console.error("Error updating quote charges:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -571,61 +303,33 @@ export const quoteRouter = createTRPCRouter({
         });
       }
     }),
-    
+
   updateStatus: protectedProcedure
     .input(
       z.object({
-        id: z.string().min(1, "Quote ID is required"),
-        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED], {
-          errorMap: () => ({ message: "Status must be one of: DRAFT, SENT, ACCEPTED, REJECTED" })
-        }),
+        id: z.string().uuid('Invalid quote ID format'),
+        status: z.enum(
+          [QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED],
+          {
+            errorMap: () => ({ message: 'Status must be one of: DRAFT, SENT, ACCEPTED, REJECTED' }),
+          }
+        ),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // Check if the quote exists and belongs to the user
-        const existingQuote = await ctx.db
-          .select()
-          .from(quotes)
-          .where(
-            and(
-              eq(quotes.id, input.id), 
-              eq(quotes.userId, ctx.session.user.id)
-            )
-          )
-          .limit(1);
-          
-        if (!existingQuote[0]) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Quote not found',
-          });
-        }
+        const services = createServices();
         
-        // Update the quote status
-        const [updatedQuote] = await ctx.db
-          .update(quotes)
-          .set({
-            status: input.status,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(quotes.id, input.id), 
-              eq(quotes.userId, ctx.session.user.id)
-            )
-          )
-          .returning();
-          
-        if (!updatedQuote) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to update quote status',
-          });
-        }
+        // Keep passing userId (placeholder)
+        const updatedQuote = await services.quote.updateStatus({
+          id: input.id,
+          status: input.status,
+          userId: 'system-user', 
+        });
         
         return updatedQuote;
       } catch (error) {
+        console.error("Error updating quote status:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -634,4 +338,116 @@ export const quoteRouter = createTRPCRouter({
         });
       }
     }),
+
+  addTask: protectedProcedure
+    .input(
+      z.object({
+        quoteId: z.string().uuid('Invalid quote ID format'),
+        description: z.string().min(1, 'Description is required'),
+        price: z.number().min(0, 'Price must be a non-negative number'),
+        materialType: z.enum(['lumpsum', 'itemized']),
+        estimatedMaterialsCost: z.number().min(0, 'Estimated cost must be non-negative').optional(),
+        materials: z
+          .array(
+            z.object({
+              productId: z.string().uuid('Product ID must be a valid UUID'),
+              quantity: z.number().min(1, 'Quantity must be at least 1'),
+              unitPrice: z.number().min(0, 'Unit price must be non-negative'),
+              notes: z.string().optional().nullable(),
+            })
+          )
+          .optional()
+          .default([]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const services = createServices();
+        
+        // Explicitly map input to service taskData structure
+        const serviceTaskData = {
+            description: input.description,
+            price: input.price,
+            materialType: input.materialType,
+            estimatedMaterialsCost: input.estimatedMaterialsCost,
+            materials: input.materials?.map(mat => ({
+              // name/description removed
+              productId: mat.productId,
+              quantity: mat.quantity,
+              unitPrice: mat.unitPrice,
+              notes: mat.notes ?? undefined, // Map null to undefined
+            })),
+        };
+
+        const task = await services.quote.addTask({
+          quoteId: input.quoteId,
+          taskData: serviceTaskData, 
+        });
+
+        return task;
+      } catch (error) {
+        console.error("Error adding task:", error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to add task',
+          cause: error,
+        });
+      }
+    }),
+
+  // Need routers for Task and Material update/delete separate from quote?
+  // Assuming task updates/deletes happen via quote update for now.
+  // Let's stub placeholder routers for task/material updates/deletes
+  // if they are intended to be standalone.
+  
+  // Example placeholder if updateTask was meant to be standalone:
+  /*
+  updateTask: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().uuid(),
+        description: z.string().optional(),
+        price: z.number().optional(),
+        estimatedMaterialsCost: z.number().optional(),
+        materialType: z.enum(['lumpsum', 'itemized']).optional(),
+        // NO quantity
+      })
+    )
+    .mutation(async ({ ctx, input }) => { 
+        const services = createServices();
+        const { taskId, ...taskData } = input;
+        return services.quote.updateTask({ taskId, taskData });
+    }),
+  */
+
+  // Example placeholder if deleteTask was meant to be standalone:
+  /*
+  deleteTask: protectedProcedure
+    .input(z.object({ taskId: z.string().uuid() })) // NO userId
+    .mutation(async ({ ctx, input }) => {
+        const services = createServices();
+        return services.quote.deleteTask({ taskId: input.taskId });
+     }),
+  */
+  
+  // Example placeholder if addMaterial was meant to be standalone:
+  /*
+  addMaterial: protectedProcedure
+    .input(
+      z.object({
+          taskId: z.string().uuid(),
+          productId: z.string().uuid(),
+          quantity: z.number(),
+          unitPrice: z.number(),
+          notes: z.string().optional().nullable(),
+          // NO name, NO description
+      })
+    )
+    .mutation(async ({ ctx, input }) => { 
+      const services = createServices();
+      const { taskId, ...materialData } = input;
+      return services.quote.addMaterial({ taskId, materialData });
+    }),
+  */
 });

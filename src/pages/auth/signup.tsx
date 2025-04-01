@@ -18,6 +18,8 @@ import {
   SelectItem,
   CardFooter,
 } from '@heroui/react';
+import { AuthLayout } from '~/layouts';
+import { withAuthLayout } from '~/utils/withAuth';
 
 type UserRole = 'contractor' | 'subcontractor' | 'supplier' | 'other';
 
@@ -99,93 +101,65 @@ const SignUp: NextPage = () => {
   };
 
   return (
-    <>
-      <div className="min-h-dvh flex">
-        <Head>
-          <title>Sign Up | Construction Quote Manager</title>
-        </Head>
+    <Card className="w-full max-w-md">
+      <CardHeader className="flex flex-col gap-1">
+        <h2 className="text-2xl font-bold">Sign Up</h2>
+        <p className="text-sm text-gray-500">Create your account to get started</p>
+      </CardHeader>
+      <CardBody>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && <div className="text-red-500 text-sm">{error}</div>}
+          <Input
+            label="Name"
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            isRequired
+          />
+          <Input
+            label="Email"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            isRequired
+          />
+          <Input
+            label="Password"
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            isRequired
+          />
+          <Input
+            label="Confirm Password"
+            type="password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            isRequired
+          />
 
-        {/* Left Column (hidden on mobile) */}
-        <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 text-white flex-col justify-between p-8 relative overflow-hidden">
-          {/* Background blobs for visual effect */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-            <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
-          </div>
-
-          {/* Content */}
-          <div className="relative z-10">
-            <h1 className="text-4xl font-bold mb-4">Create Account</h1>
-            <p className="text-lg opacity-90">
-              Join us to streamline your construction business with our powerful quoting tool.
-            </p>
-          </div>
+          <Button type="submit" color="primary" className="w-full" isLoading={isLoading}>
+            Sign Up
+          </Button>
+        </form>
+      </CardBody>
+      <CardFooter>
+        <div className="relative z-10">
+          <p className="text-sm opacity-80">
+            Already have an account?{' '}
+            <Link href={routes.auth.signIn} className="underline hover:opacity-100 text-sm">
+              Sign in
+            </Link>
+          </p>
         </div>
-
-        {/* Right Column */}
-        <div className="flex-1 flex items-center justify-center p-4 md:p-8">
-          <Card className="w-full max-w-md">
-            <CardHeader className="flex flex-col gap-1">
-              <h2 className="text-2xl font-bold">Sign Up</h2>
-              <p className="text-sm text-gray-500">Create your account to get started</p>
-            </CardHeader>
-            <CardBody>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && <div className="text-red-500 text-sm">{error}</div>}
-                <Input
-                  label="Name"
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  isRequired
-                />
-                <Input
-                  label="Email"
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  isRequired
-                />
-                <Input
-                  label="Password"
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  isRequired
-                />
-                <Input
-                  label="Confirm Password"
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  isRequired
-                />
-
-                <Button type="submit" color="primary" className="w-full" isLoading={isLoading}>
-                  Sign Up
-                </Button>
-              </form>
-            </CardBody>
-            <CardFooter>
-              <div className="relative z-10">
-                <p className="text-sm opacity-80">
-                  Already have an account?{' '}
-                  <Link href={routes.auth.signIn} className="underline hover:opacity-100 text-sm">
-                    Sign in
-                  </Link>
-                </p>
-              </div>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
-    </>
+      </CardFooter>
+    </Card>
   );
 };
 
-export default SignUp;
+// Pass title "Sign Up" to the HOC
+export default withAuthLayout(SignUp, "Sign Up");

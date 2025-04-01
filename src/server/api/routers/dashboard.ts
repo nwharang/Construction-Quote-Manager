@@ -1,107 +1,192 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { customers, products, quotes } from '~/server/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, isNotNull } from 'drizzle-orm';
 
 export const dashboardRouter = createTRPCRouter({
   getStats: protectedProcedure
-    .query(async ({ ctx }) => {
-      const userId = ctx.session.user.id;
-
+    .input(
+      z.object({
+        timeRange: z.enum(['week', 'month', 'year', 'all']).optional().default('all'),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
       try {
-        // Count total customers
-        const [customerCount] = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(customers)
-          .where(eq(customers.userId, userId));
+        // 1. Get user ID from session
+        const userId = ctx.session.user.id;
+        
+        // 2. Determine date range based on input
+        const timeRange = input?.timeRange || 'all';
+        const dateFilter = getDateFilter(timeRange);
 
-        // Count total quotes
-        const [quoteCount] = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(quotes)
-          .where(eq(quotes.userId, userId));
-          
-        // Count total products
-        const [productCount] = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(products)
-          .where(eq(products.userId, userId));
-          
-        // Calculate total revenue from accepted quotes
-        const [revenueResult] = await ctx.db
-          .select({
-            sum: sql<string>`sum(grand_total)`
-          })
-          .from(quotes)
-          .where(
-            and(
+        // 3. Count total customers
+        let customerCount;
+        try {
+          [customerCount] = await ctx.db
+            .select({ count: sql<number>`count(*)` })
+            .from(customers)
+            .where(and(
+              eq(customers.userId, userId),
+              ...(dateFilter ? [sql`created_at > ${dateFilter.toISOString()}`] : [])
+            ));
+        } catch (err) {
+          console.error('Error counting customers:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to get customer count',
+            cause: err,
+          });
+        }
+
+        // 4. Count total quotes
+        let quoteCount;
+        try {
+          [quoteCount] = await ctx.db
+            .select({ count: sql<number>`count(*)` })
+            .from(quotes)
+            .where(and(
               eq(quotes.userId, userId),
-              eq(quotes.status, 'ACCEPTED')
-            )
-          );
-          
-        // Count customers created in the last month
+              ...(dateFilter ? [sql`created_at > ${dateFilter.toISOString()}`] : [])
+            ));
+        } catch (err) {
+          console.error('Error counting quotes:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to get quote count',
+            cause: err,
+          });
+        }
+
+        // 5. Count total products
+        let productCount;
+        try {
+          [productCount] = await ctx.db
+            .select({ count: sql<number>`count(*)` })
+            .from(products)
+            .where(and(
+              eq(products.userId, userId),
+              ...(dateFilter ? [sql`created_at > ${dateFilter.toISOString()}`] : [])
+            ));
+        } catch (err) {
+          console.error('Error counting products:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to get product count',
+            cause: err,
+          });
+        }
+
+        // 6. Calculate total revenue from accepted quotes
+        let revenueResult;
+        try {
+          [revenueResult] = await ctx.db
+            .select({
+              sum: sql<string>`COALESCE(sum(grand_total), 0)`,
+            })
+            .from(quotes)
+            .where(
+              and(
+                eq(quotes.userId, userId),
+                eq(quotes.status, 'ACCEPTED'),
+                isNotNull(quotes.grandTotal),
+                ...(dateFilter ? [sql`created_at > ${dateFilter.toISOString()}`] : [])
+              )
+            );
+        } catch (err) {
+          console.error('Error calculating revenue:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to calculate revenue',
+            cause: err,
+          });
+        }
+
+        // 7. Get recent period data for growth calculation
         const lastMonth = new Date();
         lastMonth.setMonth(lastMonth.getMonth() - 1);
-        
-        const [lastMonthCustomers] = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(customers)
-          .where(
-            and(
-              eq(customers.userId, userId),
+
+        // 8. Count customers created in the last month
+        let lastMonthCustomers;
+        try {
+          [lastMonthCustomers] = await ctx.db
+            .select({ count: sql<number>`count(*)` })
+            .from(customers)
+            .where(and(
+              eq(customers.userId, userId), 
               sql`created_at > ${lastMonth.toISOString()}`
-            )
-          );
-          
-        // Count quotes created in the last month
-        const [lastMonthQuotes] = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(quotes)
-          .where(
-            and(
-              eq(quotes.userId, userId),
+            ));
+        } catch (err) {
+          console.error('Error counting last month customers:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to get recent customer count',
+            cause: err,
+          });
+        }
+
+        // 9. Count quotes created in the last month
+        let lastMonthQuotes;
+        try {
+          [lastMonthQuotes] = await ctx.db
+            .select({ count: sql<number>`count(*)` })
+            .from(quotes)
+            .where(and(
+              eq(quotes.userId, userId), 
               sql`created_at > ${lastMonth.toISOString()}`
-            )
-          );
-          
-        // Count products created in the last month
-        const [lastMonthProducts] = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(products)
-          .where(
-            and(
-              eq(products.userId, userId),
+            ));
+        } catch (err) {
+          console.error('Error counting last month quotes:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to get recent quote count',
+            cause: err,
+          });
+        }
+
+        // 10. Count products created in the last month
+        let lastMonthProducts;
+        try {
+          [lastMonthProducts] = await ctx.db
+            .select({ count: sql<number>`count(*)` })
+            .from(products)
+            .where(and(
+              eq(products.userId, userId), 
               sql`created_at > ${lastMonth.toISOString()}`
-            )
-          );
-          
-        // Calculate growth percentages
+            ));
+        } catch (err) {
+          console.error('Error counting last month products:', err);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to get recent product count',
+            cause: err,
+          });
+        }
+
+        // 11. Calculate growth percentages
         const totalCustomers = Number(customerCount?.count || 0);
         const totalQuotes = Number(quoteCount?.count || 0);
         const totalProducts = Number(productCount?.count || 0);
         const totalRevenue = Number(revenueResult?.sum || 0);
-        
+
         const lastMonthCustomerCount = Number(lastMonthCustomers?.count || 0);
         const lastMonthQuoteCount = Number(lastMonthQuotes?.count || 0);
         const lastMonthProductCount = Number(lastMonthProducts?.count || 0);
-        
-        // Calculate growth percentages (avoid division by zero)
-        const customerGrowth = totalCustomers > 0
-          ? Math.round((lastMonthCustomerCount / totalCustomers) * 100)
-          : 0;
-          
-        const quoteGrowth = totalQuotes > 0
-          ? Math.round((lastMonthQuoteCount / totalQuotes) * 100)
-          : 0;
-          
-        const productGrowth = totalProducts > 0
-          ? Math.round((lastMonthProductCount / totalProducts) * 100)
-          : 0;
-          
+
+        // 12. Calculate growth percentages
+        const customerGrowth =
+          totalCustomers > 0 ? Math.round((lastMonthCustomerCount / totalCustomers) * 100) : 0;
+
+        const quoteGrowth =
+          totalQuotes > 0 ? Math.round((lastMonthQuoteCount / totalQuotes) * 100) : 0;
+
+        const productGrowth =
+          totalProducts > 0 ? Math.round((lastMonthProductCount / totalProducts) * 100) : 0;
+
         // Revenue growth is not calculated in this example
         const revenueGrowth = 0;
-        
+
+        // 13. Return compiled statistics
         return {
           totalCustomers,
           totalQuotes,
@@ -110,11 +195,41 @@ export const dashboardRouter = createTRPCRouter({
           customerGrowth,
           quoteGrowth,
           productGrowth,
-          revenueGrowth
+          revenueGrowth,
         };
       } catch (error) {
+        // 14. Handle unexpected errors
         console.error('Error fetching dashboard stats:', error);
-        throw new Error('Failed to fetch dashboard statistics');
+
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch dashboard statistics',
+          cause: error,
+        });
       }
-    })
-}); 
+    }),
+});
+
+// Helper function to get date filter based on time range
+function getDateFilter(timeRange: string): Date | null {
+  const now = new Date();
+  
+  switch (timeRange) {
+    case 'week':
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(now.getDate() - 7);
+      return oneWeekAgo;
+    case 'month':
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(now.getMonth() - 1);
+      return oneMonthAgo;
+    case 'year':
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(now.getFullYear() - 1);
+      return oneYearAgo;
+    case 'all':
+    default:
+      return null;
+  }
+}

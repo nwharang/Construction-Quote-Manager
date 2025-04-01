@@ -1,186 +1,149 @@
-@page {
-  size: A4;
-  margin: 0;
-}
-
-/* Main container */
-.container {
-  padding: 20px;
-  max-width: 210mm; /* A4 width */
-  margin: 0 auto;
-  background: white;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #333;
-}
-
-.printbody {
-  margin: 10mm;
-}
-/* Header */
-.header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 10px;
-}
-
-.companyLogo {
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.companyInfo {
-  text-align: right;
-  font-size: 10px;
-}
-
-.companyName {
-  font-weight: bold;
-  font-size: 14px;
-  margin-bottom: 2px;
-}
-
-/* Quote title */
-.quoteTitle {
-  font-size: 24px;
-  font-weight: bold;
-  text-align: center;
-  margin: 15px 0;
-  text-transform: uppercase;
-}
-
-/* Content grid */
-.contentGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.infoBox {
-  border: 1px solid #eee;
-  border-radius: 4px;
-  padding: 10px;
-}
-
-.infoTitle {
-  font-weight: bold;
-  margin-bottom: 5px;
-  font-size: 12px;
-  color: #555;
-}
-
-/* Section titles */
-.sectionTitle {
-  font-size: 16px;
-  margin: 15px 0 8px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid #eee;
-  font-weight: bold;
-}
-
-/* Tables */
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 15px;
-  font-size: 11px;
-}
-
-.table th {
-  background-color: #f5f5f5;
-  text-align: left;
-  padding: 6px;
-  border: 1px solid #ddd;
-  font-weight: bold;
-}
-
-.table td {
-  padding: 6px;
-  border: 1px solid #ddd;
-}
-
-.descriptionColumn {
-  width: 40%;
-}
-
-.textRight {
-  text-align: right;
-}
-
-.textCenter {
-  text-align: center;
-}
-
-.totalsTable {
-  width: 50%;
-  margin-left: auto;
-  border: 1px solid #ddd;
-  margin-bottom: 20px;
-  border-collapse: collapse;
-}
-
-.totalsTable td {
-  padding: 6px;
-  border: 1px solid #ddd;
-}
-
-.totalRow {
-  font-weight: bold;
-  background-color: #f9f9f9;
-}
-
-/* Contract statement */
-.contractNote {
-  font-size: 10px;
-  margin-top: 20px;
-  margin-bottom: 20px;
-  border-top: 1px solid #eee;
-  padding-top: 10px;
-}
-
-/* Action buttons */
-.actionsBar {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
-  display: flex;
-  gap: 10px;
-}
-
-/* Print-specific styles */
 @media print {
-  .actionsBar {
+  /* Hide non-printable elements */
+  .no-print {
     display: none !important;
   }
 
-  .printbody {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  /* Set page margins and size */
+  @page {
+    size: letter;
+    margin: 0.5in;
   }
 
-  /* Make sure everything fits nicely on paper */
-  .container {
+  /* Body styles for printing */
+  body {
     margin: 0;
+    padding: 0 !important;
+    min-width: 0 !important;
+    font-size: 12pt;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Make sure content doesn't overflow */
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Main container for print layout */
+  #printable-area {
+    margin-top: 0 !important;
+    width: 100%;
     padding: 0;
-    max-width: none;
-    box-shadow: none;
-  }
-}
-
-/* Screen-only styles */
-@media screen {
-  .printbody {
-    background-color: #f0f0f0 !important;
   }
 
-  .container {
-    margin-top: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  /* Typography adjustments */
+  h1 {
+    font-size: 20pt;
+    margin-top: 0;
   }
-}
+
+  h2 {
+    font-size: 16pt;
+  }
+
+  h3 {
+    font-size: 14pt;
+  }
+
+  h4, h5, h6 {
+    font-size: 12pt;
+  }
+
+  p, ul, ol, table {
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  /* Table styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th {
+    text-align: left;
+    font-weight: bold;
+    border-bottom: 1px solid #ddd;
+  }
+
+  td, th {
+    padding: 5px;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Force page breaks */
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  /* Ensure certain elements start on a new page */
+  .quote-details, .terms-section, .signature-section {
+    page-break-before: auto;
+    page-break-inside: avoid;
+  }
+
+  /* Set background colors explicitly for printing */
+  .bg-gray-50 {
+    background-color: #f9fafb !important;
+  }
+
+  .bg-gray-100 {
+    background-color: #f3f4f6 !important;
+  }
+
+  /* Border colors */
+  .border-gray-200 {
+    border-color: #e5e7eb !important;
+  }
+
+  .border-gray-300 {
+    border-color: #d1d5db !important;
+  }
+
+  /* Text colors */
+  .text-gray-500 {
+    color: #6b7280 !important;
+  }
+
+  .text-gray-600 {
+    color: #4b5563 !important;
+  }
+
+  .text-gray-700 {
+    color: #374151 !important;
+  }
+
+  /* Remove shadows */
+  .shadow, .shadow-md, .shadow-lg {
+    box-shadow: none !important;
+  }
+
+  /* Ensure links don't display as underlined */
+  a {
+    text-decoration: none;
+    color: #000;
+  }
+
+  /* Avoid breaking images across pages */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Additional spacing for signature lines */
+  .signature-line {
+    border-bottom: 1px solid #000;
+    margin-top: 30px;
+    margin-bottom: 10px;
+  }
+} 

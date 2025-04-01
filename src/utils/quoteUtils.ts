@@ -1,6 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Task, Material, Quote } from '~/types/quote';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import type { AppRouter } from '~/server/api/root';
 import type { QuoteFormData } from '~/hooks/useQuoteCalculator';
+
+type RouterInput = inferRouterInputs<AppRouter>;
+type RouterOutput = inferRouterOutputs<AppRouter>;
+type QuoteResponse = NonNullable<RouterOutput['quote']['getById']>;
+type Task = NonNullable<QuoteResponse['tasks']>[number];
+type Material = NonNullable<Task['materials']>[number];
 
 /**
  * Create a new empty task with default values

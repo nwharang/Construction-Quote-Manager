@@ -1,38 +1,13 @@
 import '@/styles/globals.css';
 import React from 'react';
 import type { AppProps } from 'next/app';
-import { Providers } from '~/components/providers';
 import { api } from '~/utils/api';
-import { MainLayout, PrintLayout, AuthLayout } from '~/layouts';
+import { Providers } from '~/components/providers';
+import { MainLayout, PrintLayout } from '~/layouts';
+import { useRouter } from 'next/router';
+import type { NextPageWithLayout } from "~/types/next";
 
-// Helper function to determine the layout based on the route
-const getLayout = (pathname: string) => {
-  // Print layout for print routes
-  if (pathname.includes('/print')) {
-    return 'print';
-  }
-
-  // Auth layout for auth routes
-  if (pathname.includes('/auth')) {
-    return 'auth';
-  }
-
-  // Default to main layout
-  return 'main';
-};
-
-// Helper to create a page with the appropriate layout
-const withLayout = (page: React.ReactNode, layout: string) => {
-  switch (layout) {
-    case 'print':
-      return <PrintLayout>{page}</PrintLayout>;
-    case 'auth':
-      return <AuthLayout>{page}</AuthLayout>;
-    default:
-      return <MainLayout>{page}</MainLayout>;
-  }
-};
-
+// Define AppPropsWithLayout type using the imported NextPageWithLayout
 type AppPropsWithLayout = AppProps & {
   Component: AppProps['Component'] & {
     getLayout?: (page: React.ReactNode) => React.ReactNode;
@@ -40,19 +15,27 @@ type AppPropsWithLayout = AppProps & {
 };
 
 function App({ Component, pageProps, router }: AppPropsWithLayout) {
-  // Check if the component has a custom getLayout function
-  const getPageLayout = Component.getLayout ?? ((page) => page);
+  // Determine the layout based on the route
+  const getLayout = (): ((page: React.ReactNode) => React.ReactNode) => {
+    if (router.pathname.includes('[id]/print')) {
+      return (page) => <PrintLayout>{page}</PrintLayout>;
+    }
+    // Apply MainLayout by default
+    return Component.getLayout || ((page) => <MainLayout>{page}</MainLayout>);
+  };
 
-  // Otherwise, use the default layout
-  const currentLayout = getLayout(router.pathname);
+  // Function to render the component with the appropriate layout
+  const renderWithLayout = () => {
+    const Layout = getLayout();
+    return Layout(<Component {...pageProps} />);
+  };
 
-  return (
-    <Providers session={pageProps.session}>
-      {Component.getLayout
-        ? getPageLayout(<Component {...pageProps} />)
-        : withLayout(<Component {...pageProps} />, currentLayout)}
-    </Providers>
-  );
+  // Apply the layout to the content
+  const layoutContent = renderWithLayout();
+
+  // Return the final rendered component wrapped in Providers
+  // Providers likely handles SessionProvider internally
+  return <Providers session={pageProps.session}>{layoutContent}</Providers>;
 }
 
 export default api.withTRPC(App);

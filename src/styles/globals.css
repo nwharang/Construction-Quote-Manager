@@ -1,6 +1,2 @@
 @import 'tailwindcss';
 @config "../../tailwind.config.js";
-
-.dark {
-  --heroui-background: #18181b;
-}

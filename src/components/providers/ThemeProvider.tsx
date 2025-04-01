@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { api } from '~/utils/api';
 import { type SupportedLocale } from '~/i18n/locales';
+import { useConfigStore } from '~/store';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -18,6 +19,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('system');
   const [isDark, setIsDark] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const { isDarkMode, setSettings } = useConfigStore();
+  const [isChangingTheme, setIsChangingTheme] = useState(false);
 
   // Fetch user's theme preference only when logged in
   const { data: settings } = api.settings.get.useQuery(undefined, {
@@ -30,15 +33,40 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const updateSettingsMutation = api.settings.update.useMutation({
     // When the mutation succeeds, invalidate the settings query to refresh the cache
     onSuccess: () => {
-      api.useContext().settings.get.invalidate();
+      api.useUtils().settings.get.invalidate();
     },
   });
 
   // Function to set theme and persist it
   const setTheme = (newTheme: Theme) => {
+    // Prevent recursive updates
+    if (isChangingTheme) return;
+    
+    setIsChangingTheme(true);
     setThemeState(newTheme);
+    
+    // Update the configStore
+    const isNewThemeDark = newTheme === 'dark' || (newTheme === 'system' && 
+      typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
+    // First update the theme in settings
+    if (newTheme !== settings?.theme) {
+      setSettings({ theme: newTheme });
+    }
+    
+    // Then update the isDarkMode state separately if needed
+    if (isNewThemeDark !== isDarkMode) {
+      // This is a direct update to the zustand store state, not through setSettings
+      useConfigStore.setState({ isDarkMode: isNewThemeDark });
+    }
+    
+    // Update document class immediately
+    updateDocumentClass(newTheme === 'system' 
+      ? (isNewThemeDark ? 'dark' : 'light') 
+      : newTheme);
+    
     if (session && settings) {
-      // Convert settings properties to match expected input type
+      // Save to server
       updateSettingsMutation.mutate({
         companyName: settings.companyName,
         companyEmail: settings.companyEmail,
@@ -58,24 +86,56 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         timeFormat: settings.timeFormat as "12h" | "24h",
         locale: (settings.locale || 'en') as SupportedLocale,
       });
-    } else {
-      // If no session, save to localStorage
+    }
+    
+    // Always save to localStorage too for quick access on page load
+    if (typeof window !== 'undefined') {
       localStorage.setItem('theme', newTheme);
     }
+    
+    // Reset flag after a short delay
+    setTimeout(() => {
+      setIsChangingTheme(false);
+    }, 200);
   };
+
+  // Early check for dark mode preference on mount
+  useEffect(() => {
+    // This runs on first client-side render and reads what was set in _document.tsx
+    if (typeof window !== 'undefined' && !isInitialized) {
+      const isDarkClass = document.documentElement.classList.contains('dark');
+      setIsDark(isDarkClass);
+    }
+  }, [isInitialized]);
 
   // Initialize theme from settings or localStorage - run only once
   useEffect(() => {
     if (!isInitialized) {
       const initializeTheme = () => {
+        let initialTheme: Theme = 'system';
+        
+        // Priority: 1. User settings (when logged in), 2. localStorage, 3. System preference
         if (settings?.theme) {
-          setThemeState(settings.theme as Theme);
+          initialTheme = settings.theme as Theme;
         } else if (typeof window !== 'undefined') {
           const savedTheme = localStorage.getItem('theme') as Theme | null;
           if (savedTheme) {
-            setThemeState(savedTheme);
+            initialTheme = savedTheme;
           }
         }
+        
+        setThemeState(initialTheme);
+        
+        // Also check current dark mode status
+        if (initialTheme === 'system' && typeof window !== 'undefined') {
+          const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          setIsDark(systemDark);
+          updateDocumentClass(systemDark ? 'dark' : 'light');
+        } else {
+          setIsDark(initialTheme === 'dark');
+          updateDocumentClass(initialTheme);
+        }
+        
         setIsInitialized(true);
       };
 
@@ -86,6 +146,24 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [settings, status, isInitialized]);
 
+  // Sync with configStore
+  useEffect(() => {
+    if (isInitialized && !isChangingTheme) {
+      const isCurrentDark = theme === 'dark' || 
+        (theme === 'system' && typeof window !== 'undefined' && 
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
+      
+      // Only update if there's an actual difference and we're not in the middle of a change
+      if (isCurrentDark !== isDarkMode && theme !== 'system' && settings?.theme !== theme) {
+        setIsChangingTheme(true);
+        setSettings({ theme });
+        setTimeout(() => {
+          setIsChangingTheme(false);
+        }, 200);
+      }
+    }
+  }, [isInitialized, theme, isDarkMode]);
+
   // Update theme when system preference changes
   useEffect(() => {
     if (theme === 'system' && typeof window !== 'undefined') {
@@ -93,6 +171,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const handleChange = (e: MediaQueryListEvent) => {
         setIsDark(e.matches);
         updateDocumentClass(e.matches ? 'dark' : 'light');
+        
+        // Only update configStore if actually needed and not changing theme already
+        if (e.matches !== isDarkMode && !isChangingTheme && settings?.theme === 'system') {
+          setIsChangingTheme(true);
+          // Just update isDark state without changing the theme setting
+          setTimeout(() => {
+            setIsChangingTheme(false);
+          }, 200);
+        }
       };
 
       mediaQuery.addEventListener('change', handleChange);
@@ -103,7 +190,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         mediaQuery.removeEventListener('change', handleChange);
       };
     }
-  }, [theme]);
+  }, [theme, isDarkMode, isChangingTheme]);
 
   // Update document class when theme changes
   useEffect(() => {

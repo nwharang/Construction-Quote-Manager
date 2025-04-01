@@ -1,5 +1,6 @@
-"use client";
+'use client';
 
+import React, { useState } from 'react';
 import {
   Modal,
   ModalContent,
@@ -9,22 +10,23 @@ import {
   Button,
   Input,
   Textarea,
-} from "@heroui/react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { api } from "~/utils/api";
-import { useRouter } from "next/navigation";
+} from '@heroui/react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { api } from '~/utils/api';
+import { useRouter } from 'next/navigation';
+import { CustomerSelect, type CustomerData } from '~/components/customers/CustomerSelect';
+import { useToastStore } from '~/store';
+import { useTranslation } from '~/hooks/useTranslation';
 
-const createQuoteSchema = z.object({
-  title: z.string().min(1, "Project name is required"),
-  customerName: z.string().min(1, "Customer name is required"),
-  customerEmail: z.string().email().optional().or(z.literal("")),
-  customerPhone: z.string().optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
+const getCreateQuoteSchema = (t: Function) => z.object({
+  title: z.string().min(1, t('quotes.validation.titleRequired')),
+  customerId: z.string().min(1, t('quotes.validation.customerRequired')),
+  notes: z.string().optional().or(z.literal('')),
 });
 
-type CreateQuoteForm = z.infer<typeof createQuoteSchema>;
+type CreateQuoteForm = z.infer<ReturnType<typeof getCreateQuoteSchema>>;
 
 interface CreateQuoteModalProps {
   isOpen: boolean;
@@ -33,27 +35,43 @@ interface CreateQuoteModalProps {
 
 export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
   const router = useRouter();
-  const utils = api.useContext();
-  
+  const toast = useToastStore();
+  const { t } = useTranslation();
+
+  // Get schema with translations by calling the function
+  const createQuoteSchema = getCreateQuoteSchema(t);
+
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
+    setValue,
+    watch,
   } = useForm<CreateQuoteForm>({
     resolver: zodResolver(createQuoteSchema),
   });
 
+  const customerId = watch('customerId');
+
   const createQuote = api.quote.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (newQuote) => {
+      toast.success(`Quote "${newQuote.title}" created successfully`);
       reset();
       onClose();
-      router.refresh();
+      router.push(`/admin/quotes/${newQuote.id}/edit`);
+    },
+    onError: (error) => {
+      toast.error(`Error creating quote: ${error.message}`);
     },
   });
 
   const onSubmit = (data: CreateQuoteForm) => {
     createQuote.mutate(data);
+  };
+
+  const handleCustomerChange = (id: string | null, customerData?: CustomerData) => {
+    setValue('customerId', id || '');
   };
 
   return (
@@ -64,45 +82,31 @@ export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
           <ModalBody>
             <Input
               label="Project Name"
-              {...register("title")}
+              {...register('title')}
               errorMessage={errors.title?.message}
               isInvalid={!!errors.title}
             />
-            <Input
-              label="Customer Name"
-              {...register("customerName")}
-              errorMessage={errors.customerName?.message}
-              isInvalid={!!errors.customerName}
-            />
-            <Input
-              label="Customer Email"
-              type="email"
-              {...register("customerEmail")}
-              errorMessage={errors.customerEmail?.message}
-              isInvalid={!!errors.customerEmail}
-            />
-            <Input
-              label="Customer Phone"
-              {...register("customerPhone")}
-              errorMessage={errors.customerPhone?.message}
-              isInvalid={!!errors.customerPhone}
-            />
+            <div className="space-y-1">
+              <CustomerSelect
+                value={customerId || null}
+                onChange={handleCustomerChange}
+              />
+              {errors.customerId && (
+                <p className="text-danger text-sm">{errors.customerId.message}</p>
+              )}
+            </div>
             <Textarea
               label="Notes"
-              {...register("notes")}
+              {...register('notes')}
               errorMessage={errors.notes?.message}
               isInvalid={!!errors.notes}
             />
           </ModalBody>
           <ModalFooter>
-            <Button color="danger"  onPress={onClose}>
+            <Button color="danger" onPress={onClose}>
               Cancel
             </Button>
-            <Button
-              color="primary"
-              type="submit"
-              isLoading={createQuote.isPending}
-            >
+            <Button color="primary" type="submit" isLoading={createQuote.isPending}>
               Create
             </Button>
           </ModalFooter>
@@ -110,4 +114,4 @@ export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
       </ModalContent>
     </Modal>
   );
-} 
+}

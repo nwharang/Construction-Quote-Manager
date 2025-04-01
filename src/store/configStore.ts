@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import type { Settings } from '~/types';
-import { 
-  DEFAULT_LOCALE, 
-  DEFAULT_CURRENCY, 
+import {
+  DEFAULT_LOCALE,
+  DEFAULT_CURRENCY,
   DEFAULT_CURRENCY_SYMBOL,
   DEFAULT_UI_SETTINGS,
   DEFAULT_MARKUP_PERCENTAGE,
   DEFAULT_COMPLEXITY_CHARGE,
   DEFAULT_TASK_PRICE,
-  DEFAULT_MATERIAL_PRICE
+  DEFAULT_MATERIAL_PRICE,
 } from '~/config/constants';
 
 interface ConfigState {
@@ -16,17 +16,18 @@ interface ConfigState {
   settings: Settings;
   isLoading: boolean;
   isUpdating: boolean;
-  
+
   // UI state that doesn't persist to DB
   isNavOpen: boolean;
   isDarkMode: boolean;
-  
+
   // Actions
   setSettings: (settings: Partial<Settings>) => void;
   setLoading: (isLoading: boolean) => void;
   setUpdating: (isUpdating: boolean) => void;
   toggleNav: () => void;
   toggleDarkMode: () => void;
+  changeLocale: (locale: 'en' | 'vi') => void;
 }
 
 const defaultSettings: Settings = {
@@ -63,25 +64,36 @@ export const useConfigStore = create<ConfigState>((set) => ({
   isUpdating: false,
   isNavOpen: false,
   isDarkMode: false,
-  
+
   // Actions
-  setSettings: (newSettings) => set((state) => ({ 
-    settings: { ...state.settings, ...newSettings } 
-  })),
-  
+  setSettings: (newSettings) =>
+    set((state) => ({
+      settings: { ...state.settings, ...newSettings },
+    })),
+
   setLoading: (isLoading) => set({ isLoading }),
-  
+
   setUpdating: (isUpdating) => set({ isUpdating }),
-  
-  toggleNav: () => set((state) => ({ 
-    isNavOpen: !state.isNavOpen 
-  })),
-  
-  toggleDarkMode: () => set((state) => ({
-    isDarkMode: !state.isDarkMode,
-    settings: {
-      ...state.settings,
-      theme: state.isDarkMode ? 'light' : 'dark'
-    }
-  })),
-})); 
+
+  toggleNav: () =>
+    set((state) => ({
+      isNavOpen: !state.isNavOpen,
+    })),
+
+  toggleDarkMode: () =>
+    set((state) => ({
+      isDarkMode: !state.isDarkMode,
+      settings: {
+        ...state.settings,
+        theme: !state.isDarkMode ? 'dark' : 'light',
+      },
+    })),
+
+  changeLocale: (locale: string) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        locale,
+      },
+    })),
+}));

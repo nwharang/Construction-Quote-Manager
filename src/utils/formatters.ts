@@ -21,42 +21,112 @@ export const formatUserFriendlyId = (
 };
 
 /**
- * Formats a date to a localized string
- * @param date Date to format
- * @param locale Locale to use for formatting
+ * Utility functions for formatting dates, currencies, and other values
+ */
+
+/**
+ * Format a date for display
+ * @param date Date object or ISO string
+ * @param options Intl.DateTimeFormatOptions
  * @returns Formatted date string
  */
-export const formatDate = (
-  date: Date | string,
-  locale = 'en-US'
-): string => {
+export function formatDate(date: Date | string | null | undefined, options?: Intl.DateTimeFormatOptions): string {
+  if (!date) return '-';
+  
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return dateObj.toLocaleDateString(locale);
-};
+  
+  // Default options for date formatting
+  const defaultOptions: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...options
+  };
+  
+  return new Intl.DateTimeFormat('en-US', defaultOptions).format(dateObj);
+}
 
 /**
- * Formats a date with time to a localized string
- * @param date Date to format
- * @param locale Locale to use for formatting
- * @returns Formatted date and time string
+ * Format a date with time for display
+ * @param date Date object or ISO string
+ * @returns Formatted date string with time
  */
-export const formatDateTime = (
-  date: Date | string,
-  locale = 'en-US'
-): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return dateObj.toLocaleString(locale);
-};
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '-';
+  
+  return formatDate(date, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 /**
- * Formats a percentage value for display
- * @param value Percentage value (e.g., 10 for 10%)
- * @param fractionDigits Number of decimal places to include
+ * Format a currency value for display
+ * @param amount Number to format
+ * @param currency Currency code (default: USD)
+ * @returns Formatted currency string
+ */
+export function formatCurrency(amount: number | null | undefined, currency = 'USD'): string {
+  if (amount === null || amount === undefined) return '-';
+  
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+}
+
+/**
+ * Format a percentage for display
+ * @param value Number to format as percentage
+ * @param decimals Number of decimal places
  * @returns Formatted percentage string
  */
-export const formatPercentage = (
-  value: number,
-  fractionDigits = 1
-): string => {
-  return `${value.toFixed(fractionDigits)}%`;
-}; 
+export function formatPercentage(value: number | null | undefined, decimals = 2): string {
+  if (value === null || value === undefined) return '-';
+  
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(value / 100);
+}
+
+/**
+ * Format a phone number for display
+ * @param phone Phone number string
+ * @returns Formatted phone number
+ */
+export function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return '-';
+  
+  // Basic US phone formatting
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // Format based on length
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  }
+  
+  // Return original if not standard format
+  return phone;
+}
+
+/**
+ * Format a number with commas for thousands separators
+ * @param value Number to format
+ * @param decimals Number of decimal places
+ * @returns Formatted number string
+ */
+export function formatNumber(value: number | null | undefined, decimals = 0): string {
+  if (value === null || value === undefined) return '-';
+  
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(value);
+} 

@@ -62,7 +62,7 @@ const statusColors = {
 
 export default function QuoteDetail({ quote }: { quote: Quote }) {
   const router = useRouter();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const [complexityCharge, setComplexityCharge] = useState(Number(quote.complexityCharge));
   const [markupPercentage, setMarkupPercentage] = useState(Number(quote.markupPercentage));

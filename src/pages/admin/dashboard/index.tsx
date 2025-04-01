@@ -1,11 +1,30 @@
 import type { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { Users, Package, FileText, CreditCard, ArrowUp, ArrowDown } from 'lucide-react';
-import { Card, CardHeader, CardBody, Chip, Spinner, Button } from '@heroui/react';
+import {
+  Users,
+  Package,
+  FileText,
+  CreditCard,
+  ArrowUp,
+  ArrowDown,
+  AlertTriangle,
+  AlertCircle,
+  DollarSign,
+} from 'lucide-react';
+import { Card, CardHeader, CardBody, Chip, Spinner, Button, Alert } from '@heroui/react';
 import { api } from '~/utils/api';
-import { Layout } from '~/components/Layout';
 import { formatCurrency } from '~/utils/currency';
 import { formatDate, formatRelativeTime } from '~/utils/date';
+import { useToastStore } from '~/store';
+import { useEffect } from 'react';
+import type { TRPCClientErrorLike } from '@trpc/client';
+import type { AppRouter } from '~/server/api/root';
+import type { inferRouterOutputs } from '@trpc/server';
+import { withMainLayout } from '~/utils/withAuth';
+
+type RouterOutput = inferRouterOutputs<AppRouter>;
+type DashboardStats = RouterOutput['dashboard']['getStats'];
+type QuoteListResponse = RouterOutput['quote']['getAll'];
 
 // Types
 interface StatCardProps {
@@ -14,6 +33,7 @@ interface StatCardProps {
   icon: React.ReactNode;
   change?: number;
   loading?: boolean;
+  error?: boolean;
 }
 
 interface QuickActionProps {
@@ -24,13 +44,61 @@ interface QuickActionProps {
   actionLabel: string;
 }
 
+interface QuoteItem {
+  id: string;
+  sequentialId: number;
+  title: string;
+  customerName: string;
+  status: string;
+  date: Date;
+  total: string;
+}
+
 const DashboardPage: NextPage = () => {
   const router = useRouter();
+  const toast = useToastStore();
 
-  const { data: statsData, isLoading: isStatsLoading } = api.dashboard.getStats.useQuery();
-  const { data: recentQuotesData, isLoading: isQuotesLoading } = api.quote.getAll.useQuery({
-    limit: 5,
+  // Handle tRPC errors
+  const handleError = (error: TRPCClientErrorLike<AppRouter>) => {
+    console.error('Error fetching data:', error);
+    toast.error(`Error: ${error.message}`);
+  };
+
+  const {
+    data: statsData,
+    isLoading: isStatsLoading,
+    error: statsError,
+  } = api.dashboard.getStats.useQuery(undefined, {
+    retry: 1,
+    retryDelay: 1000,
   });
+
+  // Show toast on error
+  useEffect(() => {
+    if (statsError) {
+      handleError(statsError);
+    }
+  }, [statsError]);
+
+  const {
+    data: recentQuotesData,
+    isLoading: isQuotesLoading,
+    error: quotesError,
+  } = api.quote.getAll.useQuery(
+    {
+      limit: 5,
+    },
+    {
+      retry: 1,
+    }
+  );
+
+  // Show toast for quotes error
+  useEffect(() => {
+    if (quotesError) {
+      handleError(quotesError);
+    }
+  }, [quotesError]);
 
   // State is derived from query results
   const stats = statsData || {
@@ -47,22 +115,22 @@ const DashboardPage: NextPage = () => {
   // Safely extract quotes from the response
   const getQuotes = () => {
     if (!recentQuotesData) return [];
-    
+
     // Check if we have items property
     if ('items' in recentQuotesData && Array.isArray(recentQuotesData.items)) {
       return recentQuotesData.items.slice(0, 5);
     }
-    
+
     // Check if we have quotes property
     if ('quotes' in recentQuotesData && Array.isArray(recentQuotesData.quotes)) {
       return recentQuotesData.quotes.slice(0, 5);
     }
-    
+
     // Return empty array if we can't find quotes
     return [];
   };
-  
-  const recentQuotes = getQuotes().map((quote: any) => ({
+
+  const recentQuotes = getQuotes().map((quote) => ({
     id: quote.id,
     sequentialId: quote.sequentialId || 0,
     title: quote.title,
@@ -70,7 +138,7 @@ const DashboardPage: NextPage = () => {
     status: quote.status,
     date: quote.createdAt,
     total: quote.grandTotal,
-  }));
+  })) as QuoteItem[];
 
   // Quick actions for the dashboard
   const quickActions: QuickActionProps[] = [
@@ -119,12 +187,17 @@ const DashboardPage: NextPage = () => {
   };
 
   // Stat card component
-  const StatCard = ({ title, value, icon, change, loading }: StatCardProps) => (
+  const StatCard = ({ title, value, icon, change, loading, error }: StatCardProps) => (
     <Card className="h-full">
       <CardBody className="gap-2">
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <Spinner />
+          </div>
+        ) : error ? (
+          <div className="text-danger flex flex-col items-center justify-center gap-2 py-4">
+            <AlertTriangle className="h-6 w-6" />
+            <span className="text-center text-sm">Failed to load data</span>
           </div>
         ) : (
           <>
@@ -132,7 +205,9 @@ const DashboardPage: NextPage = () => {
               <span className="text-muted-foreground text-sm">{title}</span>
               <div className="bg-primary/10 rounded-full p-2">{icon}</div>
             </div>
-            <div className="text-2xl font-bold">{value}</div>
+            <div className="text-2xl font-bold">
+              {value !== undefined && value !== null ? value : '—'}
+            </div>
             {change !== undefined && (
               <div className="flex items-center gap-1 text-xs">
                 {change >= 0 ? (
@@ -174,8 +249,8 @@ const DashboardPage: NextPage = () => {
   );
 
   return (
-    <Layout>
-      <div className="p-6">
+    <>
+      <div className="p-1 sm:p-2 md:p-4">
         <div className="mb-8">
           <h1 className="mb-2 text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
@@ -186,36 +261,57 @@ const DashboardPage: NextPage = () => {
         {/* Stats Section */}
         <div className="mb-8">
           <h2 className="mb-4 text-xl font-semibold">Overview</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title="Total Customers"
-              value={stats.totalCustomers}
-              icon={<Users className="text-primary h-5 w-5" />}
-              change={stats.customerGrowth}
-              loading={isStatsLoading}
-            />
-            <StatCard
-              title="Total Quotes"
-              value={stats.totalQuotes}
-              icon={<FileText className="text-primary h-5 w-5" />}
-              change={stats.quoteGrowth}
-              loading={isStatsLoading}
-            />
-            <StatCard
-              title="Total Products"
-              value={stats.totalProducts}
-              icon={<Package className="text-primary h-5 w-5" />}
-              change={stats.productGrowth}
-              loading={isStatsLoading}
-            />
-            <StatCard
-              title="Total Revenue"
-              value={formatCurrency(stats.totalRevenue)}
-              icon={<CreditCard className="text-primary h-5 w-5" />}
-              change={stats.revenueGrowth}
-              loading={isStatsLoading}
-            />
-          </div>
+          {isStatsLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="h-[120px]">
+                  <CardBody className="flex h-full items-center justify-center">
+                    <Spinner size="md" />
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          ) : statsError ? (
+            <Alert variant="solid" color="danger">
+              <AlertCircle className="h-4 w-4" />
+              {statsError.message || 'Failed to load dashboard data'}
+            </Alert>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                title="Total Customers"
+                value={stats.totalCustomers}
+                icon={<Users className="text-muted-foreground h-4 w-4" />}
+                change={stats.customerGrowth}
+                loading={isStatsLoading}
+                error={!!statsError}
+              />
+              <StatCard
+                title="Total Quotes"
+                value={stats.totalQuotes}
+                icon={<FileText className="text-muted-foreground h-4 w-4" />}
+                change={stats.quoteGrowth}
+                loading={isStatsLoading}
+                error={!!statsError}
+              />
+              <StatCard
+                title="Total Products"
+                value={stats.totalProducts}
+                icon={<Package className="text-muted-foreground h-4 w-4" />}
+                change={stats.productGrowth}
+                loading={isStatsLoading}
+                error={!!statsError}
+              />
+              <StatCard
+                title="Total Revenue"
+                value={formatCurrency(stats.totalRevenue)}
+                icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
+                change={stats.revenueGrowth}
+                loading={isStatsLoading}
+                error={!!statsError}
+              />
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}
@@ -251,56 +347,59 @@ const DashboardPage: NextPage = () => {
                   <Spinner />
                 </div>
               ) : recentQuotes.length === 0 ? (
-                <div className="text-muted-foreground flex h-40 flex-col items-center justify-center text-center">
-                  <FileText className="text-muted-foreground/60 mb-2 h-8 w-8" />
-                  <p>No quotes yet</p>
-                  <p className="text-sm">Create your first quote to get started</p>
+                <div className="flex h-40 flex-col items-center justify-center gap-2 text-center">
+                  <FileText className="text-primary h-8 w-8 opacity-50" />
+                  <p className="text-muted-foreground">No quotes yet</p>
                   <Button
-                    className="mt-4"
-                    color="primary"
                     size="sm"
+                    color="primary"
                     onPress={() => router.push('/admin/quotes/new')}
                   >
-                    Create Quote
+                    Create Your First Quote
                   </Button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="divide-default-200 min-w-full divide-y">
                     <thead>
-                      <tr className="text-muted-foreground border-b text-left text-sm">
-                        <th className="pb-2">Quote</th>
-                        <th className="pb-2">Customer</th>
-                        <th className="pb-2">Status</th>
-                        <th className="pb-2">Date</th>
-                        <th className="pb-2 text-right">Amount</th>
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                          Quote #
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                          Title
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                          Customer
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium tracking-wider uppercase">
+                          Total
+                        </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-default-200 divide-y">
                       {recentQuotes.map((quote) => (
                         <tr
                           key={quote.id}
-                          className="group hover:bg-muted/30 border-b"
+                          className="hover:bg-default-100 cursor-pointer"
                           onClick={() => router.push(`/admin/quotes/${quote.id}`)}
-                          style={{ cursor: 'pointer' }}
                         >
-                          <td className="py-3 pr-4">
-                            <div className="font-medium">{quote.title}</div>
-                            <div className="text-muted-foreground text-xs">
-                              #{quote.sequentialId}
-                            </div>
+                          <td className="px-4 py-3 text-sm whitespace-nowrap">
+                            #{quote.sequentialId}
                           </td>
-                          <td className="py-3 pr-4">{quote.customerName}</td>
-                          <td className="py-3 pr-4">{renderStatusChip(quote.status)}</td>
-                          <td className="py-3 pr-4">
-                            <div className="flex flex-col">
-                              <span className="text-xs">{formatDate(quote.date)}</span>
-                              <span className="text-muted-foreground text-xs">
-                                {formatRelativeTime(quote.date)}
-                              </span>
-                            </div>
+                          <td className="px-4 py-3 text-sm">{quote.title}</td>
+                          <td className="px-4 py-3 text-sm">{quote.customerName}</td>
+                          <td className="px-4 py-3 text-sm">{renderStatusChip(quote.status)}</td>
+                          <td className="px-4 py-3 text-sm whitespace-nowrap">
+                            {formatRelativeTime(quote.date)}
                           </td>
-                          <td className="py-3 text-right font-medium">
+                          <td className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap">
                             {formatCurrency(quote.total)}
                           </td>
                         </tr>
@@ -313,8 +412,9 @@ const DashboardPage: NextPage = () => {
           </Card>
         </div>
       </div>
-    </Layout>
+    </>
   );
 };
 
-export default DashboardPage;
+// Export with the withAuth HOC instead of relying on _app.tsx to apply protection
+export default withMainLayout(DashboardPage);

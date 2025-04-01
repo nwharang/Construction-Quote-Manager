@@ -1,291 +1,331 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
-import { useTranslation } from '@/hooks/useTranslation';
+import type { NextPageWithLayout } from '~/types/next';
+import Head from 'next/head';
 import {
-  Spinner,
-  Pagination,
+  Button,
   Table,
   TableHeader,
   TableColumn,
   TableBody,
   TableRow,
   TableCell,
-  Button,
-  Card,
-  CardHeader,
-  CardBody,
-  useDisclosure,
+  Pagination,
+  Input,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Spinner,
 } from '@heroui/react';
-import type { SortDescriptor } from '@heroui/react';
+import { Plus, Search, MoreVertical, Edit, Trash, Mail, Phone, Eye } from 'lucide-react';
+import MainLayout from '~/layouts/MainLayout';
+import { api } from '~/utils/api';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { AppRouter } from '~/server/api/root';
+import { CustomerFormModal } from '~/components/customers/CustomerFormModal';
+import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
+import { useModalCRUD } from '~/hooks/useModalCRUD';
 
-import type { Customer, CustomerWithQuotes } from '@/types/customer';
-import { useQuery } from '@/hooks/useQuery';
-import { useDeleteItem } from '@/hooks/useDeleteItem';
-import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
-import { useEntityStore } from '@/store/entityStore';
-import { formatDate } from '@/lib/utils';
-import { usePagination } from '@/hooks/usePagination';
+// Get the types from the router
+type RouterOutput = inferRouterOutputs<AppRouter>;
 
-/**
- * Customer list page component that follows the shared CRUD pattern
- */
-export default function CustomersPage() {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
-  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+// Get the type from the getAll procedure's return type
+type CustomerListResponse = RouterOutput['customer']['getAll'];
+type CustomerItem = NonNullable<CustomerListResponse['customers']>[number];
+type CustomerFormData = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+};
 
-  // Set the entity settings for consistent UX
-  const setEntitySettings = useEntityStore((state) => state.setEntitySettings);
+const CustomersPage: NextPageWithLayout = () => {
+  const [page, setPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortColumn, setSortColumn] = useState('name');
+  const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('ascending');
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
 
-  useEffect(() => {
-    setEntitySettings({
-      entityName: 'customer',
-      entityType: 'customer',
-      baseUrl: '/admin/customers',
-      displayNameField: 'name',
-      listPath: '/admin/customers',
-      createPath: '/admin/customers/new',
-      editPath: '/admin/customers/[id]/edit',
-      viewPath: '/admin/customers/[id]',
-    });
-  }, [setEntitySettings]);
-
-  // Setup pagination
-  const { page, limit } = usePagination({
-    defaultLimit: 10,
-    syncWithUrl: true,
-    total: 0, // Will be updated when data is fetched
-  });
-
-  // Setup sorting
-  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
-    column: 'name',
-    direction: 'ascending',
-  });
-
-  // Query customers
-  const { data, isLoading } = useQuery<{
-    customers: CustomerWithQuotes[];
-    total: number;
-  }>('/api/customers', {
+  // Fetch customers data with sorting
+  const {
+    data: customersData,
+    isLoading,
+    refetch,
+  } = api.customer.getAll.useQuery({
     page,
-    limit,
-    sortBy: sortDescriptor.column,
-    sortDirection: sortDescriptor.direction === 'ascending' ? 'asc' : 'desc',
+    limit: rowsPerPage,
+    search: searchQuery,
   });
+  const customers = customersData?.customers || [];
+  const totalCustomers = customersData?.total || 0;
 
-  // Update pagination when total changes
-  const paginationInfo = usePagination({
-    defaultLimit: limit,
-    total: data?.total || 0,
-    syncWithUrl: true,
-  });
-
-  // Delete customer handler
-  const { mutate: deleteCustomer, isLoading: isDeleting } = useDeleteItem<Customer>({
-    endpoint: '/api/customers',
+  // API mutations
+  const utils = api.useUtils();
+  
+  const { mutate: createCustomer, isPending: isCreating } = api.customer.create.useMutation({
     onSuccess: () => {
-      onDeleteClose();
-      setCustomerToDelete(null);
+      utils.customer.getAll.invalidate();
+      modal.handleCreateSuccess();
+    },
+  });
+  
+  const { mutate: updateCustomer, isPending: isUpdating } = api.customer.update.useMutation({
+    onSuccess: () => {
+      utils.customer.getAll.invalidate();
+      modal.handleUpdateSuccess();
+    },
+  });
+  
+  const { mutate: deleteCustomer, isPending: isDeleting } = api.customer.delete.useMutation({
+    onSuccess: () => {
+      utils.customer.getAll.invalidate();
+      modal.handleDeleteSuccess();
     },
   });
 
-  const handleDeleteClick = (customer: Customer) => {
-    setCustomerToDelete(customer);
-    onDeleteOpen();
+  // Use the modal CRUD hook
+  const modal = useModalCRUD({
+    onCreateSuccess: () => setSelectedCustomer(null),
+    onUpdateSuccess: () => setSelectedCustomer(null),
+    onDeleteSuccess: () => setSelectedCustomer(null),
+  });
+
+  // Fetch the customer data if we're in edit or view mode
+  const { data: customerData } = api.customer.getById.useQuery(
+    { id: modal.modalState.entityId || '' },
+    { 
+      enabled: !!modal.modalState.entityId && (modal.isEdit || modal.isView || modal.isDelete),
+    }
+  );
+
+  // Update selected customer when data is fetched
+  useEffect(() => {
+    if (customerData) {
+      // Force type to work around potential missing fields
+      setSelectedCustomer(customerData as unknown as CustomerItem);
+    }
+  }, [customerData]);
+
+  // Refetch data when sort or search parameters change
+  useEffect(() => {
+    refetch();
+  }, [page, rowsPerPage, searchQuery, refetch]);
+
+  // Handle sort change
+  const handleSortChange = (columnKey: string) => {
+    if (columnKey === sortColumn) {
+      setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending');
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection('ascending');
+    }
+    // Reset to first page when sorting changes
+    setPage(1);
   };
 
-  const handleDeleteConfirm = () => {
-    if (customerToDelete) {
-      deleteCustomer({ id: customerToDelete.id });
+  // Submit handlers
+  const handleCreateSubmit = async (data: CustomerFormData) => {
+    modal.setLoading(true);
+    try {
+      await createCustomer(data);
+    } finally {
+      modal.setLoading(false);
     }
   };
 
-  // Handler for sorting changes
-  const handleSortChange = (descriptor: SortDescriptor) => {
-    setSortDescriptor(descriptor);
+  const handleUpdateSubmit = async (data: CustomerFormData) => {
+    if (modal.modalState.entityId) {
+      modal.setLoading(true);
+      try {
+        await updateCustomer({
+          id: modal.modalState.entityId,
+          ...data,
+        });
+      } finally {
+        modal.setLoading(false);
+      }
+    }
   };
 
-  // Columns for the HeroUI table
-  const columns = [
-    {
-      key: 'displayId',
-      label: t('customers.fields.id'),
-    },
-    {
-      key: 'name',
-      label: t('customers.fields.name'),
-      sortable: true,
-    },
-    {
-      key: 'email',
-      label: t('customers.fields.email'),
-      sortable: true,
-    },
-    {
-      key: 'createdAt',
-      label: t('customers.fields.created_at'),
-      sortable: true,
-    },
-    {
-      key: 'actions',
-      label: t('common.actions'),
-    },
-  ];
+  const handleDeleteConfirm = async () => {
+    if (modal.modalState.entityId) {
+      modal.setLoading(true);
+      try {
+        await deleteCustomer({ id: modal.modalState.entityId });
+      } finally {
+        modal.setLoading(false);
+      }
+    }
+  };
 
-  // Render cell content based on column key
-  const renderCell = (customer: CustomerWithQuotes, columnKey: React.Key) => {
+  const renderCell = (customer: CustomerItem, columnKey: string) => {
     switch (columnKey) {
-      case 'displayId':
-        return <span>{customer.displayId || customer.id.substring(0, 8)}</span>;
-
       case 'name':
         return (
-          <Link
-            href={`/admin/customers/${customer.id}`}
-            className="text-blue-600 hover:text-blue-900"
-          >
-            {customer.name}
-          </Link>
-        );
-
-      case 'email':
-        return <span>{customer.email}</span>;
-
-      case 'createdAt':
-        return <span>{formatDate(customer.createdAt)}</span>;
-
-      case 'actions':
-        return (
-          <div className="flex justify-end gap-2">
-            <Button
-              size="sm"
-              color="primary"
-              variant="flat"
-              as={Link}
-              href={`/admin/customers/${customer.id}/edit`}
-            >
-              {t('common.edit')}
-            </Button>
-            <Button
-              size="sm"
-              color="danger"
-              variant="flat"
-              onPress={() => handleDeleteClick(customer)}
-            >
-              {t('common.delete')}
-            </Button>
+          <div className="flex flex-col">
+            <p className="text-foreground font-medium">{customer.name}</p>
+            {customer.address && (
+              <p className="text-default-500 max-w-[200px] truncate text-xs">{customer.address}</p>
+            )}
           </div>
         );
-
+      case 'contact':
+        return (
+          <div className="flex flex-col gap-1">
+            {customer.email && (
+              <div className="flex items-center gap-1">
+                <Mail size={14} className="text-default-500" />
+                <span className="text-sm">{customer.email}</span>
+              </div>
+            )}
+            {customer.phone && (
+              <div className="flex items-center gap-1">
+                <Phone size={14} className="text-default-500" />
+                <span className="text-sm">{customer.phone}</span>
+              </div>
+            )}
+          </div>
+        );
+      case 'createdAt':
+        return customer.createdAt instanceof Date
+          ? customer.createdAt.toLocaleDateString()
+          : new Date(customer.createdAt).toLocaleDateString();
+      case 'actions':
+        return (
+          <div className="flex items-center justify-end">
+            <Dropdown>
+              <DropdownTrigger>
+                <Button isIconOnly variant="light" size="sm">
+                  <MoreVertical size={16} />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="Customer actions">
+                <DropdownItem
+                  key="view"
+                  startContent={<Eye size={16} />}
+                  onPress={() => modal.openViewModal(customer.id)}
+                >
+                  View
+                </DropdownItem>
+                <DropdownItem
+                  key="edit"
+                  startContent={<Edit size={16} />}
+                  onPress={() => modal.openEditModal(customer.id)}
+                >
+                  Edit
+                </DropdownItem>
+                <DropdownItem
+                  key="delete"
+                  startContent={<Trash size={16} />}
+                  className="text-danger"
+                  color="danger"
+                  onPress={() => modal.openDeleteModal(customer.id)}
+                >
+                  Delete
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        );
       default:
-        // Safe fallback that returns a React node
-        return <span>{String(customer[columnKey as keyof CustomerWithQuotes] || '')}</span>;
+        const value = customer[columnKey as keyof CustomerItem];
+        return typeof value === 'object' ? JSON.stringify(value) : String(value || '');
     }
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="shadow-sm">
-        <CardHeader className="flex items-center justify-between px-6 py-4">
-          <h1 className="text-xl font-bold">{t('customers.title')}</h1>
-          <Button
-            color="primary"
-            as={Link}
-            href={'/admin/customers/new'}
-            startContent={<span>+</span>}
-          >
-            {t('customers.new')}
-          </Button>
-        </CardHeader>
-
-        <CardBody className="p-4">
-          <Table
-            aria-label="Customers table"
-            sortDescriptor={sortDescriptor}
-            onSortChange={handleSortChange}
-            bottomContent={
-              data?.total && data.total > 0 ? (
-                <div className="flex justify-center">
-                  <Pagination
-                    page={paginationInfo.page}
-                    total={paginationInfo.totalPages}
-                    onChange={paginationInfo.setPage}
-                    showControls
-                    showShadow
-                    color="primary"
-                  />
-                </div>
-              ) : null
-            }
-            classNames={{
-              wrapper: 'shadow-none',
-            }}
-          >
-            <TableHeader columns={columns}>
-              {(column) => (
-                <TableColumn
-                  key={column.key}
-                  allowsSorting={column.sortable}
-                  align={column.key === 'actions' ? 'end' : 'start'}
-                >
-                  {column.label}
-                </TableColumn>
-              )}
-            </TableHeader>
-            <TableBody
-              items={data?.customers || []}
-              emptyContent={
-                isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Spinner size="md" color="primary" />
-                    <span className="ml-2">{t('common.loading')}</span>
-                  </div>
-                ) : (
-                  <div className="py-8 text-center">
-                    <p className="text-gray-500">{t('customers.empty')}</p>
-                    <Button
-                      color="primary"
-                      className="mt-4"
-                      onPress={() => router.push('/admin/customers/new')}
-                    >
-                      {t('customers.actions.create_first')}
-                    </Button>
-                  </div>
-                )
-              }
-              isLoading={isLoading}
-              loadingContent={
-                <div className="flex items-center justify-center py-8">
-                  <Spinner size="md" color="primary" />
-                  <span className="ml-2">{t('common.loading')}</span>
-                </div>
-              }
+    <>
+      <Head>
+        <title>Customers | Construction Quote Manager</title>
+      </Head>
+      <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+        {/* Top Content */}
+        <div className="mb-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold">Customers</h1>
+            <Button
+              color="primary"
+              startContent={<Plus size={16} />}
+              onPress={modal.openCreateModal}
             >
-              {(customer) => (
-                <TableRow
-                  key={customer.id}
-                  onClick={() => router.push(`/admin/customers/${customer.id}`)}
-                >
-                  {(columnKey) => <TableCell>{renderCell(customer, columnKey)}</TableCell>}
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardBody>
-      </Card>
+              New Customer
+            </Button>
+          </div>
+          <div className="flex items-center justify-between">
+            <Input
+              placeholder="Search customers..."
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              startContent={<Search size={16} className="text-default-300" />}
+              className="w-full"
+            />
+          </div>
+        </div>
 
-      {customerToDelete && (
-        <DeleteCustomerDialog
-          isOpen={isDeleteOpen}
-          customer={customerToDelete}
-          isDeleting={isDeleting}
-          onClose={onDeleteClose}
-          onConfirm={handleDeleteConfirm}
-        />
-      )}
-    </div>
+        {/* Table */}
+        {isLoading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <div>
+            <Table aria-label="Customers table">
+              <TableHeader>
+                <TableColumn key="name">CUSTOMER</TableColumn>
+                <TableColumn key="contact">CONTACT</TableColumn>
+                <TableColumn key="createdAt">CREATED</TableColumn>
+                <TableColumn key="actions" className="text-right">
+                  ACTIONS
+                </TableColumn>
+              </TableHeader>
+              <TableBody emptyContent="No customers found">
+                {customers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    {['name', 'contact', 'createdAt', 'actions'].map((columnKey) => (
+                      <TableCell key={columnKey}>{renderCell(customer, columnKey)}</TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        <div className="mt-4 flex items-center justify-center">
+          <Pagination
+            total={Math.ceil(totalCustomers / rowsPerPage)}
+            page={page}
+            onChange={setPage}
+          />
+        </div>
+      </div>
+
+      {/* Customer Form Modal */}
+      <CustomerFormModal
+        customer={selectedCustomer || undefined}
+        isOpen={modal.modalState.isOpen && (modal.isCreate || modal.isEdit || modal.isView)}
+        onClose={modal.closeModal}
+        onSubmit={modal.isEdit ? handleUpdateSubmit : handleCreateSubmit}
+        isLoading={modal.modalState.isLoading}
+      />
+
+      {/* Delete Customer Dialog */}
+      <DeleteEntityDialog
+        isOpen={modal.modalState.isOpen && modal.isDelete}
+        onClose={modal.closeModal}
+        onConfirm={handleDeleteConfirm}
+        isLoading={modal.modalState.isLoading}
+        entityName="Customer"
+        entityLabel={selectedCustomer?.name || ""}
+      />
+    </>
   );
-}
+};
+
+// Define the getLayout function
+CustomersPage.getLayout = (page) => <MainLayout>{page}</MainLayout>;
+
+export default CustomersPage;

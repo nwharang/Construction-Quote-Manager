@@ -8,7 +8,6 @@ import { api } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
 import { type QuoteStatus } from '~/server/db/schema';
 import { useAppToast } from '~/components/providers/ToastProvider';
-import { Layout } from '~/components/Layout';
 import { EntityList, type EntityColumn } from '~/components/shared/EntityList';
 
 // Fix: Use import type for type-only imports
@@ -139,18 +138,18 @@ export default function CustomerDetailsPage() {
   // Loading customer data
   if (isLoadingCustomer) {
     return (
-      <Layout>
+      <>
         <div className="flex h-96 items-center justify-center">
           <Spinner size="lg" color="primary" />
         </div>
-      </Layout>
+      </>
     );
   }
 
   // Customer not found
   if (!customer) {
     return (
-      <Layout>
+      <>
         <div className="p-6">
           <div className="flex h-64 flex-col items-center justify-center">
             <h1 className="text-foreground mb-2 text-2xl font-bold">Customer Not Found</h1>
@@ -166,12 +165,12 @@ export default function CustomerDetailsPage() {
             </Button>
           </div>
         </div>
-      </Layout>
+      </>
     );
   }
 
   return (
-    <Layout>
+    <>
       <Head>
         <title>{customer.name} | Customer Details</title>
       </Head>
@@ -311,6 +310,6 @@ export default function CustomerDetailsPage() {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

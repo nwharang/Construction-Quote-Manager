@@ -33,6 +33,14 @@ export const QuoteStatus = {
 
 export type QuoteStatusType = (typeof QuoteStatus)[keyof typeof QuoteStatus];
 
+// Material type enum
+export const materialTypeEnum = pgEnum('material_type', ['ITEMIZED', 'LUMPSUM']);
+
+export const MaterialType = {
+  ITEMIZED: 'ITEMIZED',
+  LUMPSUM: 'LUMPSUM',
+} as const;
+
 // Product categories enum
 export const productCategoryEnum = pgEnum('product_category', [
   'LUMBER',
@@ -156,35 +164,46 @@ export const verificationTokens = pgTable(
 );
 
 // Quotes table
-export const quotes = pgTable('quotes', {
-  id: text('id').primaryKey(),
-  sequentialId: serial('sequential_id').notNull(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  customerId: uuid('customer_id')
-    .notNull()
-    .references(() => customers.id),
-  title: text('title').notNull(),
-  customerName: text('customer_name').notNull(),
-  customerEmail: text('customer_email'),
-  customerPhone: text('customer_phone'),
-  status: quoteStatusEnum('status').notNull().default('DRAFT'),
-  subtotalTasks: decimal('subtotal_tasks', { precision: 10, scale: 2 }).notNull().default('0'),
-  subtotalMaterials: decimal('subtotal_materials', { precision: 10, scale: 2 }).notNull().default('0'),
-  complexityCharge: decimal('complexity_charge', { precision: 10, scale: 2 }).notNull().default('0'),
-  markupCharge: decimal('markup_charge', { precision: 10, scale: 2 }).notNull().default('0'),
-  markupPercentage: decimal('markup_percentage', { precision: 5, scale: 2 }).notNull().default('10'),
-  grandTotal: decimal('grand_total', { precision: 10, scale: 2 }).notNull().default('0'),
-  notes: text('notes'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const quotes = pgTable(
+  'quotes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sequentialId: serial('sequential_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    title: text('title').notNull(),
+    status: quoteStatusEnum('status').notNull().default('DRAFT'),
+    subtotalTasks: decimal('subtotal_tasks', { precision: 10, scale: 2 }).notNull().default('0'),
+    subtotalMaterials: decimal('subtotal_materials', { precision: 10, scale: 2 })
+      .notNull()
+      .default('0'),
+    complexityCharge: decimal('complexity_charge', { precision: 10, scale: 2 })
+      .notNull()
+      .default('0'),
+    markupCharge: decimal('markup_charge', { precision: 10, scale: 2 }).notNull().default('0'),
+    markupPercentage: decimal('markup_percentage', { precision: 5, scale: 2 })
+      .notNull()
+      .default('10'),
+    grandTotal: decimal('grand_total', { precision: 10, scale: 2 }).notNull().default('0'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('quotes_user_id_idx').on(table.userId),
+    statusIdx: index('quotes_status_idx').on(table.status),
+    createdAtIdx: index('quotes_created_at_idx').on(table.createdAt),
+  })
+);
 
 // Tasks table
 export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().defaultRandom(),
-  quoteId: text('quote_id')
+  quoteId: uuid('quote_id')
     .notNull()
     .references(() => quotes.id, { onDelete: 'cascade' }),
   description: text('description').notNull(),
@@ -193,30 +212,38 @@ export const tasks = pgTable('tasks', {
     .notNull()
     .default('0'),
   order: integer('order').notNull().default(0),
+  materialType: materialTypeEnum('material_type').notNull().default('ITEMIZED'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 // Products table
-export const products = pgTable('products', {
-  id: text('id').primaryKey(),
-  sequentialId: serial('sequential_id').notNull(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  description: text('description'),
-  category: productCategoryEnum('category').notNull(),
-  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
-  unit: text('unit').notNull(),
-  sku: text('sku'),
-  manufacturer: text('manufacturer'),
-  supplier: text('supplier'),
-  location: text('location'),
-  notes: text('notes'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const products = pgTable(
+  'products',
+  {
+    id: text('id').primaryKey(),
+    sequentialId: serial('sequential_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    category: productCategoryEnum('category').notNull(),
+    unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
+    unit: text('unit').notNull(),
+    sku: text('sku'),
+    manufacturer: text('manufacturer'),
+    supplier: text('supplier'),
+    location: text('location'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('products_user_id_idx').on(table.userId),
+    createdAtIdx: index('products_created_at_idx').on(table.createdAt),
+  })
+);
 
 // Update materials table to reference products
 export const materials = pgTable('materials', {
@@ -240,7 +267,7 @@ export const transactions = pgTable('transactions', {
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  quoteId: text('quote_id').references(() => quotes.id),
+  quoteId: uuid('quote_id').references(() => quotes.id),
   type: transactionTypeEnum('type').notNull(),
   category: transactionCategoryEnum('category').notNull(),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
@@ -304,10 +331,18 @@ export const settings = pgTable('settings', {
   companyEmail: text('company_email').notNull().default(''),
   companyPhone: text('company_phone'),
   companyAddress: text('company_address'),
-  defaultComplexityCharge: decimal('default_complexity_charge', { precision: 5, scale: 2 }).notNull().default('0'),
-  defaultMarkupCharge: decimal('default_markup_charge', { precision: 5, scale: 2 }).notNull().default('0'),
-  defaultTaskPrice: decimal('default_task_price', { precision: 10, scale: 2 }).notNull().default('0'),
-  defaultMaterialPrice: decimal('default_material_price', { precision: 10, scale: 2 }).notNull().default('0'),
+  defaultComplexityCharge: decimal('default_complexity_charge', { precision: 5, scale: 2 })
+    .notNull()
+    .default('0'),
+  defaultMarkupCharge: decimal('default_markup_charge', { precision: 5, scale: 2 })
+    .notNull()
+    .default('0'),
+  defaultTaskPrice: decimal('default_task_price', { precision: 10, scale: 2 })
+    .notNull()
+    .default('0'),
+  defaultMaterialPrice: decimal('default_material_price', { precision: 10, scale: 2 })
+    .notNull()
+    .default('0'),
   emailNotifications: boolean('email_notifications').notNull().default(true),
   quoteNotifications: boolean('quote_notifications').notNull().default(true),
   taskNotifications: boolean('task_notifications').notNull().default(true),
@@ -347,19 +382,26 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 }));
 
 // Customer table
-export const customers = pgTable('customers', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  email: text('email'),
-  phone: text('phone'),
-  address: text('address'),
-  notes: text('notes'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const customers = pgTable(
+  'customers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    email: text('email'),
+    phone: text('phone'),
+    address: text('address'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('customers_user_id_idx').on(table.userId),
+    createdAtIdx: index('customers_created_at_idx').on(table.createdAt),
+  })
+);
 
 // Customer relations
 export const customersRelations = relations(customers, ({ one, many }) => ({

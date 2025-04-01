@@ -14,36 +14,36 @@ interface PrintLayoutProps {
 export function PrintLayout({ children, title }: PrintLayoutProps) {
   const { t } = useTranslation();
   const pageTitle = title || t('print.document');
-  
+
   return (
-    <div className="print-layout bg-white min-h-screen">
+    <div className="print-layout min-h-screen bg-white">
       <Head>
         <title>{pageTitle}</title>
         <meta name="robots" content="noindex, nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
-      
-      <div className="print-header p-4 flex justify-between items-center border-b print:hidden">
+
+      <div className="print-header flex items-center justify-between border-b p-4 print:hidden">
         <h1 className="text-xl font-semibold">{pageTitle}</h1>
         <div className="print-controls">
-          <button 
+          <button
             onClick={() => window.print()}
-            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors"
+            className="bg-primary hover:bg-primary-dark rounded-md px-4 py-2 text-white transition-colors"
           >
             {t('print.printNow')}
           </button>
-          <button 
+          <button
             onClick={() => window.history.back()}
-            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md ml-2 hover:bg-gray-300 transition-colors"
+            className="ml-2 rounded-md bg-gray-200 px-4 py-2 text-gray-800 transition-colors hover:bg-gray-300"
           >
             {t('common.back')}
           </button>
         </div>
       </div>
-      
+
       <main className="p-4 md:p-8 print:p-0">{children}</main>
-      
-      <div className="print-footer text-center p-4 text-gray-500 text-sm print:hidden">
+
+      <div className="print-footer p-4 text-center text-sm text-gray-500 print:hidden">
         <p>{t('print.generatedOn', { date: new Date().toLocaleDateString() })}</p>
       </div>
     </div>
@@ -53,4 +53,4 @@ export function PrintLayout({ children, title }: PrintLayoutProps) {
 // Set display name for debugging
 PrintLayout.displayName = 'PrintLayout';
 
-export default PrintLayout; 
+export default PrintLayout;

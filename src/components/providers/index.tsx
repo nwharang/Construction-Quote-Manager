@@ -5,10 +5,12 @@ import { HeroUIProvider } from '@heroui/react';
 import { ToastContainer } from '~/components/shared/ToastContainer';
 import { LanguageMetaData } from '~/components/accessibility/LanguageMetaData';
 import { I18nProvider } from './I18nProvider';
+import { ThemeProvider } from './ThemeProvider';
+import type { Session } from 'next-auth';
 
 interface ProvidersProps {
   children: ReactNode;
-  session?: any;
+  session?: Session | null;
 }
 
 /**
@@ -18,13 +20,15 @@ interface ProvidersProps {
 export function Providers({ children, session }: ProvidersProps) {
   return (
     <SessionProvider session={session}>
-      <HeroUIProvider>
-        <I18nProvider>
-          <LanguageMetaData />
-          <ToastContainer />
-          {children}
-        </I18nProvider>
-      </HeroUIProvider>
+      <ThemeProvider>
+        <HeroUIProvider>
+          <I18nProvider>
+            <LanguageMetaData />
+            <ToastContainer />
+            {children}
+          </I18nProvider>
+        </HeroUIProvider>
+      </ThemeProvider>
     </SessionProvider>
   );
 }

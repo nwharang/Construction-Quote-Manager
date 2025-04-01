@@ -8,7 +8,6 @@ const nextConfig = {
     // Don't fail the build on ESLint warnings for now
     ignoreDuringBuilds: true,
     // Lint the entire project during builds
-    dirs: ['pages', 'components', 'lib', 'utils', 'hooks', 'contexts', 'styles'],
   },
 
   // Temporarily allow TypeScript errors during builds while we fix the warnings
@@ -30,6 +29,12 @@ const nextConfig = {
 
   images: {
     domains: ['images.unsplash.com', 'tailwindui.com'],
+  },
+  
+  // Improve hydration performance for theme switching
+  experimental: {
+    // Allow components with suppressHydrationWarning
+    optimizePackageImports: ['@heroui/react'],
   },
 };
 

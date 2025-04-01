@@ -437,9 +437,17 @@ export function useTranslation() {
       // Persist the locale preference to localStorage
       setPersistedLocale(newLocale);
       
-      // Update the URL with the new locale
-      const { pathname, asPath, query } = router;
-      router.push({ pathname, query }, asPath, { locale: newLocale, scroll: false });
+      // Only update the URL if the new locale is different from the current router locale
+      // This prevents unnecessary navigation/re-renders
+      if (newLocale !== router.locale) {
+        const { pathname, asPath, query } = router;
+        // Use the replace method instead of push to avoid adding entries to the browser history
+        router.replace({ pathname, query }, asPath, { 
+          locale: newLocale, 
+          scroll: false,
+          shallow: true // Use shallow routing to avoid a full page reload
+        });
+      }
       
       // Update the HTML lang attribute for accessibility
       if (typeof document !== 'undefined') {

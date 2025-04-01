@@ -4,6 +4,7 @@ import { settings } from '~/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
+// Schema for updating settings
 const updateSettingsInput = z.object({
   companyName: z.string().min(1, 'Company name is required'),
   companyEmail: z.string().email('Invalid email address'),
@@ -24,7 +25,7 @@ const updateSettingsInput = z.object({
   timeFormat: z.enum(['12h', '24h']),
 });
 
-// Default settings
+// Default settings configuration
 const defaultSettings = {
   companyName: '',
   companyEmail: '',
@@ -48,31 +49,37 @@ const defaultSettings = {
 export const settingsRouter = createTRPCRouter({
   get: protectedProcedure.query(async ({ ctx }) => {
     try {
-      // Use staleTime to cache the settings for 5 minutes (300000ms)
-      // This is configured on the client side in utils/api.ts
-
+      // 1. Get user ID from session
+      const userId = ctx.session.user.id;
+      
+      // 2. Find user settings
       const userSettings = await ctx.db
         .select()
         .from(settings)
-        .where(eq(settings.userId, ctx.session.user.id))
+        .where(eq(settings.userId, userId))
         .limit(1);
 
+      // 3. Create default settings if none exist
       if (!userSettings[0]) {
         // Create default settings if none exist
         const [newSettings] = await ctx.db
           .insert(settings)
           .values({
-            userId: ctx.session.user.id,
+            userId: userId,
             ...defaultSettings,
           })
           .returning();
 
-        return newSettings;
+        // 4. Convert numeric string values to numbers for client consumption
+        return processSettingsForClient(newSettings);
       }
 
-      return userSettings[0];
+      // 5. Convert numeric string values to numbers for client consumption
+      return processSettingsForClient(userSettings[0]);
     } catch (error) {
+      // 6. Handle errors
       console.error('Error fetching settings:', error);
+      if (error instanceof TRPCError) throw error;
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to fetch settings',
@@ -81,37 +88,73 @@ export const settingsRouter = createTRPCRouter({
     }
   }),
 
-  update: protectedProcedure.input(updateSettingsInput).mutation(async ({ ctx, input }) => {
-    try {
-      const [updatedSettings] = await ctx.db
-        .update(settings)
-        .set({
+  update: protectedProcedure
+    .input(updateSettingsInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // 1. Get user ID from session
+        const userId = ctx.session.user.id;
+        
+        // 2. Convert numeric values to strings for database storage
+        const dataToUpdate = {
           ...input,
           defaultComplexityCharge: input.defaultComplexityCharge.toString(),
           defaultMarkupCharge: input.defaultMarkupCharge.toString(),
           defaultTaskPrice: input.defaultTaskPrice.toString(),
           defaultMaterialPrice: input.defaultMaterialPrice.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.userId, ctx.session.user.id))
-        .returning();
+        };
 
-      if (!updatedSettings) {
+        // 3. Update settings
+        const [updatedSettings] = await ctx.db
+          .update(settings)
+          .set({
+            ...dataToUpdate,
+            updatedAt: new Date(),
+          })
+          .where(eq(settings.userId, userId))
+          .returning();
+
+        // 4. Verify update was successful
+        if (!updatedSettings) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Settings not found',
+          });
+        }
+
+        // 5. Convert numeric string values to numbers for client consumption
+        return processSettingsForClient(updatedSettings);
+      } catch (error) {
+        // 6. Handle errors
+        console.error('Error updating settings:', error);
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Settings not found',
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update settings',
+          cause: error,
         });
       }
-
-      return updatedSettings;
-    } catch (error) {
-      console.error('Error updating settings:', error);
-      if (error instanceof TRPCError) throw error;
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to update settings',
-        cause: error,
-      });
-    }
-  }),
+    }),
 });
+
+/**
+ * Helper function to convert string numeric values to actual numbers
+ * for client consumption
+ */
+function processSettingsForClient(settingsData: any) {
+  return {
+    ...settingsData,
+    defaultComplexityCharge: typeof settingsData.defaultComplexityCharge === 'string' 
+      ? parseFloat(settingsData.defaultComplexityCharge) 
+      : settingsData.defaultComplexityCharge,
+    defaultMarkupCharge: typeof settingsData.defaultMarkupCharge === 'string' 
+      ? parseFloat(settingsData.defaultMarkupCharge) 
+      : settingsData.defaultMarkupCharge,
+    defaultTaskPrice: typeof settingsData.defaultTaskPrice === 'string' 
+      ? parseFloat(settingsData.defaultTaskPrice) 
+      : settingsData.defaultTaskPrice,
+    defaultMaterialPrice: typeof settingsData.defaultMaterialPrice === 'string' 
+      ? parseFloat(settingsData.defaultMaterialPrice) 
+      : settingsData.defaultMaterialPrice,
+  };
+}

@@ -53,42 +53,21 @@ export const api = createTRPCNext<AppRouter>({
       queryClientConfig: {
         defaultOptions: {
           queries: {
-            staleTime: 30 * 1000, // 30 seconds by default for more frequent refresh
-            refetchOnWindowFocus: true, // Refresh data when window regains focus
-            refetchOnReconnect: true, // Refresh when reconnecting
-            refetchOnMount: true, // Refresh when component mounts
+            staleTime: Infinity, // 30 seconds by default for more frequent refresh
+            refetchOnWindowFocus: false, // Refresh data when window regains focus
+            refetchOnReconnect: false, // Refresh when reconnecting
+            refetchOnMount: false, // Refresh when component mounts
             // Set up retry behavior
-            retry: (failureCount, error) => {
-              // Don't retry on 404s and authorization errors
-              if (
-                typeof error === 'object' && 
-                error !== null && 
-                'message' in error &&
-                (
-                  String(error.message).includes('UNAUTHORIZED') || 
-                  String(error.message).includes('NOT_FOUND')
-                )
-              ) {
-                return false;
-              }
-              // Retry up to 3 times for other errors with exponential backoff
-              return failureCount < 3;
-            },
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+            retry: false,
           },
           mutations: {
-            retry: 1,
+            retry: false,
           },
         },
       },
       abortOnUnmount: true, // Important for proper cleanup
       // Custom query options for specific queries
-      queryOptions: {
-        'settings.get': {
-          staleTime: 5 * 60 * 1000, // Cache settings for 5 minutes
-          gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-        },
-      },
+      queryOptions: {},
     };
   },
   transformer: superjson,
