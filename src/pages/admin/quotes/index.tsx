@@ -39,6 +39,7 @@ import { QuoteDetailModal } from '~/components/quotes/QuoteDetailModal';
 import { QuoteViewModal } from '~/components/quotes/QuoteViewModal';
 import { formatCurrency } from '~/utils/currency';
 import { formatDate, formatUserFriendlyId } from '~/utils/formatters';
+import type { QuoteStatusType } from '~/server/db/schema-exports';
 
 // Get the types from the router
 type RouterOutput = inferRouterOutputs<AppRouter>;
@@ -50,7 +51,7 @@ type QuoteItem = NonNullable<QuoteListResponse['items']>[number];
 
 // Map status to display settings
 const QuoteStatusSettings: Record<
-  string,
+  QuoteStatusType,
   { color: 'default' | 'primary' | 'success' | 'danger'; label: string }
 > = {
   DRAFT: { color: 'default', label: 'Draft' },
@@ -125,26 +126,33 @@ const QuotesPage: NextPageWithLayout = () => {
     setMounted(true);
   }, []);
 
-  // Set global entity settings for the EntityList component
+  // Set global entity settings once when component mounts
   useEffect(() => {
-    entityStore.setEntitySettings({
-      // Add empty object {} as second argument
-      entityName: t('quotes.entityName', {}),
-      entityType: 'quotes',
-      baseUrl: '/admin/quotes',
-      displayNameField: 'title',
-      canView: true,
-      canEdit: true,
-      canDelete: false,
-      listPath: '/admin/quotes',
-      createPath: '#',
-      editPath: '/admin/quotes/:id/edit',
-      viewPath: '/admin/quotes/:id',
-    });
+    if (mounted) {
+      entityStore.setEntitySettings({
+        entityName: t('quotes.entityName', {}),
+        entityType: 'quotes',
+        baseUrl: '/admin/quotes',
+        displayNameField: 'title',
+        canView: true,
+        canEdit: true,
+        canDelete: false,
+        listPath: '/admin/quotes',
+        createPath: '#',
+        editPath: '#',
+        viewPath: '#',
+      });
+    }
+  }, [mounted]); // Only depend on mounted state
 
-    // Clean up
-    return () => entityStore.resetEntitySettings();
-  }, []);
+  // Clean up entity settings when component unmounts
+  useEffect(() => {
+    return () => {
+      if (mounted) {
+        entityStore.resetEntitySettings();
+      }
+    };
+  }, [mounted]); // Only depend on mounted state
 
   // Render loading state
   if (!mounted || sessionStatus === 'loading') {
@@ -182,21 +190,27 @@ const QuotesPage: NextPageWithLayout = () => {
     }
   };
 
-  // Navigate to create quote page
+  // Open Create Modal
   const handleCreateQuote = () => {
     onCreateOpen();
   };
 
-  // Navigate to view quote - Now opens modal
+  // Open View Modal
   const handleViewQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
     onViewOpen();
   };
 
-  // Navigate to edit quote - Opens modal
+  // Open Edit Modal
   const handleEditQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
     onDetailOpen();
+  };
+
+  // Function to handle opening Detail modal after creation
+  const handleCreateSuccess = (newQuoteId: string) => {
+    onCreateClose(); // Close the create modal
+    handleEditQuote(newQuoteId); // Open the detail/edit modal for the new quote
   };
 
   const handleSendQuote = async (quote: QuoteItem) => {
@@ -212,7 +226,7 @@ const QuotesPage: NextPageWithLayout = () => {
   const renderCell = (quote: QuoteItem, columnKey: string) => {
     switch (columnKey) {
       case 'id':
-        return <div>{formatUserFriendlyId(quote.id, quote.sequentialId)}</div>;
+        return <div>#{quote.sequentialId}</div>;
       case 'title':
         return (
           <div className="flex flex-col">
@@ -234,7 +248,7 @@ const QuotesPage: NextPageWithLayout = () => {
         return <span className="text-default-500 text-sm">{t('common.notAvailable')}</span>;
       case 'status': {
         const statusKey = (quote.status ?? 'UNKNOWN').toUpperCase();
-        const baseSetting = QuoteStatusSettings[statusKey] || {
+        const baseSetting = QuoteStatusSettings[statusKey as QuoteStatusType] || {
           color: 'default',
           label: 'Unknown',
         };
@@ -297,53 +311,64 @@ const QuotesPage: NextPageWithLayout = () => {
         <title>{t('quotes.pageTitle')}</title>
       </Head>
       <div className="flex flex-col gap-4 p-4 sm:p-6">
-        {/* Header */}
-        <div className="mb-4 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            {/* Remove empty object {} */}
-            <h1 className="text-xl font-bold">{t('quotes.header')}</h1>
-            {/* Remove empty object {} */}
-            <Button color="primary" startContent={<Plus size={16} />} onPress={onCreateOpen}>
-              {t('quotes.createAction')}
-            </Button>
-          </div>
-          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        {/* Top Bar - Actions */}
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{t('quotes.listTitle')}</h1>
+          <div className="flex gap-2">
+            {/* Search Input */}
             <Input
-              placeholder={t('quotes.searchPlaceholder')}
+              isClearable
+              placeholder={t('common.searchPlaceholder')}
+              startContent={<Search size={18} />}
               value={searchQuery}
               onValueChange={setSearchQuery}
-              startContent={<Search size={16} className="text-default-300" />}
               className="w-full sm:max-w-[44%]"
             />
+            {/* Status Filter */}
             <Select
-              label={t('common.status')}
-              className="w-full sm:max-w-[200px]"
-              selectedKeys={[statusFilter]}
+              label={t('common.statusFilterLabel')}
+              placeholder={t('common.allStatuses')}
+              selectedKeys={statusFilter !== 'all' ? [statusFilter] : []}
               onSelectionChange={(keys) => {
-                const selected = Array.from(keys)[0]?.toString() || 'all';
-                setStatusFilter(selected);
+                // Handle Set<React.Key> type for selectedKeys
+                const selectedKey = Array.from(keys)[0];
+                setStatusFilter(selectedKey ? String(selectedKey) : 'all');
+                setPage(1); // Reset page when filter changes
               }}
+              size="md"
+              className="max-w-[150px]"
             >
-              <SelectItem key="all">{String(t('quotes.status.all'))}</SelectItem>
-              <SelectItem key="DRAFT">{String(t('quotes.status.draft'))}</SelectItem>
-              <SelectItem key="SENT">{String(t('quotes.status.sent'))}</SelectItem>
-              <SelectItem key="ACCEPTED">{String(t('quotes.status.accepted'))}</SelectItem>
-              <SelectItem key="REJECTED">{String(t('quotes.status.rejected'))}</SelectItem>
+              <SelectItem key="all">{t('common.allStatuses')}</SelectItem>
+              <>
+                {Object.entries(QuoteStatusSettings).map(([key, setting]) => (
+                  <SelectItem key={key}>
+                    {t(`quotes.status.${key.toLowerCase()}`, { defaultValue: setting.label })}
+                  </SelectItem>
+                ))}
+              </>
             </Select>
+            {/* Create Button */}
+            <Button color="primary" startContent={<Plus size={18} />} onClick={handleCreateQuote}>
+              {t('quotes.createButton')}
+            </Button>
           </div>
         </div>
 
-        {/* Table */}
-        <Card className="flex-grow">
-          <CardBody className="p-0">
-            {isLoading ? (
-              <div className="flex h-64 items-center justify-center">
-                <Spinner />
-              </div>
-            ) : (
+        {/* Loading state for table */}
+        {isLoading ? (
+          <div className="flex h-64 items-center justify-center">
+            <Spinner />
+          </div>
+        ) : (
+          <Card>
+            <CardBody>
+              {/* Main Table */}
               <Table
                 aria-label={t('quotes.listAriaLabel')}
-                sortDescriptor={{ column: sortColumn, direction: sortDirection }}
+                sortDescriptor={{
+                  column: sortColumn,
+                  direction: sortDirection,
+                }}
                 onSortChange={handleSortChange}
                 bottomContent={
                   totalQuotes > 0 ? (
@@ -355,7 +380,7 @@ const QuotesPage: NextPageWithLayout = () => {
                         color="primary"
                         page={page}
                         total={Math.ceil(totalQuotes / rowsPerPage)}
-                        onChange={(page) => setPage(page)}
+                        onChange={(newPage) => setPage(newPage)}
                       />
                     </div>
                   ) : null
@@ -363,7 +388,12 @@ const QuotesPage: NextPageWithLayout = () => {
               >
                 <TableHeader columns={columns}>
                   {(column) => (
-                    <TableColumn key={column.key} allowsSorting={column.allowSort}>
+                    <TableColumn
+                      key={column.key}
+                      // Add conditional alignment for total column
+                      className={column.key === 'total' ? 'text-right' : 'text-left'}
+                      allowsSorting={column.allowSort}
+                    >
                       {column.label}
                     </TableColumn>
                   )}
@@ -371,42 +401,47 @@ const QuotesPage: NextPageWithLayout = () => {
                 <TableBody items={quotes} emptyContent={t('quotes.noQuotesFound')}>
                   {(item) => (
                     <TableRow key={item.id}>
-                      {(columnKey) => <TableCell>{renderCell(item, String(columnKey))}</TableCell>}
+                      {(columnKey) => (
+                        <TableCell className={columnKey === 'total' ? 'text-right' : 'text-left'}>
+                          {renderCell(item, String(columnKey))}
+                        </TableCell>
+                      )}
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
-            )}
-          </CardBody>
-        </Card>
-      </div>
+            </CardBody>
+          </Card>
+        )}
 
-      {/* Create Quote Modal */}
-      <CreateQuoteModal isOpen={isCreateOpen} onClose={onCreateClose} />
+        {/* Create Modal */}
+        <CreateQuoteModal
+          isOpen={isCreateOpen}
+          onClose={onCreateClose}
+          onSuccess={handleCreateSuccess} // Pass the success handler
+        />
 
-      {/* Quote Detail/Edit Modal */}
-      {selectedQuoteId && (
+        {/* Detail/Edit Modal */}
         <QuoteDetailModal
+          quoteId={selectedQuoteId}
           isOpen={isDetailOpen}
           onClose={() => {
-            onDetailClose();
             setSelectedQuoteId(null);
+            onDetailClose();
           }}
-          quoteId={selectedQuoteId}
+          onSaveSuccess={() => refetch()} // Refetch list after saving changes
         />
-      )}
 
-      {/* Quote View Modal */}
-      {selectedQuoteId && (
+        {/* View Modal */}
         <QuoteViewModal
+          quoteId={selectedQuoteId}
           isOpen={isViewOpen}
           onClose={() => {
-            onViewClose();
             setSelectedQuoteId(null);
+            onViewClose();
           }}
-          quoteId={selectedQuoteId}
         />
-      )}
+      </div>
     </>
   );
 };

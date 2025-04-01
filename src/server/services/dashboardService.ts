@@ -1,13 +1,17 @@
 import { TRPCError } from '@trpc/server';
 import { sql, eq, desc } from 'drizzle-orm';
 import { quotes, customers, type QuoteStatusType } from '../db/schema';
-import { type DB, toNumber } from './index';
+import { type DB } from './index';
+import { BaseService } from './baseService';
+import type { Session } from 'next-auth';
 
 /**
  * Service layer for handling dashboard-related business logic
  */
-export class DashboardService {
-  constructor(private db: DB) {}
+export class DashboardService extends BaseService {
+  constructor(db: DB, ctx: { session: Session | null }) {
+    super(db, ctx);
+  }
 
   /**
    * Get dashboard statistics for quotes
@@ -61,29 +65,41 @@ export class DashboardService {
       }
 
       // Process quotes to convert string numeric values to numbers
-      const processedRecentQuotes = recentQuotes.map(({ quote, customer }: { quote: any; customer: any }) => ({
-        ...quote,
-        customer: customer || null,
-        subtotalTasks: toNumber(quote.subtotalTasks),
-        subtotalMaterials: toNumber(quote.subtotalMaterials),
-        complexityCharge: toNumber(quote.complexityCharge),
-        markupCharge: toNumber(quote.markupCharge),
-        markupPercentage: toNumber(quote.markupPercentage),
-        grandTotal: toNumber(quote.grandTotal),
-      }));
+      const processedRecentQuotes = recentQuotes.map(
+        ({ quote, customer }: { quote: any; customer: any }) => ({
+          ...quote,
+          customer: customer || null,
+          subtotalTasks: this.toNumber(quote.subtotalTasks),
+          subtotalMaterials: this.toNumber(quote.subtotalMaterials),
+          complexityCharge: this.toNumber(quote.complexityCharge),
+          markupCharge: this.toNumber(quote.markupCharge),
+          markupPercentage: this.toNumber(quote.markupPercentage),
+          grandTotal: this.toNumber(quote.grandTotal),
+        })
+      );
 
       // Process top customers to convert string numeric values to numbers
-      const processedTopCustomers = topCustomers.map(({ customer, totalRevenue, quoteCount }: { customer: any; totalRevenue: string; quoteCount: number }) => ({
-        ...customer,
-        totalRevenue: toNumber(totalRevenue),
-        quoteCount: Number(quoteCount || 0),
-      }));
+      const processedTopCustomers = topCustomers.map(
+        ({
+          customer,
+          totalRevenue,
+          quoteCount,
+        }: {
+          customer: any;
+          totalRevenue: string;
+          quoteCount: number;
+        }) => ({
+          ...customer,
+          totalRevenue: this.toNumber(totalRevenue),
+          quoteCount: this.toNumber(quoteCount || 0),
+        })
+      );
 
       return {
-        totalQuotes: Number(stats[0].totalQuotes || 0),
-        acceptedQuotes: Number(stats[0].acceptedQuotes || 0),
-        totalCustomers: Number(stats[0].totalCustomers || 0),
-        totalRevenue: toNumber(stats[0].totalRevenue),
+        totalQuotes: this.toNumber(stats[0].totalQuotes || 0),
+        acceptedQuotes: this.toNumber(stats[0].acceptedQuotes || 0),
+        totalCustomers: this.toNumber(stats[0].totalCustomers || 0),
+        totalRevenue: this.toNumber(stats[0].totalRevenue),
         recentQuotes: processedRecentQuotes,
         topCustomers: processedTopCustomers,
       };
@@ -97,4 +113,4 @@ export class DashboardService {
       });
     }
   }
-} 
+}

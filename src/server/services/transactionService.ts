@@ -1,13 +1,23 @@
 import { TRPCError } from '@trpc/server';
 import { and, eq, sql, desc, gte, lte } from 'drizzle-orm';
-import { transactions, TransactionType, TransactionCategory, type TransactionTypeType, type TransactionCategoryType } from '../db/schema';
-import { type DB, toNumber } from './index';
+import {
+  transactions,
+  TransactionType,
+  TransactionCategory,
+  type TransactionTypeType,
+  type TransactionCategoryType,
+} from '../db/schema';
+import { type DB } from './index';
+import type { Session } from 'next-auth';
+import { BaseService } from './baseService';
 
 /**
  * Service layer for handling transaction-related business logic
  */
-export class TransactionService {
-  constructor(private db: DB) {}
+export class TransactionService extends BaseService {
+  constructor(db: DB, ctx: { session: Session | null }) {
+    super(db, ctx);
+  }
 
   /**
    * Get all transactions with filtering and pagination
@@ -79,22 +89,11 @@ export class TransactionService {
   /**
    * Get a transaction by ID
    */
-  async getTransactionById({
-    id,
-    userId,
-  }: {
-    id: string;
-    userId: string;
-  }) {
+  async getTransactionById({ id, userId }: { id: string; userId: string }) {
     const transaction = await this.db
       .select()
       .from(transactions)
-      .where(
-        and(
-          eq(transactions.id, id),
-          eq(transactions.userId, userId)
-        )
-      )
+      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
       .limit(1);
 
     if (!transaction[0]) {
@@ -188,19 +187,11 @@ export class TransactionService {
   /**
    * Delete a transaction
    */
-  async deleteTransaction({
-    id,
-    userId,
-  }: {
-    id: string;
-    userId: string;
-  }) {
+  async deleteTransaction({ id, userId }: { id: string; userId: string }) {
     // Verify transaction exists and belongs to user
     await this.getTransactionById({ id, userId });
 
-    await this.db
-      .delete(transactions)
-      .where(eq(transactions.id, id));
+    await this.db.delete(transactions).where(eq(transactions.id, id));
 
     return { success: true };
   }
@@ -300,7 +291,7 @@ export class TransactionService {
   private processTransaction(transactionData: any) {
     return {
       ...transactionData,
-      amount: toNumber(transactionData.amount),
+      amount: this.toNumber(transactionData.amount),
     };
   }
-} 
+}

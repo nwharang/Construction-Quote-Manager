@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
-import { quotes, tasks, materials, QuoteStatus, customers } from '~/server/db/schema';
+import {
+  quotes,
+  tasks,
+  materials,
+  QuoteStatus,
+  customers,
+  type QuoteStatusType,
+} from '~/server/db/schema';
 import { and, eq, ilike, or, sql, desc, type SQL, ne, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { createServices } from '~/server/services';
@@ -20,19 +27,24 @@ export const quoteRouter = createTRPCRouter({
         sortOrder: z.enum(['asc', 'desc']).optional(),
       })
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input, ctx }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Pass input WITHOUT userId
         const quotes = await services.quote.getAllQuotes({
-          ...input, 
-          // userId removed from this call
+          ...input,
+        } as {
+          search?: string;
+          customerId?: string;
+          status?: QuoteStatusType;
+          page: number;
+          limit: number;
         });
-        
+
         return quotes;
       } catch (error) {
-        console.error("Error getting quotes:", error);
+        console.error('Error getting quotes:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -43,23 +55,25 @@ export const quoteRouter = createTRPCRouter({
     }),
 
   getById: protectedProcedure
-    .input(z.object({
-      id: z.string().min(1, 'Quote ID is required'),
-    }))
+    .input(
+      z.object({
+        id: z.string().min(1, 'Quote ID is required'),
+      })
+    )
     .query(async ({ ctx, input }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Pass input WITHOUT userId
         const quote = await services.quote.getQuoteById({
           id: input.id,
           includeRelated: true,
           // userId removed from this call
         });
-        
+
         return quote;
       } catch (error) {
-        console.error("Error getting quote:", error);
+        console.error('Error getting quote:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -76,7 +90,8 @@ export const quoteRouter = createTRPCRouter({
         customerId: z.string().uuid('Valid customer ID is required'),
         notes: z.string().optional().nullable(),
         markupPercentage: z.number().min(0).default(10),
-        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
+        status: z
+          .enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
           .optional(),
         tasks: z
           .array(
@@ -104,8 +119,8 @@ export const quoteRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Explicitly map input to service data structure
         const serviceData = {
           customerId: input.customerId,
@@ -113,12 +128,12 @@ export const quoteRouter = createTRPCRouter({
           status: input.status,
           markupPercentage: input.markupPercentage,
           notes: input.notes ?? undefined, // Map null to undefined
-          tasks: input.tasks?.map(task => ({
+          tasks: input.tasks?.map((task) => ({
             description: task.description,
             price: task.price,
             materialType: task.materialType,
             estimatedMaterialsCost: task.estimatedMaterialsCost,
-            materials: task.materials?.map(mat => ({
+            materials: task.materials?.map((mat) => ({
               // name/description removed
               productId: mat.productId,
               quantity: mat.quantity,
@@ -129,13 +144,13 @@ export const quoteRouter = createTRPCRouter({
         };
 
         const quote = await services.quote.createQuote({
-          data: serviceData, 
-          userId: 'system-user', 
+          data: serviceData,
+          userId: 'system-user',
         });
-        
+
         return quote;
       } catch (error) {
-        console.error("Error creating quote:", error);
+        console.error('Error creating quote:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -152,7 +167,8 @@ export const quoteRouter = createTRPCRouter({
         title: z.string().min(1, 'Title is required').optional(),
         customerId: z.string().uuid('Valid customer ID is required').optional(),
         notes: z.string().optional().nullable(),
-        status: z.enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
+        status: z
+          .enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
           .optional(),
         markupPercentage: z.number().min(0).optional(),
         tasks: z
@@ -177,15 +193,15 @@ export const quoteRouter = createTRPCRouter({
                   })
                 )
                 .optional(),
-              })
-            )
-            .optional(),
+            })
+          )
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Explicitly map input to service data structure
         const serviceData = {
           customerId: input.customerId,
@@ -193,13 +209,13 @@ export const quoteRouter = createTRPCRouter({
           status: input.status,
           markupPercentage: input.markupPercentage,
           notes: input.notes ?? undefined, // Map null to undefined
-          tasks: input.tasks?.map(task => ({
+          tasks: input.tasks?.map((task) => ({
             id: task.id,
             description: task.description,
             price: task.price,
             materialType: task.materialType,
             estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum,
-            materials: task.materials?.map(mat => ({
+            materials: task.materials?.map((mat) => ({
               id: mat.id,
               // name/description removed
               productId: mat.productId ?? undefined, // Map null to undefined for optional DB field?
@@ -212,13 +228,13 @@ export const quoteRouter = createTRPCRouter({
 
         const quote = await services.quote.updateQuote({
           id: input.id,
-          data: serviceData, 
-          userId: 'system-user', 
+          data: serviceData,
+          userId: 'system-user',
         });
 
         return quote;
       } catch (error) {
-        console.error("Error updating quote:", error);
+        console.error('Error updating quote:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -229,22 +245,24 @@ export const quoteRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({
-      id: z.string().min(1, 'Quote ID is required'),
-    }))
+    .input(
+      z.object({
+        id: z.string().min(1, 'Quote ID is required'),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Keep passing userId (placeholder)
         const result = await services.quote.deleteQuote({
           id: input.id,
-          userId: 'system-user', 
+          userId: 'system-user',
         });
-        
+
         return result;
       } catch (error) {
-        console.error("Error deleting quote:", error);
+        console.error('Error deleting quote:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -256,10 +274,10 @@ export const quoteRouter = createTRPCRouter({
 
   getDashboardStats: protectedProcedure.query(async ({ ctx }) => {
     try {
-      const services = createServices();
-      
+      const services = createServices(ctx);
+
       const stats = await services.dashboard.getDashboardStats('system-user'); // Use a consistent system user
-      
+
       return stats;
     } catch (error) {
       console.error('Dashboard stats error:', error);
@@ -282,19 +300,19 @@ export const quoteRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Keep passing userId (placeholder)
         const updatedQuote = await services.quote.updateCharges({
           id: input.id,
           complexityCharge: input.complexityCharge,
           markupCharge: input.markupCharge,
-          userId: 'system-user', 
+          userId: 'system-user',
         });
-        
+
         return updatedQuote;
       } catch (error) {
-        console.error("Error updating quote charges:", error);
+        console.error('Error updating quote charges:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -318,18 +336,18 @@ export const quoteRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Keep passing userId (placeholder)
         const updatedQuote = await services.quote.updateStatus({
           id: input.id,
           status: input.status,
-          userId: 'system-user', 
+          userId: 'system-user',
         });
-        
+
         return updatedQuote;
       } catch (error) {
-        console.error("Error updating quote status:", error);
+        console.error('Error updating quote status:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -362,31 +380,31 @@ export const quoteRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // Explicitly map input to service taskData structure
         const serviceTaskData = {
-            description: input.description,
-            price: input.price,
-            materialType: input.materialType,
-            estimatedMaterialsCost: input.estimatedMaterialsCost,
-            materials: input.materials?.map(mat => ({
-              // name/description removed
-              productId: mat.productId,
-              quantity: mat.quantity,
-              unitPrice: mat.unitPrice,
-              notes: mat.notes ?? undefined, // Map null to undefined
-            })),
+          description: input.description,
+          price: input.price,
+          materialType: input.materialType,
+          estimatedMaterialsCost: input.estimatedMaterialsCost,
+          materials: input.materials?.map((mat) => ({
+            // name/description removed
+            productId: mat.productId,
+            quantity: mat.quantity,
+            unitPrice: mat.unitPrice,
+            notes: mat.notes ?? undefined, // Map null to undefined
+          })),
         };
 
         const task = await services.quote.addTask({
           quoteId: input.quoteId,
-          taskData: serviceTaskData, 
+          taskData: serviceTaskData,
         });
 
         return task;
       } catch (error) {
-        console.error("Error adding task:", error);
+        console.error('Error adding task:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -400,7 +418,7 @@ export const quoteRouter = createTRPCRouter({
   // Assuming task updates/deletes happen via quote update for now.
   // Let's stub placeholder routers for task/material updates/deletes
   // if they are intended to be standalone.
-  
+
   // Example placeholder if updateTask was meant to be standalone:
   /*
   updateTask: protectedProcedure
@@ -415,7 +433,7 @@ export const quoteRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => { 
-        const services = createServices();
+        const services = createServices(ctx);
         const { taskId, ...taskData } = input;
         return services.quote.updateTask({ taskId, taskData });
     }),
@@ -426,11 +444,11 @@ export const quoteRouter = createTRPCRouter({
   deleteTask: protectedProcedure
     .input(z.object({ taskId: z.string().uuid() })) // NO userId
     .mutation(async ({ ctx, input }) => {
-        const services = createServices();
+        const services = createServices(ctx);
         return services.quote.deleteTask({ taskId: input.taskId });
      }),
   */
-  
+
   // Example placeholder if addMaterial was meant to be standalone:
   /*
   addMaterial: protectedProcedure
@@ -445,7 +463,7 @@ export const quoteRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => { 
-      const services = createServices();
+      const services = createServices(ctx);
       const { taskId, ...materialData } = input;
       return services.quote.addMaterial({ taskId, materialData });
     }),

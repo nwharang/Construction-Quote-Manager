@@ -31,9 +31,10 @@ type CreateQuoteForm = z.infer<ReturnType<typeof getCreateQuoteSchema>>;
 interface CreateQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (newQuoteId: string) => void;
 }
 
-export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
+export function CreateQuoteModal({ isOpen, onClose, onSuccess }: CreateQuoteModalProps) {
   const router = useRouter();
   const toast = useToastStore();
   const { t } = useTranslation();
@@ -58,8 +59,11 @@ export function CreateQuoteModal({ isOpen, onClose }: CreateQuoteModalProps) {
     onSuccess: (newQuote) => {
       toast.success(`Quote "${newQuote.title}" created successfully`);
       reset();
-      onClose();
-      router.push(`/admin/quotes/${newQuote.id}/edit`);
+      if (onSuccess) {
+        onSuccess(newQuote.id);
+      } else {
+        onClose();
+      }
     },
     onError: (error) => {
       toast.error(`Error creating quote: ${error.message}`);

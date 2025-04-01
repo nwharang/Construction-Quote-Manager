@@ -2,29 +2,36 @@
 
 **Objective:** Create a web app for generating quotes based on **Tasks** (Labor) + **Materials** (Lump Sum OR Itemized). Core goals are ease of use, speed, **strict consistency**, robust security, and **error-free implementation**.
 
-**Core Workflow (Quote Management - Standardized Flow):**
+**Core Workflow (Quote Management - Hybrid Flow):**
 
-1.  **List & Initial Creation (List Page & Create Modal):**
+1.  **List & Creation:**
     - Quotes list is displayed on `/admin/quotes`.
-    - New quote creation is initiated via a **standardized modal** (`CreateQuoteModal`) launched from the list page using a dedicated "Create Quote" button and the `useDisclosure` hook.
-    - This initial modal collects **only essential header information**: Project Title (`Input`), Customer (`CustomerSelector`), and optional Notes (`Textarea`). **(Uses Standardized Modal Layout & Form Handling)**
-2.  **Detailed Configuration (Detail/Edit Modal):**
-    - Upon successful initial creation in the `CreateQuoteModal`, or when clicking an "Edit" action on the list page, a **standardized detail/edit modal** (e.g., `QuoteDetailModal`) is opened.
-    - This modal is responsible for adding/modifying the full quote details:
-      - **Add Tasks:** Dynamically add `TaskInputRow` components. Each **MUST consistently** contain:
-        - `description` (`Textarea`).
-        - `Task Price` (Currency `NumberInput`).
-        - Materials Choice (Radio/Select): **Lump Sum OR Itemized** (Enforce exclusivity per task via backend validation).
-          - **Lump Sum:** `estimatedMaterialsCostLumpSum` (Currency `NumberInput`).
-          - **Itemized:** Add `MaterialInputRow`s: `name` (`Input`), `quantity` (Int `NumberInput`), `unitPrice` (Currency `NumberInput`), optional `Product` lookup (`ProductSelector` / `Autocomplete` / `Select`).
-      - **Review Totals (Real-time UI):** Display `subtotalTasks`, `subtotalMaterials`, `subtotalCombined`. **(Clear & Immediate Feedback)**
-      - **Adjustments:** `complexityCharge` (%), `markupCharge` (%) via Percentage `NumberInput`. Display calculated amounts. **(Simple & Understandable)**
-      - **Final Total:** Prominently display `grandTotal`.
-    - **Prefetching:** To enhance responsiveness, data required for the `QuoteDetailModal` (e.g., full quote details including tasks/materials for editing, product lists for selection) **SHOULD** be prefetched in the background when the creation or edit action is initiated (e.g., on `CreateQuoteModal` success, on hover/focus/click of the list item's edit button).
-3.  **Save/Output:** A "Save" or "Update" button within the `QuoteDetailModal` persists data via the appropriate backend service call (`api.quote.update` or similar). "View"/"Print" actions can be triggered from the list page or potentially the detail modal via standard patterns.
+    - Creation can be initiated via:
+        - A **standardized modal** (`CreateQuoteModal`) launched from the list page (`/admin/quotes`) using a "Create" button and `useDisclosure`.
+            - This modal collects essential header info: Title, Customer, optional Notes.
+            - **On success, it currently redirects to the dedicated edit page (`/admin/quotes/[id]/edit`).**
+        - Navigating directly to the dedicated `/admin/quotes/new` page.
+            - This page allows creating a quote with full details (tasks, materials, etc.) using a different form setup (potentially Zustand-based).
+2.  **Detailed Configuration / Editing:**
+    - Editing/Adding full details can be done via:
+        - A **standardized detail/edit modal** (`QuoteDetailModal`) launched from the list page (`/admin/quotes`) using an "Edit" action.
+            - This modal uses TanStack Form for managing the full quote details.
+            - **Add Tasks:** Uses the `TaskList` component, which renders fields internally using TanStack Form helpers.
+                - `description` (`Textarea`).
+                - `Task Price` (Currency `NumberInput`).
+                - Materials Choice (Radio): Lump Sum (`estimatedMaterialsCostLumpSum`) OR Itemized (using nested fields for quantity, unitPrice, `ProductSelector`, notes).
+            - **Review Totals:** Displays calculated totals via `QuoteSummary`.
+            - **Adjustments:** `markupCharge` (%).
+            - **Final Total:** Display `grandTotal`.
+        - Navigating to the dedicated edit page (`/admin/quotes/[id]/edit`), linked from the view page (`/admin/quotes/[id]`) and reached after modal creation.
+            - This page seems to use a `useReducer` pattern for state management and includes components like `MaterialInputRow`.
+    - **Prefetching:** Data prefetching for the `QuoteDetailModal` (when opened from the list) is recommended.
+3.  **Save/Output:**
+    - Saving occurs via buttons within `QuoteDetailModal`, `/admin/quotes/new`, or `/admin/quotes/[id]/edit`, using appropriate backend calls (`api.quote.create` or `api.quote.update`).
+    - "View" (`QuoteViewModal` from list) and "Print" (`/admin/quotes/[id]/print`) actions are available.
 
 **Standard Workflow for Core Entities (Quotes, Customers, Products):**
-Unless explicitly stated otherwise, the standard workflow for managing Quotes, Customers, and Products follows the **List Page -> Create Modal -> Detail/Edit Modal** pattern described above, incorporating prefetching for optimal performance. Dedicated `/edit` pages for these entities are generally avoided in favor of this modal-based approach to promote UI consistency and component reusability.
+Unless explicitly stated otherwise, Customers and Products follow the **List Page -> Create Modal -> Detail/Edit Modal** pattern. Dedicated `/edit` pages for these entities are generally avoided. **Quotes currently use a hybrid approach, employing both modals and dedicated `/new` and `/edit` pages.**
 
 **Mandatory Tech Stack (Strictly Enforced - No Deviations):**
 

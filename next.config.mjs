@@ -14,7 +14,7 @@ const nextConfig = {
   typescript: {
     // Allow the build to complete with TypeScript errors
     // This should be set to false once all TypeScript issues are fixed
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 
   reactStrictMode: true,

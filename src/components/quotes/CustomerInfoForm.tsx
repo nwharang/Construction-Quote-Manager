@@ -2,7 +2,6 @@ import React from 'react';
 import { Card, CardBody, CardHeader, Input, Textarea } from '@heroui/react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useQuoteStore } from '~/store/quoteStore';
-import type { QuoteFormData } from '~/types/quote';
 
 interface CustomerInfoFormProps {
   readOnly?: boolean;

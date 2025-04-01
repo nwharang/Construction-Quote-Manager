@@ -25,57 +25,55 @@ const getAllInput = z.object({
 });
 
 export const transactionRouter = createTRPCRouter({
-  getAll: protectedProcedure
-    .input(getAllInput)
-    .query(async ({ ctx, input }) => {
-      try {
-        // 1. Get services
-        const services = createServices();
-        
-        // 2. Get user ID from context
-        const userId = ctx.session.user.id;
-        
-        // 3. Use service to fetch transactions
-        const result = await services.transaction.getAllTransactions({
-          userId,
-          ...input,
-        });
-        
-        // 4. Return result
-        return result;
-      } catch (error) {
-        // 5. Handle errors
-        console.error("Error fetching transactions:", error);
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch transactions',
-          cause: error,
-        });
-      }
-    }),
+  getAll: protectedProcedure.input(getAllInput).query(async ({ ctx, input }) => {
+    try {
+      // 1. Get services
+      const services = createServices(ctx);
+
+      // 2. Get user ID from context
+      const userId = ctx.session.user.id;
+
+      // 3. Use service to fetch transactions
+      const result = await services.transaction.getAllTransactions({
+        userId,
+        ...input,
+      });
+
+      // 4. Return result
+      return result;
+    } catch (error) {
+      // 5. Handle errors
+      console.error('Error fetching transactions:', error);
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch transactions',
+        cause: error,
+      });
+    }
+  }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.string().uuid('Invalid transaction ID format') }))
     .query(async ({ ctx, input }) => {
       try {
         // 1. Get services
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // 2. Get user ID from context
         const userId = ctx.session.user.id;
-        
+
         // 3. Use service to get transaction by ID
         const transaction = await services.transaction.getTransactionById({
           id: input.id,
           userId,
         });
-        
+
         // 4. Return the transaction
         return transaction;
       } catch (error) {
         // 5. Handle errors
-        console.error("Error fetching transaction:", error);
+        console.error('Error fetching transaction:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -85,61 +83,61 @@ export const transactionRouter = createTRPCRouter({
       }
     }),
 
-  create: protectedProcedure
-    .input(transactionInput)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        // 1. Get services
-        const services = createServices();
-        
-        // 2. Get user ID from context
-        const userId = ctx.session.user.id;
-        
-        // 3. Use service to create transaction
-        const transaction = await services.transaction.createTransaction({
-          data: input,
-          userId,
-        });
-        
-        // 4. Return the created transaction
-        return transaction;
-      } catch (error) {
-        // 5. Handle errors
-        console.error("Error creating transaction:", error);
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to create transaction',
-          cause: error,
-        });
-      }
-    }),
+  create: protectedProcedure.input(transactionInput).mutation(async ({ ctx, input }) => {
+    try {
+      // 1. Get services
+      const services = createServices(ctx);
+
+      // 2. Get user ID from context
+      const userId = ctx.session.user.id;
+
+      // 3. Use service to create transaction
+      const transaction = await services.transaction.createTransaction({
+        data: input,
+        userId,
+      });
+
+      // 4. Return the created transaction
+      return transaction;
+    } catch (error) {
+      // 5. Handle errors
+      console.error('Error creating transaction:', error);
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to create transaction',
+        cause: error,
+      });
+    }
+  }),
 
   update: protectedProcedure
-    .input(z.object({ 
-      id: z.string().uuid('Invalid transaction ID format'), 
-      data: transactionInput 
-    }))
+    .input(
+      z.object({
+        id: z.string().uuid('Invalid transaction ID format'),
+        data: transactionInput,
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       try {
         // 1. Get services
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // 2. Get user ID from context
         const userId = ctx.session.user.id;
-        
+
         // 3. Use service to update transaction
         const updatedTransaction = await services.transaction.updateTransaction({
           id: input.id,
           data: input.data,
           userId,
         });
-        
+
         // 4. Return the updated transaction
         return updatedTransaction;
       } catch (error) {
         // 5. Handle errors
-        console.error("Error updating transaction:", error);
+        console.error('Error updating transaction:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -154,22 +152,22 @@ export const transactionRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         // 1. Get services
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // 2. Get user ID from context
         const userId = ctx.session.user.id;
-        
+
         // 3. Use service to delete transaction
         const result = await services.transaction.deleteTransaction({
           id: input.id,
           userId,
         });
-        
+
         // 4. Return success response
         return result;
       } catch (error) {
         // 5. Handle errors
-        console.error("Error deleting transaction:", error);
+        console.error('Error deleting transaction:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -189,23 +187,23 @@ export const transactionRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       try {
         // 1. Get services
-        const services = createServices();
-        
+        const services = createServices(ctx);
+
         // 2. Get user ID from context
         const userId = ctx.session.user.id;
-        
+
         // 3. Use service to get financial report
         const report = await services.transaction.getFinancialReport({
           startDate: input.startDate,
           endDate: input.endDate,
           userId,
         });
-        
+
         // 4. Return the financial report
         return report;
       } catch (error) {
         // 5. Handle errors
-        console.error("Error generating financial report:", error);
+        console.error('Error generating financial report:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -214,4 +212,4 @@ export const transactionRouter = createTRPCRouter({
         });
       }
     }),
-}); 
+});

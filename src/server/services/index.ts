@@ -1,47 +1,25 @@
 import { TransactionService } from './transactionService';
 import { QuoteService } from './quoteService';
 import { DashboardService } from './dashboardService';
+import { AppService } from './appService';
 import { db } from '../db';
+import type { Session } from 'next-auth';
 
-/**
- * Common database interface used by all services
- * This matches the methods actually used across services
- */
-export type DB = {
-  select: any;
-  insert: any;
-  update: any;
-  delete: any;
-  transaction: any;
-  from: any;
-  leftJoin: any;
-  where: any;
-  groupBy: any;
-  orderBy: any;
-  limit: any;
-  offset: any;
-};
-
-/**
- * Utility function to convert string numeric values to numbers
- * This ensures consistent handling of numeric data across all services
- */
-export function toNumber(value: string | number | null | undefined): number {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === 'number') return value;
-  return parseFloat(value) || 0;
-}
+// Re-export types and error handling
+export * from './types';
 
 /**
  * Factory function to create service instances
  */
-export function createServices() {
+export function createServices(ctx: { session: Session | null }) {
+  // The db instance is already correctly typed by Drizzle
   return {
-    transaction: new TransactionService(db as unknown as DB),
-    quote: new QuoteService(db as unknown as DB),
-    dashboard: new DashboardService(db as unknown as DB),
+    transaction: new TransactionService(db, ctx),
+    quote: new QuoteService(db, ctx),
+    dashboard: new DashboardService(db, ctx),
+    app: new AppService(db, ctx),
   };
 }
 
-// Export only services
-export { TransactionService, QuoteService, DashboardService };
+// Export service classes
+export { TransactionService, QuoteService, DashboardService, AppService };
