@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { useForm, type FieldApi } from '@tanstack/react-form';
+import React, { useEffect, useMemo } from 'react';
 import { z } from 'zod';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Modal,
   ModalContent,
@@ -13,466 +14,522 @@ import {
   Spinner,
   Input,
   Textarea,
-  // TODO: Import other necessary HeroUI components like NumberInput, Select, RadioGroup etc.
+  NumberInput,
+  Card,
+  CardBody,
+  // TODO: Import other necessary HeroUI components like Select, RadioGroup etc.
 } from '@heroui/react';
 import { api, type RouterInputs, type RouterOutputs } from '~/utils/api';
-import { useToastStore } from '~/store';
+import { useAppToast } from '~/components/providers/ToastProvider'; // Correct toast import
 import { useTranslation } from '~/hooks/useTranslation';
-import { TaskList } from './TaskList'; // Assuming TaskList will be adapted
-import { QuoteSummary } from './QuoteSummary'; // Assuming QuoteSummary can take calculated values
-import type { FormApi } from '@tanstack/react-form'; // Import FormApi type
-// import { CustomerDisplay } from '~/components/customers/CustomerDisplay'; // Placeholder for displaying customer
+import { TaskList } from './TaskList'; // Uncomment TaskList import
+import { QuoteSummary } from './QuoteSummary';
+import { CustomerSelector } from '~/components/customers/CustomerSelector'; // Ensure CustomerSelect is imported
+import type { QuoteStatusType } from '~/server/db/schema-exports'; // Import QuoteStatusType
 
-// Define types based on tRPC router (adapt as needed for form state)
+// Interface for props
+interface QuoteDetailModalProps {
+  quoteId: string | null; // Allow null for create mode
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+// --- API Types ---
 // Using NonNullable to ensure quoteData exists when mapping
 type QuoteData = NonNullable<RouterOutputs['quote']['getById']>;
+
+type QuoteCreateInput = RouterInputs['quote']['create'];
 type QuoteUpdateInput = RouterInputs['quote']['update'];
 
-// Revert back to the manually defined interface
+// --- Form Value Types (Corrected Definitions) ---
+// Define the type for a single material in the form state
+export interface MaterialFormValues {
+  id?: string; // Optional ID
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  notes?: string | null; // Allow null or undefined
+}
+
+// Define the type for a single task in the form state
+export interface TaskFormValues {
+  id?: string; // Optional ID
+  description: string;
+  price: number;
+  materialType: 'LUMPSUM' | 'ITEMIZED'; // Uppercase for RadioGroup
+  estimatedMaterialsCostLumpSum?: number | null; // Use number for form, allow null
+  materials: MaterialFormValues[]; // Use the defined material form values type
+}
+
+// Define the type for the entire quote detail form state
 export interface QuoteDetailFormValues {
-  id: string; // Keep ID as part of the form state
+  id?: string; // Optional ID
   title: string;
   customerId: string;
-  notes?: string | null;
-  tasks: Array<{ 
-    id?: string; 
-    description: string;
-    price: number;
-    materialType: 'lumpsum' | 'itemized';
-    estimatedMaterialsCostLumpSum?: number | null;
-    materials: Array<{ 
-      id?: string; 
-      quantity: number;
-      unitPrice: number;
-      productId?: string | null;
-      notes?: string | null;
-    }>;
-  }>;
+  notes?: string | null; // Allow null or undefined
+  tasks: TaskFormValues[]; // Use the defined task form values type
   markupPercentage: number;
 }
 
-// --- Zod Schemas for Validation --- 
-
+// --- Zod Schemas (Aligned with Form Value Types) --- //
+// Zod schema for a single material in the form
 const materialSchema = z.object({
   id: z.string().optional(),
-  quantity: z.number()
-    .positive('Quantity must be positive')
-    .int('Quantity must be a whole number'),
-  unitPrice: z.number().min(0, 'Unit price cannot be negative'),
-  productId: z.string().nullable().optional(),
+  productId: z.string().min(1, 'Product is required'), // Required selection
+  quantity: z.number().min(1, 'Quantity must be at least 1'),
+  unitPrice: z.number().min(0, 'Unit price must be non-negative'),
   notes: z.string().nullable().optional(),
 });
 
-const taskSchema = z.object({
-  id: z.string().optional(),
-  description: z.string().min(1, 'Task description is required'),
-  price: z.number().positive('Task price must be positive'),
-  materialType: z.enum(['lumpsum', 'itemized']),
-  estimatedMaterialsCostLumpSum: z.number().min(0, 'Lump sum cost cannot be negative').nullable().optional(),
-  materials: z.array(materialSchema),
-}).refine(data => {
-  // If materialType is 'lumpsum', estimatedMaterialsCostLumpSum should be provided (or 0)
-  if (data.materialType === 'lumpsum') {
-    return data.estimatedMaterialsCostLumpSum !== null && data.estimatedMaterialsCostLumpSum !== undefined;
-  }
-  return true;
-}, {
-  message: "Lump sum cost estimate is required when Material Type is 'Lump Sum'",
-  path: ["estimatedMaterialsCostLumpSum"], // Path to the field this error belongs to
-}).refine(data => {
-   // If materialType is 'itemized', materials array should not be empty (or you might allow empty)
-  if (data.materialType === 'itemized') {
-     // Decide if an empty materials array is valid for itemized tasks
-     // return data.materials.length > 0;
-     return true; // Allowing empty materials array for now
-  }
-  return true;
-}, {
-  // message: "At least one material is required when Material Type is 'Itemized'",
-  // path: ["materials"],
-});
-
-
-// Main schema mirroring QuoteDetailFormValues (including id)
-const quoteDetailSchema = z.object({
-  id: z.string(), // Add ID back
-  title: z.string().min(1, 'Title is required'),
-  customerId: z.string(), // Keep customerId validation if needed
-  notes: z.string().nullable().optional(),
-  tasks: z.array(taskSchema), // Keep as non-optional array
-  markupPercentage: z.number()
-    .min(0, 'Markup must be non-negative')
-    .max(100, 'Markup cannot exceed 100%'), // Keep as required number
-});
-
-// --- End Zod Schemas --- 
-
-interface QuoteDetailModalProps {
-  quoteId: string | null; // Expect a non-null ID when editing
-  isOpen: boolean;
-  onClose: () => void;
-  onSaveSuccess?: (updatedQuote: QuoteData) => void; // Optional callback after successful save
-}
-
-export const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
-  quoteId,
-  isOpen,
-  onClose,
-  onSaveSuccess,
-}) => {
-  const { t } = useTranslation();
-  const toast = useToastStore();
-  const utils = api.useUtils(); // Get tRPC utils
-
-  // Fetch quote data for editing
-  const { data: quoteData, isLoading: isLoadingQuote, isError } = api.quote.getById.useQuery(
-    { id: quoteId! }, // Use ! asserting quoteId is non-null when modal is open for edit
+// Zod schema for a single task in the form
+const taskSchema = z
+  .object({
+    id: z.string().optional(),
+    description: z.string().min(1, 'Task description is required'),
+    price: z.number().min(0, 'Price must be non-negative'),
+    materialType: z.enum(['LUMPSUM', 'ITEMIZED']), // Uppercase
+    estimatedMaterialsCostLumpSum: z.number().min(0).nullable().optional(),
+    // Make materials array required, matching TaskFormValues
+    materials: z.array(materialSchema).default([]), // Use default([]) instead of optional()
+  })
+  .refine(
+    (data) => {
+      if (data.materialType === 'LUMPSUM') {
+        return (
+          data.estimatedMaterialsCostLumpSum !== null &&
+          data.estimatedMaterialsCostLumpSum !== undefined
+        );
+      }
+      // If ITEMIZED, the materials array *must* exist (schema ensures this with default)
+      // Can add validation for non-empty if needed: data.materials.length > 0
+      return true;
+    },
     {
-       enabled: !!quoteId && isOpen, // Only fetch if quoteId is provided and modal is open
-       staleTime: 5 * 60 * 1000, // Cache data for 5 minutes
-       refetchOnWindowFocus: false, // Don't refetch just on focus
+      message: 'Estimated cost required for Lump Sum',
+      path: ['estimatedMaterialsCostLumpSum'],
     }
   );
 
-  // tRPC Mutation for updating the quote
+// Main schema mirroring QuoteDetailFormValues
+const quoteDetailSchema = z.object({
+  id: z.string().optional(), // ID is optional
+  title: z.string().min(1, 'Title is required'),
+  customerId: z.string().min(1, 'Customer is required'),
+  notes: z.string().nullable().optional(),
+  tasks: z.array(taskSchema), // Use taskSchema, which matches TaskFormValues structure
+  markupPercentage: z
+    .number()
+    .min(0, 'Markup must be non-negative')
+    .max(100, 'Markup cannot exceed 100%'),
+});
+
+// --- End Zod Schemas --- //
+
+// --- Helper Component for Field Errors ---
+function FieldInfo({ error }: { error?: { message?: string } }) {
+  return error?.message ? <p className="text-danger mt-1 text-xs">{error.message}</p> : null;
+}
+
+// --- Initial Values Functions ---
+// Function to get initial form values for EDIT mode
+function mapQuoteDataToFormValues(quote: QuoteData, defaultMarkup: number): QuoteDetailFormValues {
+  return {
+    id: quote.id,
+    title: quote.title || '',
+    customerId: quote.customerId || '',
+    notes: quote.notes,
+    markupPercentage: Number(quote.markupPercentage ?? defaultMarkup), // Ensure number
+    tasks:
+      quote.tasks?.map((task) => ({
+        id: task.id,
+        description: task.description || '',
+        price: Number(task.price ?? 0), // Ensure number
+        materialType: (task.materialType?.toUpperCase() || 'LUMPSUM') as 'LUMPSUM' | 'ITEMIZED',
+        estimatedMaterialsCostLumpSum: Number(task.estimatedMaterialsCost ?? 0), // Ensure number
+        materials:
+          task.materials?.map((mat) => ({
+            id: mat.id,
+            productId: mat.productId, // Is string from DB
+            quantity: Number(mat.quantity ?? 1), // Ensure number
+            unitPrice: Number(mat.unitPrice ?? 0), // Ensure number
+            notes: mat.notes || null,
+          })) ?? [], // Default to empty array if task.materials is null/undefined
+      })) ?? [], // Default to empty array if quote.tasks is null/undefined
+  };
+}
+
+// Function to get initial form values for CREATE mode
+function getInitialCreateFormValues(defaultMarkup: number): QuoteDetailFormValues {
+  return {
+    title: '',
+    customerId: '',
+    notes: null,
+    markupPercentage: defaultMarkup,
+    tasks: [],
+  };
+}
+
+// --- Main Modal Component ---
+export const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({ quoteId, isOpen, onClose }) => {
+  const { t } = useTranslation();
+  const toast = useAppToast();
+  const utils = api.useUtils();
+  const isEditMode = !!quoteId;
+
+  // Fetch quote data only in edit mode
+  const { data: quoteData, isLoading: isLoadingQuote } = api.quote.getById.useQuery(
+    { id: quoteId! },
+    { enabled: isEditMode, refetchOnWindowFocus: false }
+  );
+
+  // --- Mutations ---
   const updateQuoteMutation = api.quote.update.useMutation({
-    onSuccess: (updatedQuoteData) => {
-      toast.success(t('quotes.updateSuccessToast'));
-      // Invalidate relevant queries (e.g., quote list)
-      utils.quote.getAll.invalidate(); // Uncommented
-      if (onSaveSuccess && updatedQuoteData) {
-        onSaveSuccess(updatedQuoteData);
-      }
-      onClose(); // Close modal on success
+    onSuccess: () => {
+      toast.success(t('quotes.updateSuccessToast')); // Use specific method
+      void utils.quote.getAll.invalidate();
+      onClose();
     },
     onError: (error) => {
-      toast.error(`${t('quotes.updateErrorToast')}: ${error.message}`);
+      toast.error(`${t('quotes.updateErrorToast')}: ${error.message}`); // Use specific method
     },
   });
 
-  // Helper function returns QuoteDetailFormValues
-  function getInitialFormValues(): QuoteDetailFormValues {
-    return {
-      id: '', // Include ID
-      title: '',
-      customerId: '', // Initialize customerId
-      notes: null,
-      tasks: [],
-      markupPercentage: 0,
-    };
-  }
+  const createQuoteMutation = api.quote.create.useMutation({
+    onSuccess: (newQuote) => {
+      toast.success(`${t('quotes.createSuccess')}: ${newQuote.title}`); // Use specific method
+      void utils.quote.getAll.invalidate();
+      onClose(); // Close after successful creation
+    },
+    onError: (error) => {
+      toast.error(`${t('quotes.createError') || 'Failed to create quote'}: ${error.message}`); // Use specific method
+    },
+  });
 
-  // Helper function maps to QuoteDetailFormValues
-  function mapQuoteDataToFormValues(data: QuoteData): QuoteDetailFormValues {
-      return {
-          id: data.id, // Map ID
-          title: data.title || '',
-          customerId: data.customerId || '',
-          notes: data.notes,
-          tasks: data.tasks?.map((task: QuoteData['tasks'][number]) => ({ 
-              id: task.id,
-              description: task.description || '',
-              price: Number(task.price) || 0,
-              materialType: (task.materialType?.toLowerCase() as 'lumpsum' | 'itemized') || 'lumpsum',
-              estimatedMaterialsCostLumpSum: task.estimatedMaterialsCost ? Number(task.estimatedMaterialsCost) : null,
-              materials: task.materials?.map((mat: QuoteData['tasks'][number]['materials'][number]) => ({ 
-                  id: mat.id,
-                  quantity: mat.quantity ?? 1, 
-                  unitPrice: Number(mat.unitPrice) || 0, 
+  const isLoading = isEditMode && isLoadingQuote;
+  const isSubmitting = updateQuoteMutation.isPending || createQuoteMutation.isPending;
+
+  // Determine if the form should be read-only based on status (only in edit mode)
+  const isReadOnlyBasedOnStatus = useMemo(() => {
+    if (!isEditMode || !quoteData) {
+      return false; // Not read-only in create mode or before data loads
+    }
+    // Explicitly check if status is NOT DRAFT
+    return quoteData.status !== ('DRAFT' as QuoteStatusType);
+  }, [isEditMode, quoteData]);
+
+  // Combine read-only status with submission status for disabling fields
+  const isDisabled = isReadOnlyBasedOnStatus || isSubmitting;
+
+  // Helper function accepts QuoteDetailFormValues
+  function formatFormValuesToApiInput(
+    values: QuoteDetailFormValues
+  ): QuoteUpdateInput | QuoteCreateInput {
+    const formattedTasks =
+      values.tasks?.map((task) => ({
+        ...(isEditMode && task.id ? { id: task.id } : {}), // Conditionally add task id
+        description: task.description,
+        price: task.price,
+        materialType: (task.materialType?.toLowerCase() ?? 'lumpsum') as 'lumpsum' | 'itemized',
+        estimatedMaterialsCostLumpSum:
+          task.materialType === 'LUMPSUM' ? task.estimatedMaterialsCostLumpSum : undefined,
+        materials:
+          task.materialType === 'LUMPSUM'
+            ? undefined
+            : task.materials
+                ?.map((mat) => ({
+                  ...(isEditMode && mat.id ? { id: mat.id } : {}), // Conditionally add material id
+                  quantity: mat.quantity,
+                  unitPrice: mat.unitPrice,
                   productId: mat.productId,
-                  notes: mat.notes,
-              })) || [],
-          })) || [],
-          markupPercentage: Number(data.markupPercentage) || 0,
-      };
+                  notes: mat.notes || undefined,
+                }))
+                .filter(Boolean), // Ensure we don't send null/undefined materials in the array if map returns nothing
+      })) ?? [];
+
+    const commonData = {
+      title: values.title,
+      notes: values.notes,
+      customerId: values.customerId,
+      markupPercentage: values.markupPercentage,
+      tasks: formattedTasks,
+    };
+
+    if (isEditMode) {
+      if (!quoteId) throw new Error('Cannot update without quoteId');
+      return { ...commonData, id: quoteId };
+    } else {
+      return commonData as QuoteCreateInput;
+    }
   }
 
-    // Helper function accepts QuoteDetailFormValues
-    // Returns QuoteUpdateInput (extracts necessary fields)
-    function formatFormValuesToApiInput(values: QuoteDetailFormValues, id: string): QuoteUpdateInput {
-        const { id: formId, ...dataToUpdate } = values; 
-        return {
-            id: id, 
-            title: dataToUpdate.title,
-            notes: dataToUpdate.notes,
-            customerId: dataToUpdate.customerId, 
-            markupPercentage: dataToUpdate.markupPercentage,
-            tasks: dataToUpdate.tasks?.map((task: QuoteDetailFormValues['tasks'][number]) => ({ 
-                id: task.id || undefined,
-                description: task.description,
-                price: task.price, 
-                materialType: task.materialType,
-                estimatedMaterialsCostLumpSum: task.materialType === 'lumpsum' ? (task.estimatedMaterialsCostLumpSum || null) : undefined,
-                materials: task.materialType === 'itemized' ? task.materials?.map((mat: QuoteDetailFormValues['tasks'][number]['materials'][number]) => ({ 
-                    id: mat.id || undefined, 
-                    quantity: mat.quantity, 
-                    unitPrice: mat.unitPrice, 
-                    productId: mat.productId || null,
-                    notes: mat.notes || null, 
-                })) : undefined,
-            })) || [], 
-        };
-    }
+  // --- Form Initialization (React Hook Form) --- //
+  // Get the default markup from settings or use a fallback
+  const { data: settings } = api.settings.get.useQuery();
+  const defaultMarkup = useMemo(() => Number(settings?.defaultMarkupCharge ?? 10), [settings]);
 
-  // Remove explicit generic type from useForm
-  const form = useForm({
-    defaultValues: getInitialFormValues(),
-    onSubmit: async ({ value }: { value: QuoteDetailFormValues }) => {
-      const result = quoteDetailSchema.safeParse(value);
-      if (!result.success) {
-         console.error("Form validation failed on submit:", result.error.flatten());
-         toast.error(t('common.validationErrorToast', { defaultValue: 'Please fix validation errors.' }));
-         return;
-      }
-      
-      if (!quoteId) return;
-      
-      const updatePayload = formatFormValuesToApiInput(result.data, quoteId);
-      await updateQuoteMutation.mutateAsync(updatePayload);
-    },
-    validators: {
-      onChange: quoteDetailSchema
-    },
+  // Use useForm hook - THIS IS THE FORM OBJECT WE NEED TO PASS
+  const form = useForm<QuoteDetailFormValues>({
+    resolver: zodResolver(quoteDetailSchema),
+    defaultValues: useMemo(
+      () =>
+        isEditMode && quoteData
+          ? mapQuoteDataToFormValues(quoteData, defaultMarkup)
+          : getInitialCreateFormValues(defaultMarkup),
+      [isEditMode, quoteData, defaultMarkup]
+    ),
+    mode: 'onBlur', // Trigger validation on blur
   });
 
-   // Effect to load fetched data into the form once available
-   useEffect(() => {
-    if (quoteData && !isLoadingQuote) {
-      form.reset(mapQuoteDataToFormValues(quoteData));
+  // Destructure methods AFTER form is defined
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = form;
+
+  // --- Effects --- //
+  // Reset form when quoteData changes (for edit mode)
+  useEffect(() => {
+    if (isEditMode && quoteData) {
+      reset(mapQuoteDataToFormValues(quoteData, defaultMarkup));
     }
-   }, [quoteData, isLoadingQuote, form]);
+    // If switching to create mode (quoteId becomes null), reset to initial create values
+    else if (!isEditMode) {
+      reset(getInitialCreateFormValues(defaultMarkup));
+    }
+  }, [quoteData, isEditMode, reset, defaultMarkup]);
 
-  // Calculate derived values
-  const { subtotalTasks, subtotalMaterials, markupCharge, tax, grandTotal } = useMemo(() => {
-    return calculateQuoteTotals(form.state.values);
-  }, [form.state.values]);
+  // Effect to reset form when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      const timer = setTimeout(() => {
+        // Reset based on the mode it *should* be in when reopened
+        reset(
+          isEditMode && quoteData
+            ? mapQuoteDataToFormValues(quoteData, defaultMarkup)
+            : getInitialCreateFormValues(defaultMarkup)
+        );
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]); // Only depend on isOpen
 
-  // Handle markup changes
-  const handleMarkupChange = (value: number) => {
-    form.setFieldValue('markupPercentage', value);
+  // --- Calculations --- //
+  const watchedValues = watch();
+  const calculatedTotals = useMemo(() => {
+    return calculateQuoteTotals(watchedValues);
+  }, [watchedValues]);
+
+  // --- Submit Handler ---
+  const onSubmitHandler = async (data: QuoteDetailFormValues) => {
+    try {
+      // Ensure ID from form state matches quoteId prop in edit mode
+      if (isEditMode && data.id !== quoteId) {
+        console.error('Form ID mismatch');
+        toast.error('An internal error occurred. Please try again.');
+        return;
+      }
+      const apiInput = formatFormValuesToApiInput(data);
+      if (isEditMode) {
+        await updateQuoteMutation.mutateAsync(apiInput as QuoteUpdateInput);
+      } else {
+        await createQuoteMutation.mutateAsync(apiInput as QuoteCreateInput);
+      }
+    } catch (error) {
+      console.error('Submission Error caught in onSubmitHandler:', error);
+      // Errors should be handled by mutation's onError, but maybe add generic toast?
+      toast.error('Failed to save quote. Please check your input.');
+    }
   };
 
-  // Render loading or error state before form is ready
-  if (isOpen && isLoadingQuote) {
-     return (
-       <Modal size="5xl" isOpen={isOpen} onClose={onClose}>
-         <ModalContent>
-           <ModalHeader>{t('common.loading')}</ModalHeader>
-           <ModalBody><Spinner label={t('common.loading')} /></ModalBody>
-           <ModalFooter>
-             <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-           </ModalFooter>
-         </ModalContent>
-       </Modal>
-     );
-   }
-
-   if (isOpen && isError) {
-       return (
-       <Modal size="md" isOpen={isOpen} onClose={onClose}>
-         <ModalContent>
-           <ModalHeader>{t('common.error')}</ModalHeader>
-           <ModalBody><p>{t('quotes.loadError')}</p></ModalBody>
-           <ModalFooter>
-             <Button variant="ghost" onClick={onClose}>{t('common.close')}</Button>
-           </ModalFooter>
-         </ModalContent>
-       </Modal>
-     );
-   }
-
-   // Only render the main modal content when not loading and no error
-   if (!isOpen || !quoteData) {
-       return null; // Or some placeholder if needed when closed but maybe pre-rendering
-   }
-
+  // --- Render Logic ---
+  const modalTitle = isEditMode ? t('quotes.editModalTitle') : t('quotes.createModalTitle');
+  const submitButtonText = isEditMode ? t('common.saveChanges') : t('common.create');
 
   return (
-    <Modal size="5xl" isOpen={isOpen} onClose={onClose} scrollBehavior="inside">
+    <Modal size="4xl" isOpen={isOpen} onClose={onClose} backdrop="blur" scrollBehavior="inside">
       <ModalContent>
-        {/* Using form.Provider might be needed if child components access form state directly -> Removed */}
-        {/* <form.Provider> */}
-          <ModalHeader>{t('quotes.editModalTitle')} {`(#${quoteData.sequentialId})`}</ModalHeader>
-          <ModalBody>
-              <form
-                id="quote-detail-form" // Give form an ID
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  void form.handleSubmit(); // Use void if not awaiting inside UI handler
-                }}
-              >
-                {/* --- Basic Info --- */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <form.Field
+        <ModalHeader className="text-lg font-semibold">
+          {isLoading ? <Spinner size="sm" className="mr-2" /> : null}
+          {modalTitle}
+          {isEditMode && quoteData && ` (#${quoteData.sequentialId})`}
+        </ModalHeader>
+        <ModalBody>
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Spinner label="Loading quote data..." />
+            </div>
+          ) : (
+            <form
+              onSubmit={handleSubmit(onSubmitHandler)}
+              id="quote-detail-form"
+              className="space-y-6"
+            >
+              {/* --- Basic Info Card --- */}
+              <Card>
+                <CardBody className="space-y-4">
+                  {/* Title */}
+                  <Controller
                     name="title"
-                    children={(field) => ( 
+                    control={control}
+                    render={({ field }) => (
                       <div>
+                        <label htmlFor={field.name} className="block text-sm font-medium">
+                          {t('quotes.fields.title')} <span className="text-danger">*</span>
+                        </label>
                         <Input
-                          label={t('quotes.titleLabel')}
-                          placeholder={t('quotes.titlePlaceholder')}
-                          name={field.name}
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          // Add aria-invalid and aria-describedby for accessibility
-                          aria-invalid={!!field.state.meta.errors.length}
-                          aria-describedby={field.state.meta.errors.length ? `${field.name}-errors` : undefined}
+                          {...field}
+                          id={field.name}
+                          placeholder="Enter quote title"
+                          disabled={isDisabled}
+                          className="mt-1"
                         />
-                        {/* Error message area */}
-                        <div id={`${field.name}-errors`} aria-live="polite">
-                          {field.state.meta.errors ? (<em className="text-red-500 text-sm">{field.state.meta.errors.join(', ')}</em>) : null}
-                        </div>
+                        <FieldInfo error={errors.title} />
                       </div>
                     )}
                   />
-                  {/* Display Customer Info (Read Only) */}
-                  {/* {quoteData.customer && <CustomerDisplay customer={quoteData.customer} />} */}
-                </div>
-                 <form.Field
+                  {/* Customer */}
+                  <Controller
+                    name="customerId"
+                    control={control}
+                    render={({ field }) => (
+                      <div>
+                        <label htmlFor={field.name} className="block text-sm font-medium">
+                          {t('quotes.fields.customer')} <span className="text-danger">*</span>
+                        </label>
+                        <CustomerSelector
+                          value={field.value}
+                          onChange={(id) => field.onChange(id ?? '')}
+                          placeholder={t('quotes.placeholders.selectCustomer')}
+                          className="mt-1"
+                          disabled={isDisabled}
+                        />
+                        <FieldInfo error={errors.customerId} />
+                      </div>
+                    )}
+                  />
+                  {/* Notes */}
+                  <Controller
                     name="notes"
-                    children={(field) => ( 
-                      <div className="mb-4">
+                    control={control}
+                    render={({ field }) => (
+                      <div>
+                        <label htmlFor={field.name} className="block text-sm font-medium">
+                          {t('quotes.fields.notes')}
+                        </label>
                         <Textarea
-                           label={t('quotes.notesLabel')}
-                           placeholder={t('quotes.notesPlaceholder')}
-                           name={field.name}
-                           value={field.state.value ?? ''}
-                           onBlur={field.handleBlur}
-                           onChange={(e) => field.handleChange(e.target.value)}
-                           rows={3}
-                           // Add aria-invalid and aria-describedby for accessibility
-                           aria-invalid={!!field.state.meta.errors.length}
-                           aria-describedby={field.state.meta.errors.length ? `${field.name}-errors` : undefined}
+                          {...field}
+                          id={field.name}
+                          value={field.value ?? ''}
+                          placeholder={t('quotes.placeholders.notes')}
+                          disabled={isDisabled}
+                          className="mt-1"
                         />
-                        {/* Error message area */}
-                        <div id={`${field.name}-errors`} aria-live="polite">
-                          {field.state.meta.errors ? (<em className="text-red-500 text-sm">{field.state.meta.errors.join(', ')}</em>) : null}
-                        </div>
+                        <FieldInfo error={errors.notes} />
                       </div>
                     )}
                   />
+                </CardBody>
+              </Card>
 
-                {/* --- Task List --- */}
-                <h3 className="text-lg font-semibold mb-2">{t('quotes.tasksSectionTitle')}</h3>
-                
-                <form.Field
-                  name="tasks"
-                  mode="array"
-                  children={(field) => (
-                    <>
-                      <TaskList 
-                        form={form}
-                        field={field}
-                        readOnly={updateQuoteMutation.isPending}
+              {/* --- Task List Section --- */}
+              <TaskList form={form} readOnly={isDisabled} />
+
+              {/* --- Charges & Summary Card --- */}
+              <Card>
+                <CardBody>
+                  <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-3">
+                    {/* Markup Percentage */}
+                    <Controller
+                      name="markupPercentage"
+                      control={control}
+                      render={({ field }) => (
+                        <div>
+                          <label htmlFor={field.name} className="block text-sm font-medium">
+                            {t('quoteSummary.markupInputLabel')}
+                          </label>
+                          <NumberInput
+                            {...field}
+                            id={field.name}
+                            value={field.value}
+                            onValueChange={(v) => field.onChange(v ?? 0)}
+                            placeholder="Enter markup percentage"
+                            min={0}
+                            max={100}
+                            step={1}
+                            formatOptions={{ style: 'decimal', maximumFractionDigits: 1 }}
+                            endContent="%"
+                            isDisabled={isDisabled}
+                            className="mt-1"
+                          />
+                          <FieldInfo error={errors.markupPercentage} />
+                        </div>
+                      )}
+                    />
+                    {/* Quote Summary */}
+                    <div className="md:col-span-2">
+                      <QuoteSummary
+                        {...calculatedTotals}
+                        markupPercentage={watchedValues.markupPercentage}
+                        readOnly={isDisabled}
                       />
-                      <Button 
-                        type="button" 
-                        onClick={() => field.pushValue({
-                          id: undefined, // New tasks don't have an ID yet
-                          description: '', 
-                          price: 0, 
-                          materialType: 'itemized', 
-                          estimatedMaterialsCostLumpSum: null,
-                          materials: [] 
-                        })} 
-                        className="mt-2"
-                      >
-                        {t('quotes.addTaskButton')}
-                      </Button>
-                    </>
-                  )}
-                />
-                
-                {/* <p className="text-red-500 italic">TaskList component needs adaptation for TanStack Form</p> */}
-                {/* Removed old placeholder button */}
-
-                <hr className="my-6" />
-
-                {/* --- Charges & Summary --- */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-end">
-                  <div className="md:col-span-3"> {/* Make summary span full width */} 
-                     <QuoteSummary 
-                       subtotalTasks={subtotalTasks}
-                       subtotalMaterials={subtotalMaterials}
-                       markupPercentage={form.state.values.markupPercentage}
-                       markupCharge={markupCharge}
-                       tax={tax}
-                       grandTotal={grandTotal}
-                       onMarkupChange={handleMarkupChange}
-                       readOnly={updateQuoteMutation.isPending} 
-                     />
+                    </div>
                   </div>
-                </div>
-              </form>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
-            <form.Subscribe
-               selector={(state) => [state.canSubmit, state.isSubmitting]}
-               children={([canSubmit, isSubmitting]) => (
-                  <Button
-                      color="primary"
-                      type="submit" // Trigger the form submission
-                      form="quote-detail-form" // Associate with the form
-                      isLoading={isSubmitting || updateQuoteMutation.isPending} // Use isPending
-                      // Disable if form cannot submit OR if mutation is running
-                      disabled={!canSubmit || isSubmitting || updateQuoteMutation.isPending} // Use isPending
-                  >
-                      {t('common.save')}
-                  </Button>
-               )}
-            />
-          </ModalFooter>
-        {/* </form.Provider> */}
+                </CardBody>
+              </Card>
+            </form>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="flat" color="default" onClick={onClose} isDisabled={isSubmitting}>
+            {isReadOnlyBasedOnStatus ? t('common.close') : t('common.cancel')}
+          </Button>
+          {!isReadOnlyBasedOnStatus && (
+            <Button
+              color="primary"
+              type="submit"
+              form="quote-detail-form"
+              isLoading={isSubmitting}
+              isDisabled={isLoading || isSubmitting}
+            >
+              {submitButtonText}
+            </Button>
+          )}
+        </ModalFooter>
       </ModalContent>
     </Modal>
   );
 };
 
-// Placeholder for CustomerDisplay component if it doesn't exist
-/*
-const CustomerDisplay = ({ customer }: { customer: NonNullable<QuoteData['customer']> }) => {
-   if (!customer) return null;
-   return (
-     <div className="p-3 border rounded-md bg-gray-50 dark:bg-gray-800">
-       <p className="font-semibold">{customer.name}</p>
-       {customer.email && <p className="text-sm text-gray-600 dark:text-gray-400">{customer.email}</p>}
-       {customer.phone && <p className="text-sm text-gray-600 dark:text-gray-400">{customer.phone}</p>}
-     </div>
-   );
-};
-*/ 
-
 // Helper function to calculate totals based on form values
-function calculateQuoteTotals(currentValues: QuoteDetailFormValues) {
+function calculateQuoteTotals(values: QuoteDetailFormValues) {
   let tasksTotal = 0;
   let materialsTotal = 0;
 
-  currentValues.tasks?.forEach(task => {
+  values.tasks?.forEach((task) => {
     tasksTotal += Number(task.price) || 0;
-    if (task.materialType === 'lumpsum') {
+    if (task.materialType === 'LUMPSUM') {
       materialsTotal += Number(task.estimatedMaterialsCostLumpSum) || 0;
     } else {
-      task.materials?.forEach(material => {
+      task.materials?.forEach((material) => {
         materialsTotal += (Number(material.quantity) || 0) * (Number(material.unitPrice) || 0);
       });
     }
   });
 
   const combinedSubtotal = tasksTotal + materialsTotal;
-  // Use currentValues for markup percentage
-  const markup = combinedSubtotal * (Number(currentValues.markupPercentage) || 0) / 100;
-  // Removed complexity calculation
-  // Assume tax is applied to subtotal + markup
-  const calculatedTax = (combinedSubtotal + markup) * 0.07; // Apply tax after markup
-  const total = combinedSubtotal + markup + calculatedTax;
+  const markup = (combinedSubtotal * (Number(values.markupPercentage) || 0)) / 100;
+  const taxAmount = (combinedSubtotal + markup) * 0.07;
+  const roundedTax = Math.round(taxAmount * 100) / 100;
+  const total = combinedSubtotal + markup + roundedTax;
 
   return {
     subtotalTasks: tasksTotal,
     subtotalMaterials: materialsTotal,
-    markupCharge: markup, // Return calculated markup
-    tax: calculatedTax,
+    markupCharge: markup,
+    tax: roundedTax,
     grandTotal: total,
   };
-} 
+}

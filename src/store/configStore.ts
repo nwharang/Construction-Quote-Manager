@@ -1,75 +1,77 @@
 import { create } from 'zustand';
-import type { Settings } from '~/types';
-import {
-  DEFAULT_LOCALE,
-  DEFAULT_CURRENCY,
-  DEFAULT_CURRENCY_SYMBOL,
-  DEFAULT_UI_SETTINGS,
-  DEFAULT_MARKUP_PERCENTAGE,
-  DEFAULT_COMPLEXITY_CHARGE,
-  DEFAULT_TASK_PRICE,
-  DEFAULT_MATERIAL_PRICE,
-} from '~/config/constants';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { AppRouter } from '~/server/api/root';
+
+type Settings = inferRouterOutputs<AppRouter>['settings']['get'];
+
+type Theme = 'light' | 'dark' | 'system';
 
 interface ConfigState {
-  // User configurable settings (stored in DB)
-  settings: Settings;
+  settings: Settings | null;
   isLoading: boolean;
   isUpdating: boolean;
 
-  // UI state that doesn't persist to DB
   isNavOpen: boolean;
   isDarkMode: boolean;
 
-  // Actions
-  setSettings: (settings: Partial<Settings>) => void;
+  setSettings: (settings: Partial<Settings> | Settings) => void;
   setLoading: (isLoading: boolean) => void;
   setUpdating: (isUpdating: boolean) => void;
   toggleNav: () => void;
   toggleDarkMode: () => void;
-  changeLocale: (locale: 'en' | 'vi') => void;
 }
 
-const defaultSettings: Settings = {
-  // Company information
-  companyName: '',
-  companyEmail: '',
-  companyPhone: '',
-  companyAddress: '',
-
-  // Quote defaults
-  defaultComplexityCharge: DEFAULT_COMPLEXITY_CHARGE,
-  defaultMarkupCharge: DEFAULT_MARKUP_PERCENTAGE,
-  defaultTaskPrice: DEFAULT_TASK_PRICE,
-  defaultMaterialPrice: DEFAULT_MATERIAL_PRICE,
-
-  // Notification settings
-  emailNotifications: true,
-  quoteNotifications: true,
-  taskNotifications: true,
-
-  // Appearance
-  theme: 'system',
-  locale: DEFAULT_LOCALE,
-  currency: DEFAULT_CURRENCY,
-  currencySymbol: DEFAULT_CURRENCY_SYMBOL,
-  dateFormat: 'MM/DD/YYYY',
-  timeFormat: '12h',
-};
-
 export const useConfigStore = create<ConfigState>((set) => ({
-  // Default state
-  settings: defaultSettings,
+  settings: null,
   isLoading: true,
   isUpdating: false,
   isNavOpen: false,
   isDarkMode: false,
 
-  // Actions
-  setSettings: (newSettings) =>
-    set((state) => ({
-      settings: { ...state.settings, ...newSettings },
-    })),
+  setSettings: (newSettingsOrFull: Partial<Settings> | Settings) =>
+    set((state) => {
+      let updatedSettings: Settings | null = null; // Initialize as null
+      let updatedIsLoading = state.isLoading; // Default to current loading state
+
+      if (state.settings === null || ('id' in newSettingsOrFull && newSettingsOrFull.id)) {
+        // Handle initial hydration or explicit full replacement
+        if (!('id' in newSettingsOrFull)) {
+          return {}; // Should not happen if ConfigLoader is correct
+        }
+        updatedSettings = newSettingsOrFull as Settings;
+        updatedIsLoading = false; // Mark loading as complete on hydration
+      } else if (state.settings) {
+        // Handle partial update
+        updatedSettings = {
+          ...state.settings,
+          ...(newSettingsOrFull as Partial<Settings>), // Cast to Partial
+        };
+        // isLoading remains unchanged during partial updates
+      } else {
+        return {};
+      }
+
+      // Ensure updatedSettings is not null before proceeding
+      if (updatedSettings === null) {
+        return {}; // Prevent further processing with null settings
+      }
+
+      // Calculate isDarkMode based on the potentially updated theme
+      const potentialNextTheme = updatedSettings.theme;
+      const updatedIsDarkMode =
+        potentialNextTheme === 'dark' ||
+        (potentialNextTheme === 'system' &&
+          typeof window !== 'undefined' &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+      const newStateSlice = {
+        settings: updatedSettings, // Now guaranteed non-null
+        isDarkMode: updatedIsDarkMode,
+        isLoading: updatedIsLoading, // Include isLoading in the returned slice
+      };
+
+      return newStateSlice;
+    }),
 
   setLoading: (isLoading) => set({ isLoading }),
 
@@ -81,19 +83,18 @@ export const useConfigStore = create<ConfigState>((set) => ({
     })),
 
   toggleDarkMode: () =>
-    set((state) => ({
-      isDarkMode: !state.isDarkMode,
-      settings: {
-        ...state.settings,
-        theme: !state.isDarkMode ? 'dark' : 'light',
-      },
-    })),
+    set((state) => {
+      if (!state?.settings) return {};
+      const currentTheme = state.settings.theme;
+      const nextTheme: Theme = currentTheme === 'light' ? 'dark' : 'light';
 
-  changeLocale: (locale: string) =>
-    set((state) => ({
-      settings: {
-        ...state.settings,
-        locale,
-      },
-    })),
+      const isNextDark = nextTheme === 'dark';
+
+      return {
+        settings: { ...state.settings, theme: nextTheme },
+        isDarkMode: isNextDark,
+      };
+    }),
 }));
+
+export type { Settings };

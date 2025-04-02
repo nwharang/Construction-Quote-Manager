@@ -1,6 +1,6 @@
 import React from 'react';
 import Head from 'next/head';
-import { useTranslation } from '~/utils/i18n';
+import { useTranslation } from '~/hooks/useTranslation';
 
 interface PrintLayoutProps {
   children: React.ReactNode;
@@ -52,5 +52,3 @@ export function PrintLayout({ children, title }: PrintLayoutProps) {
 
 // Set display name for debugging
 PrintLayout.displayName = 'PrintLayout';
-
-export default PrintLayout;

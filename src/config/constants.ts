@@ -26,10 +26,6 @@ export const DATE_FORMAT = {
 
 // Locale settings
 export const DEFAULT_LOCALE = 'en';
-export const SUPPORTED_LOCALES = {
-  en: 'English',
-  vi: 'Tiếng Việt',
-};
 
 // Currency settings
 export const DEFAULT_CURRENCY = 'USD';
@@ -172,6 +168,7 @@ export const FORMAT = {
    */
   DATE: {
     US: 'MM/DD/YYYY',
+    EU: 'DD/MM/YYYY',
     INTL: 'YYYY-MM-DD',
   },
   /**

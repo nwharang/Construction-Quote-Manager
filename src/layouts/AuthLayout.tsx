@@ -1,7 +1,7 @@
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useTranslation } from '~/utils/i18n';
+import { useTranslation } from '~/hooks/useTranslation';
 import { LocaleSwitch } from '~/components/LocaleSwitch';
 
 interface AuthLayoutProps {
@@ -20,7 +20,7 @@ export function AuthLayout({ children, title }: AuthLayoutProps) {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
       <Head>
-        <title>{pageTitle} | Construction Pro</title>
+        <title>{`${pageTitle} | Construction Pro`}</title>
       </Head>
 
       <header className="flex items-center justify-between p-4">
@@ -45,5 +45,3 @@ export function AuthLayout({ children, title }: AuthLayoutProps) {
 
 // Set display name for debugging
 AuthLayout.displayName = 'AuthLayout';
-
-export default AuthLayout;

@@ -6,14 +6,12 @@ import {
   Listbox,
   ListboxItem,
   ListboxSection,
-  Divider,
   Button,
-  Avatar,
-  User,
   cn,
 } from '@heroui/react';
-import { Home, FileText, Package, Users, Settings, LogOut, ChevronLeft } from 'lucide-react';
+import { Home, FileText, Package, Users, ChevronLeft } from 'lucide-react';
 import { routes } from '~/config/routes';
+import { useTranslation } from '~/hooks/useTranslation';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -21,6 +19,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: session } = useSession();
   const [isMounted, setIsMounted] = useState(false);
@@ -34,12 +33,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     return null; // Return nothing during SSR
   }
 
-  // Navigation links
+  // Navigation links with translated names
   const navItems = [
-    { name: 'Dashboard', href: routes.admin.dashboard, icon: <Home className="h-5 w-5" /> },
-    { name: 'Quotes', href: routes.admin.quotes.list, icon: <FileText className="h-5 w-5" /> },
-    { name: 'Customers', href: routes.admin.customers.list, icon: <Users className="h-5 w-5" /> },
-    { name: 'Products', href: routes.admin.products.list, icon: <Package className="h-5 w-5" /> },
+    { name: t('nav.dashboard'), href: routes.admin.dashboard, icon: <Home className="h-5 w-5" /> },
+    { name: t('nav.quotes'), href: routes.admin.quotes.list, icon: <FileText className="h-5 w-5" /> },
+    { name: t('nav.customers'), href: routes.admin.customers.list, icon: <Users className="h-5 w-5" /> },
+    { name: t('nav.products'), href: routes.admin.products.list, icon: <Package className="h-5 w-5" /> },
   ];
 
   const isActive = (path: string) => {
@@ -72,7 +71,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             variant="light"
             className="md:hidden"
             onPress={onClose}
-            aria-label="Close sidebar"
+            aria-label={t('common.closeSidebar')}
           >
             <ChevronLeft size={20} />
           </Button>
@@ -90,7 +89,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           autoFocus={false}
           selectionMode="single"
         >
-          <ListboxSection title="MENU" className="px-4 py-2 text-xs font-medium">
+          <ListboxSection title={t('common.menu')} className="px-4 py-2 text-xs font-medium">
             {navItems.map((item) => (
               <ListboxItem
                 key={item.name}
@@ -110,7 +109,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Footer */}
         <div className="text-default-400 p-4 text-xs">
-          © {new Date().getFullYear()} Construction Pro
+          {t('footer.copyright', { year: new Date().getFullYear() })}
         </div>
       </aside>
 

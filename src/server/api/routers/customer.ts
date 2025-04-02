@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { customers } from '~/server/db/schema';
-import { eq, and, like, sql, or, ilike, desc } from 'drizzle-orm';
+import { eq, and, sql, or, ilike, desc } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { type SQL } from 'drizzle-orm';
 
 const customerInput = z.object({
   name: z.string().min(1, 'Name is required'),

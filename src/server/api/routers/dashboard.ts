@@ -216,18 +216,21 @@ function getDateFilter(timeRange: string): Date | null {
   const now = new Date();
   
   switch (timeRange) {
-    case 'week':
+    case 'week': {
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(now.getDate() - 7);
       return oneWeekAgo;
-    case 'month':
+    }
+    case 'month': {
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(now.getMonth() - 1);
       return oneMonthAgo;
-    case 'year':
+    }
+    case 'year': {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(now.getFullYear() - 1);
       return oneYearAgo;
+    }
     case 'all':
     default:
       return null;

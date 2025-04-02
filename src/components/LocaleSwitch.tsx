@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 import React, { useCallback } from 'react';
 import {
@@ -10,9 +10,10 @@ import {
   Select,
   SelectItem,
 } from '@heroui/react';
-import { useTranslation } from '~/utils/i18n';
-import { useI18n } from './providers/I18nProvider';
-import { useConfigStore } from '~/store';
+import { useTranslation } from '~/hooks/useTranslation';
+import { useI18n } from '~/hooks/useI18n';
+import { Globe } from 'lucide-react';
+import type { AppLocale } from '~/i18n/locales';
 
 interface LocaleSwitchProps {
   /**
@@ -43,13 +44,13 @@ interface LocaleSwitchProps {
    * Optional callback for deferred changes (used in settings page)
    * This will be called instead of applying the change directly when applyImmediately is false
    */
-  onLocaleChange?: (newLocale: string) => void;
+  onLocaleChange?: (newLocale: AppLocale) => void;
 
   /**
    * Optional value to override the current locale (used with applyImmediately=false)
    * This allows the settings page to control the displayed value
    */
-  value?: string;
+  value?: AppLocale;
 }
 
 /**
@@ -73,16 +74,16 @@ interface LocaleSwitchProps {
 export function LocaleSwitch({
   variant = 'dropdown',
   className = '',
-  label = 'Language',
+  label,
   applyImmediately = true,
   onLocaleChange,
   value,
 }: LocaleSwitchProps) {
   const { t, locales } = useTranslation();
-  const { currentLocale, changeLocale } = useI18n();
-  const { setSettings } = useConfigStore();
+  const { currentLocale: contextLocale, changeLocale } = useI18n();
 
   // Map locale codes to flag emojis (or use a proper flag icon library in a real app)
+  const effectiveLocale = value !== undefined ? value : contextLocale;
   const localeFlags: Record<string, string> = {
     en: '🇺🇸',
     vi: '🇻🇳',
@@ -91,72 +92,54 @@ export function LocaleSwitch({
 
   // Memoize the handler to avoid recreating it on each render
   const handleLocaleChange = useCallback(
-    (locale: string) => {
-      // Prevent unnecessary updates if the locale is already set
-      if (locale === currentLocale) {
+    (localeKey: string) => {
+      const appLocale = localeKey as AppLocale;
+
+      // Prevent unnecessary updates
+      if (appLocale === effectiveLocale) {
         return;
       }
 
       if (applyImmediately) {
-        // Apply changes immediately (for navbar)
-        changeLocale(locale);
-
-        // Also update in settings store for consistency
-        setSettings({ locale });
+        // Only call changeLocale from context, which handles store update and side effects
+        changeLocale(appLocale);
       } else if (onLocaleChange) {
-        // Defer changes to parent component (for settings page)
-        onLocaleChange(locale);
+        // Defer changes to parent component
+        onLocaleChange(appLocale);
       }
     },
-    [currentLocale, changeLocale, setSettings, applyImmediately, onLocaleChange]
+    [effectiveLocale, changeLocale, applyImmediately, onLocaleChange]
   );
+  // Add a check here: If locales is not ready, don't render anything
+  if (!locales) {
+    return null;
+  }
 
-  // Handler for dropdown selection
-  const handleDropdownAction = useCallback(
-    (key: React.Key) => {
-      handleLocaleChange(key as string);
-    },
-    [handleLocaleChange]
-  );
-
-  // Handler for select change
-  const handleSelectChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      handleLocaleChange(e.target.value);
-    },
-    [handleLocaleChange]
-  );
-
-  // Get the display locale - either from prop value, or from current app locale
-  const displayLocale = value || currentLocale;
+  // Determine the effective locale: controlled or from context
 
   // Render as dropdown (for navbar)
   if (variant === 'dropdown') {
     return (
       <Dropdown>
         <DropdownTrigger>
-          <Button
-            variant="light"
-            startContent={localeFlags[displayLocale] || '🌐'}
-            endContent={<span className="ml-1 text-xs">▼</span>}
-            className={`min-w-unit-24 ${className}`}
-          >
-            {locales[displayLocale as keyof typeof locales]}
+          <Button isIconOnly variant="light" aria-label={t('settings.selectLanguage')}>
+            <Globe size={20} />
           </Button>
         </DropdownTrigger>
         <DropdownMenu
-          aria-label={t('settings.selectLanguage')}
+          aria-label={t('settings.language')}
           selectionMode="single"
-          selectedKeys={[displayLocale]}
-          onAction={handleDropdownAction}
-          disallowEmptySelection
+          selectedKeys={effectiveLocale ? [effectiveLocale] : []}
+          onSelectionChange={(keys) => handleLocaleChange(Array.from(keys)[0] as string)}
         >
-          {Object.entries(locales).map(([code, name]) => (
-            <DropdownItem
-              key={code}
-              startContent={<span className="mr-2">{localeFlags[code] || '🌐'}</span>}
-            >
-              {name}
+          {Object.entries(locales).map(([code, { name, flag }]) => (
+            <DropdownItem key={code} textValue={name}>
+              <div className="flex items-center">
+                <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
+                  {localeFlags[code]}
+                </span>
+                {flag} {name}
+              </div>
             </DropdownItem>
           ))}
         </DropdownMenu>
@@ -167,32 +150,22 @@ export function LocaleSwitch({
   // Render as select (for settings page)
   return (
     <Select
-      label={label}
-      aria-label={t('settings.selectLanguage')}
+      label={label || t('settings.language')}
+      selectedKeys={effectiveLocale ? [effectiveLocale] : []}
+      onSelectionChange={(keys) => handleLocaleChange(Array.from(keys)[0] as string)}
       className={className}
-      selectedKeys={[displayLocale]}
-      onChange={(e) => handleLocaleChange(e.target.value)}
-      variant="bordered"
-      renderValue={(items) => {
-        return items.map((item) => (
-          <div key={item.key} className="flex items-center gap-2">
-            {localeFlags[item.key as string] && <span>{localeFlags[item.key as string]}</span>}
-            <span>{locales[item.key as keyof typeof locales]}</span>
-          </div>
-        ));
-      }}
+      aria-label={label || t('settings.selectLanguage')}
     >
-      {Object.entries(locales).map(([code, name]) => (
-        <SelectItem
-          key={code}
-          textValue={name}
-          startContent={<span className="mr-2">{localeFlags[code] || '🌐'}</span>}
-        >
-          {name}
+      {Object.entries(locales).map(([code, { name, flag }]) => (
+        <SelectItem key={code} textValue={name}>
+          <div className="flex items-center">
+            <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
+              {localeFlags[code]}
+            </span>
+            {flag} {name}
+          </div>
         </SelectItem>
       ))}
     </Select>
   );
 }
-
-export default LocaleSwitch;

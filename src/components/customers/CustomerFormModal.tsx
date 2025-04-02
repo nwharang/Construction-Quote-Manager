@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import type { RouterOutputs } from '~/utils/api';
 import { EntityModal } from '~/components/shared/EntityModal';
 import { FormField } from '~/components/ui/FormField';
 import { z } from 'zod';
 
 // Define the validation schema
 export const customerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email").optional().nullable(),
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email').optional().nullable(),
   phone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -29,7 +28,7 @@ type Customer = {
   createdAt: Date;
   updatedAt: Date;
   // Other fields may exist but are not needed for the form
-  [key: string]: any;
+  // REMOVED: [key: string]: any;
 };
 
 // Use this type for the form state
@@ -50,14 +49,14 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  isLoading = false
+  isLoading = false,
 }) => {
   const [formData, setFormData] = useState<CustomerFormState>({
     name: '',
     email: '',
     phone: '',
     address: '',
-    notes: ''
+    notes: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -71,7 +70,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           email: customer.email,
           phone: customer.phone,
           address: customer.address,
-          notes: customer.notes
+          notes: customer.notes,
         });
       } else {
         setFormData({
@@ -79,7 +78,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           email: '',
           phone: '',
           address: '',
-          notes: ''
+          notes: '',
         });
       }
       setErrors({});
@@ -88,23 +87,23 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.name) {
       newErrors.name = 'Name is required';
     }
-    
+
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Valid email is required';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -113,7 +112,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     if (validateForm()) {
       try {
         // Extract only the fields needed for the form submission
-        const { id, ...formDataWithoutId } = formData;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, ...formDataWithoutId } = formData;
         await onSubmit(formDataWithoutId as CustomerFormData);
         onClose();
       } catch (error) {
@@ -145,7 +145,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           isRequired
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
             id="email"
             name="email"
@@ -188,4 +188,4 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       </div>
     </EntityModal>
   );
-}; 
+};

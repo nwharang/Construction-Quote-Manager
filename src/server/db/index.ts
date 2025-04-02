@@ -1,11 +1,9 @@
-// Mark this as server-only code to prevent client-side imports
-import 'server-only';
+// Remove the explicit server-only import as it was causing conflicts
+// import 'server-only';
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-// Import the env variables directly instead of using dotenv.config()
-import { env } from "~/env.mjs";
 
 // This is a temporary implementation for build purposes
 // Replace with actual database configuration when ready

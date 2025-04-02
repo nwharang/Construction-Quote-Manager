@@ -5,23 +5,19 @@ import { Card, CardBody, Button, Spinner } from '@heroui/react';
 import { FileText, ArrowRight, CheckCircle2, Users } from 'lucide-react';
 import { api } from '~/utils/api';
 import type { RouterOutputs } from '~/utils/api';
-import { QuoteStatus } from '~/server/db/schema';
 import { useTrpcErrorHandling } from '~/hooks/useTrpcWithErrorHandling';
 
-type Quote = RouterOutputs['quote']['getAll']['quotes'][number];
+type Quote = RouterOutputs['quote']['getAll']['items'][number];
 
 export default function Home() {
   const router = useRouter();
-  const { data: session, status: authStatus } = useSession();
+  const { status: authStatus } = useSession();
 
   // Conditionally fetch quotes only when authenticated with error handling
-  const { 
-    data: quotesData, 
-    isLoading: isQuotesLoading 
-  } = useTrpcErrorHandling(
+  const { data: quotesData, isLoading: isQuotesLoading } = useTrpcErrorHandling(
     api.quote.getAll.useQuery(
       { page: 1, limit: 10 },
-      { 
+      {
         enabled: authStatus === 'authenticated',
         // Don't refetch on window focus to avoid unnecessary requests
         refetchOnWindowFocus: false,
@@ -35,7 +31,7 @@ export default function Home() {
   // Loading state
   if (authStatus === 'loading') {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <Spinner />
       </div>
     );
@@ -49,17 +45,17 @@ export default function Home() {
 
   // Get stats from the quotes data
   const totalQuotes = quotesData?.total ?? 0;
-  const quotes = quotesData?.quotes ?? [];
-  const acceptedQuotes = quotes.filter((q) => q.status === QuoteStatus.ACCEPTED).length;
-  const pendingQuotes = quotes.filter((q) => q.status === QuoteStatus.SENT).length;
+  const quotes = quotesData?.items ?? [];
+  const acceptedQuotes = quotes.filter((q) => q.status === 'ACCEPTED').length;
+  const pendingQuotes = quotes.filter((q) => q.status === 'SENT').length;
 
   return (
     <div className="container mx-auto px-4">
       <div className="flex flex-col gap-6">
         {/* Welcome Section */}
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground/90">Welcome Back</h1>
+            <h1 className="text-foreground/90 text-2xl font-bold">Welcome Back</h1>
             <p className="text-muted-foreground/80">Manage your construction quotes</p>
           </div>
           <Button
@@ -72,17 +68,17 @@ export default function Home() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Total Quotes */}
-          <Card className="bg-card/50 backdrop-blur-sm border border-border/50">
+          <Card className="bg-card/50 border-border/50 border backdrop-blur-sm">
             <CardBody className="p-4">
               <div className="flex items-center gap-4">
-                <div className="p-2 rounded-lg bg-primary/5">
+                <div className="bg-primary/5 rounded-lg p-2">
                   <FileText size={24} className="text-primary/80" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground/80">Total Quotes</p>
-                  <div className="text-2xl font-semibold text-foreground/90">
+                  <p className="text-muted-foreground/80 text-sm">Total Quotes</p>
+                  <div className="text-foreground/90 text-2xl font-semibold">
                     {isQuotesLoading ? <Spinner /> : totalQuotes}
                   </div>
                 </div>
@@ -91,15 +87,15 @@ export default function Home() {
           </Card>
 
           {/* Accepted Quotes */}
-          <Card className="bg-card/50 backdrop-blur-sm border border-border/50">
+          <Card className="bg-card/50 border-border/50 border backdrop-blur-sm">
             <CardBody className="p-4">
               <div className="flex items-center gap-4">
-                <div className="p-2 rounded-lg bg-success/5">
+                <div className="bg-success/5 rounded-lg p-2">
                   <CheckCircle2 size={24} className="text-success/80" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground/80">Accepted Quotes</p>
-                  <div className="text-2xl font-semibold text-foreground/90">
+                  <p className="text-muted-foreground/80 text-sm">Accepted Quotes</p>
+                  <div className="text-foreground/90 text-2xl font-semibold">
                     {isQuotesLoading ? <Spinner /> : acceptedQuotes}
                   </div>
                 </div>
@@ -108,15 +104,15 @@ export default function Home() {
           </Card>
 
           {/* Pending Quotes */}
-          <Card className="bg-card/50 backdrop-blur-sm border border-border/50">
+          <Card className="bg-card/50 border-border/50 border backdrop-blur-sm">
             <CardBody className="p-4">
               <div className="flex items-center gap-4">
-                <div className="p-2 rounded-lg bg-warning/5">
+                <div className="bg-warning/5 rounded-lg p-2">
                   <Users size={24} className="text-warning/80" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground/80">Pending Quotes</p>
-                  <div className="text-2xl font-semibold text-foreground/90">
+                  <p className="text-muted-foreground/80 text-sm">Pending Quotes</p>
+                  <div className="text-foreground/90 text-2xl font-semibold">
                     {isQuotesLoading ? <Spinner /> : pendingQuotes}
                   </div>
                 </div>
@@ -126,10 +122,10 @@ export default function Home() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="bg-card/50 backdrop-blur-sm border border-border/50">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <Card className="bg-card/50 border-border/50 border backdrop-blur-sm">
             <CardBody className="p-6">
-              <h3 className="text-lg font-medium text-foreground/90 mb-4">Quick Actions</h3>
+              <h3 className="text-foreground/90 mb-4 text-lg font-medium">Quick Actions</h3>
               <div className="space-y-4">
                 <Button
                   variant="flat"
@@ -153,16 +149,16 @@ export default function Home() {
             </CardBody>
           </Card>
 
-          <Card className="bg-card/50 backdrop-blur-sm border border-border/50">
+          <Card className="bg-card/50 border-border/50 border backdrop-blur-sm">
             <CardBody className="p-6">
-              <h3 className="text-lg font-medium text-foreground/90 mb-4">Recent Activity</h3>
+              <h3 className="text-foreground/90 mb-4 text-lg font-medium">Recent Activity</h3>
               {quotes.length > 0 ? (
                 <div className="space-y-4">
                   {quotes.slice(0, 3).map((quote: Quote) => (
                     <div key={quote.id} className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-foreground/90">{quote.title}</p>
-                        <p className="text-sm text-muted-foreground/80">{quote.customerName}</p>
+                        <p className="text-foreground/90 text-sm font-medium">{quote.title}</p>
+                        <p className="text-muted-foreground/80 text-sm">{quote.customer.name}</p>
                       </div>
                       <Button
                         isIconOnly
@@ -175,8 +171,8 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground/80">No recent activity</p>
+                <div className="py-4 text-center">
+                  <p className="text-muted-foreground/80 text-sm">No recent activity</p>
                 </div>
               )}
             </CardBody>

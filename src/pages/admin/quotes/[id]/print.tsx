@@ -7,8 +7,6 @@ import { useSession } from 'next-auth/react';
 import {
   Button,
   Spinner,
-  Card,
-  CardBody,
   Table,
   TableHeader,
   TableColumn,
@@ -20,36 +18,33 @@ import { Download, Printer } from 'lucide-react';
 import { api } from '~/utils/api';
 import { useToastStore } from '~/store';
 import { useTranslation } from '~/hooks/useTranslation';
-import {
-  formatCurrency,
-  formatDate,
-  formatUserFriendlyId,
-  formatPercentage,
-} from '~/utils/formatters';
+import { useConfigStore } from '~/store/configStore';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '~/server/api/root';
 import type { NextPageWithLayout } from '~/types/next';
-import PrintLayout from '~/layouts/PrintLayout';
+import { PrintLayout } from '~/layouts/PrintLayout';
 
-type RouterInput = inferRouterInputs<AppRouter>;
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type QuoteResponse = NonNullable<RouterOutput['quote']['getById']>;
 type Task = NonNullable<QuoteResponse['tasks']>[number];
 type MaterialItem = NonNullable<Task['materials']>[number];
 
-interface PrintPageProps {}
-
-const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
+const PrintQuotePage: NextPageWithLayout = () => {
   const router = useRouter();
   const { id: quoteId } = router.query;
   const { status } = useSession();
   const toast = useToastStore();
   const { formatCurrency, formatDate, t } = useTranslation();
+  const companyDetails = useConfigStore((state) => ({
+    name: state.settings?.companyName,
+    email: state.settings?.companyEmail,
+    phone: state.settings?.companyPhone,
+    address: state.settings?.companyAddress,
+  }));
   const [mounted, setMounted] = useState(false);
   const [quoteData, setQuoteData] = useState<QuoteResponse | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const printRef = useRef<HTMLDivElement>(null);
 
   const { data: fetchedQuoteData, isLoading } = api.quote.getById.useQuery(
@@ -68,11 +63,6 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
     if (fetchedQuoteData) {
       try {
         setQuoteData(fetchedQuoteData);
-
-        if (fetchedQuoteData.tasks && Array.isArray(fetchedQuoteData.tasks)) {
-          setTasks(fetchedQuoteData.tasks);
-        }
-        
       } catch (error) {
         console.error('Error processing quote data:', error);
         toast.error('Error loading quote data');
@@ -141,11 +131,12 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
 
     const subtotalTasks = getLaborTotal(quoteData.tasks);
     const subtotalMaterials = quoteData.tasks.reduce((sum: number, task: Task) => {
-      if (task.materialType === 'lumpsum') {
+      if (task.materialType === 'ITEMIZED' && task.materials) {
+        return sum + getMaterialsTotal(task.materials);
+      } else if (task.materialType === 'LUMPSUM') {
         return sum + (Number(task.estimatedMaterialsCost) || 0);
-      } else {
-        return sum + getMaterialsTotal(task.materials || []);
       }
+      return sum;
     }, 0);
 
     const grandTotal = Number(quoteData.grandTotal) || 0;
@@ -156,6 +147,22 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
       grandTotal,
     };
   }, [quoteData]);
+
+  const toNumber = (value: string | number | null | undefined): number => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const formatPercent = (value: number | string | null | undefined) => {
+    const num = toNumber(value);
+    return num.toLocaleString(undefined, {
+      style: 'percent',
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+  };
 
   if (!mounted || status === 'loading' || isLoading) {
     return (
@@ -176,7 +183,7 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
         <div className="py-12 text-center">
           <h2 className="mb-4 text-2xl font-bold">Quote Not Found</h2>
           <p className="mb-6 text-gray-500">
-            The quote you're looking for doesn't exist or has been removed.
+            The quote you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
           <Button color="primary" onPress={() => router.push('/admin/quotes')}>
             Back to Quotes
@@ -191,7 +198,7 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
   return (
     <>
       <Head>
-        <title>Quote #{quoteData.sequentialId || ''} | Print View</title>
+        <title>{t('quotes.print.title', { id: `#${quoteData.sequentialId}` })}</title>
       </Head>
 
       <div className="no-print fixed top-0 right-0 left-0 z-10 bg-white p-4 shadow-md print:hidden">
@@ -226,26 +233,30 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
       >
         <div className="mb-8 flex flex-col items-center justify-between border-b border-gray-300 pb-4 print:flex-row print:items-start print:border-b-2 print:border-black">
           <div>
-            <h1 className="text-xl font-bold print:text-2xl">Construction Quote Manager</h1>
-            <div className="text-sm text-gray-500 print:text-xs">
-              <p>123 Construction Avenue, Builder City, State 12345</p>
-              <p>Phone: (555) 123-4567 | Email: info@constructionquote.com</p>
-            </div>
+            {companyDetails.name && (
+              <>
+                <h1 className="text-xl font-bold print:text-2xl">{companyDetails.name}</h1>
+                <div className="text-sm text-gray-500 print:text-xs">
+                  {companyDetails.address && <p>{companyDetails.address}</p>}
+                  {(companyDetails.phone || companyDetails.email) && (
+                    <p>
+                      {companyDetails.phone}
+                      {companyDetails.phone && companyDetails.email && ' | '}
+                      {companyDetails.email}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           <div className="mt-4 text-center print:mt-0 print:text-right">
             <h2 className="mb-1 text-2xl font-bold text-gray-700 print:text-3xl">QUOTE</h2>
             <p className="text-sm text-gray-500 print:text-base">
-              <span className="font-semibold">Quote #:</span> {quoteData.sequentialId}
+              {t('quotes.id')}: #{quoteData.sequentialId}
             </p>
             <p className="text-sm text-gray-500 print:text-base">
-              <span className="font-semibold">Date:</span> {formatDate(quoteData.createdAt)}
+              {t('quotes.date')}: {formatDate(quoteData.createdAt)}
             </p>
-            {quoteData.validUntil && (
-              <p className="text-sm text-gray-500 print:text-base">
-                <span className="font-semibold">Valid Until:</span>{' '}
-                {formatDate(quoteData.validUntil)}
-              </p>
-            )}
             <p className="mt-2 text-sm font-medium uppercase print:mt-1 print:text-xs">
               STATUS: {quoteData.status}
             </p>
@@ -257,27 +268,25 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-6 print:grid-cols-2">
-          {quoteData?.customer && (
-            <div>
-              <h3 className="mb-2 text-base font-bold text-gray-700 print:text-lg">
-                Customer Information
-              </h3>
-              <div className="rounded-md border bg-gray-50 p-4 print:border-gray-300 print:bg-transparent print:p-0">
-                <p className="font-semibold print:font-bold">{quoteData.customer.name}</p>
-                {quoteData.customer.email && (
-                  <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.email}</p>
-                )}
-                {quoteData.customer.phone && (
-                  <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.phone}</p>
-                )}
-                {quoteData.customer.address && (
-                  <p className="mt-1 text-sm whitespace-pre-line text-gray-600 print:text-sm">
-                    {quoteData.customer.address}
-                  </p>
-                )}
-              </div>
+          <div>
+            <h3 className="mb-2 text-base font-bold text-gray-700 print:text-lg">
+              Customer Information
+            </h3>
+            <div className="rounded-md border bg-gray-50 p-4 print:border-gray-300 print:bg-transparent print:p-0">
+              <p className="font-semibold print:font-bold">{quoteData.customer.name}</p>
+              {quoteData.customer.email && (
+                <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.email}</p>
+              )}
+              {quoteData.customer.phone && (
+                <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.phone}</p>
+              )}
+              {quoteData.customer.address && (
+                <p className="mt-1 text-sm whitespace-pre-line text-gray-600 print:text-sm">
+                  {quoteData.customer.address}
+                </p>
+              )}
             </div>
-          )}
+          </div>
           <div>
             <h3 className="mb-2 text-base font-bold text-gray-700 print:text-lg">Quote Summary</h3>
             <div className="rounded-md border bg-gray-50 p-4 print:border-none print:bg-transparent print:p-0">
@@ -297,7 +306,7 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
               {quoteData.markupCharge > 0 && (
                 <div className="mb-1 flex justify-between print:mb-0.5">
                   <span className="text-sm text-gray-600 print:text-sm">
-                    Markup ({formatPercentage(quoteData.markupPercentage)}):
+                    Markup ({formatPercent(quoteData.markupPercentage)}):
                   </span>
                   <span className="text-sm print:text-sm">
                     {formatCurrency(quoteData.markupCharge)}
@@ -333,24 +342,24 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
                   </div>
                   <div className="flex justify-between text-sm print:text-xs">
                     <p>
-                      {t('quotes.taskPriceLabel')}: {formatCurrency(task.price)}
+                      {t('quotes.taskPriceLabel')}: {formatCurrency(toNumber(task.price))}
                     </p>
                     <p>
                       {t('quotes.materialTypeLabel')}:{' '}
-                      <span className="capitalize">{task.materialType || '-'}</span>
+                      <span className="capitalize">{task.materialType?.toUpperCase() || '-'}</span>
                     </p>
                   </div>
 
-                  {task.materialType === 'lumpsum' && (
+                  {task.materialType === 'LUMPSUM' && (
                     <div className="text-sm print:text-xs">
                       <p>
                         {t('quotes.estimatedMaterialCostLumpSumLabel')}:{' '}
-                        {formatCurrency(task.estimatedMaterialsCost ?? 0)}
+                        {formatCurrency(toNumber(task.estimatedMaterialsCost) || 0)}
                       </p>
                     </div>
                   )}
 
-                  {task.materialType === 'itemized' &&
+                  {task.materialType === 'ITEMIZED' &&
                     task.materials &&
                     task.materials.length > 0 && (
                       <div className="mt-2 pl-4 print:mt-1 print:pl-2">
@@ -384,12 +393,16 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
                                   {material.productId || t('common.notAvailable')}
                                 </TableCell>
                                 <TableCell>{material.notes || '-'}</TableCell>
-                                <TableCell className="text-right">{material.quantity}</TableCell>
                                 <TableCell className="text-right">
-                                  {formatCurrency(material.unitPrice)}
+                                  {toNumber(material.quantity)}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {formatCurrency(material.quantity * material.unitPrice)}
+                                  {formatCurrency(toNumber(material.unitPrice))}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatCurrency(
+                                    toNumber(material.quantity) * toNumber(material.unitPrice)
+                                  )}
                                 </TableCell>
                               </TableRow>
                             )}
@@ -397,7 +410,7 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
                         </Table>
                       </div>
                     )}
-                  {task.materialType === 'itemized' &&
+                  {task.materialType === 'ITEMIZED' &&
                     (!task.materials || task.materials.length === 0) && (
                       <p className="mt-1 pl-4 text-xs text-gray-500 italic print:pl-2">
                         {t('quotes.noMaterialsAdded')}
@@ -448,7 +461,6 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
           </div>
         </div>
 
-        {/* Signature Section - Adjust spacing for print */}
         <div className="mt-12 grid grid-cols-1 gap-8 border-t border-gray-300 pt-8 print:mt-8 print:grid-cols-2 print:gap-12 print:border-t-2 print:border-black print:pt-4">
           <div>
             <p className="mb-4 text-sm text-gray-600 print:mb-2 print:text-xs">
@@ -478,17 +490,24 @@ const PrintQuotePage: NextPageWithLayout<PrintPageProps> = (props) => {
           </div>
         </div>
 
-        {/* Footer - Simplify for print */}
         <div className="mt-12 border-t border-gray-300 pt-4 text-center text-sm text-gray-500 print:mt-6 print:border-t-2 print:border-black print:pt-2 print:text-xs">
           <p>Thank you for your business!</p>
           <p>For any questions regarding this quote, please contact us at (555) 123-4567.</p>
+        </div>
+
+        <div className="mt-8 text-right text-xs">
+          <p>Quote Generated On: {formatDate(new Date(), 'long')}</p>
+          <p>Thank you for your business!</p>
+          <p className="mt-2 italic">
+            {companyDetails.name ||
+              'Your Company Name - 123 Street, City, State ZIP - (555) 123-4567 - your@email.com'}
+          </p>
         </div>
       </div>
     </>
   );
 };
 
-// Assign the PrintLayout to the page
 PrintQuotePage.getLayout = function getLayout(page: React.ReactElement) {
   return <PrintLayout>{page}</PrintLayout>;
 };

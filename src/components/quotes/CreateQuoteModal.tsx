@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   Modal,
   ModalContent,
@@ -11,22 +11,12 @@ import {
   Input,
   Textarea,
 } from '@heroui/react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from '@tanstack/react-form';
 import { z } from 'zod';
 import { api } from '~/utils/api';
-import { useRouter } from 'next/navigation';
-import { CustomerSelect, type CustomerData } from '~/components/customers/CustomerSelect';
-import { useToastStore } from '~/store';
+import { CustomerSelector } from '~/components/customers/CustomerSelector';
 import { useTranslation } from '~/hooks/useTranslation';
-
-const getCreateQuoteSchema = (t: Function) => z.object({
-  title: z.string().min(1, t('quotes.validation.titleRequired')),
-  customerId: z.string().min(1, t('quotes.validation.customerRequired')),
-  notes: z.string().optional().or(z.literal('')),
-});
-
-type CreateQuoteForm = z.infer<ReturnType<typeof getCreateQuoteSchema>>;
+import { useAppToast } from '~/components/providers/ToastProvider';
 
 interface CreateQuoteModalProps {
   isOpen: boolean;
@@ -34,31 +24,34 @@ interface CreateQuoteModalProps {
   onSuccess?: (newQuoteId: string) => void;
 }
 
+function FieldInfo({ errors }: { errors?: { message: string }[] }) {
+  const errorMessages = errors
+    ?.map((e) => e.message)
+    .filter((msg) => typeof msg === 'string' && msg.length > 0);
+
+  return (
+    <>
+      {errorMessages && errorMessages.length > 0 ? (
+        <p className="text-danger mt-1 text-xs">{errorMessages.join(', ')}</p>
+      ) : null}
+    </>
+  );
+}
+
 export function CreateQuoteModal({ isOpen, onClose, onSuccess }: CreateQuoteModalProps) {
-  const router = useRouter();
-  const toast = useToastStore();
+  const toast = useAppToast();
   const { t } = useTranslation();
 
-  // Get schema with translations by calling the function
-  const createQuoteSchema = getCreateQuoteSchema(t);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-    setValue,
-    watch,
-  } = useForm<CreateQuoteForm>({
-    resolver: zodResolver(createQuoteSchema),
+  const createQuoteSchema = z.object({
+    title: z.string().min(1, t('quotes.validation.titleRequired', { field: 'Title' })),
+    customerId: z.string().min(1, t('quotes.validation.customerRequired', { field: 'Customer' })),
+    notes: z.string(),
   });
 
-  const customerId = watch('customerId');
-
-  const createQuote = api.quote.create.useMutation({
+  const createQuoteMutation = api.quote.create.useMutation({
     onSuccess: (newQuote) => {
       toast.success(`Quote "${newQuote.title}" created successfully`);
-      reset();
+      form.reset();
       if (onSuccess) {
         onSuccess(newQuote.id);
       } else {
@@ -70,52 +63,117 @@ export function CreateQuoteModal({ isOpen, onClose, onSuccess }: CreateQuoteModa
     },
   });
 
-  const onSubmit = (data: CreateQuoteForm) => {
-    createQuote.mutate(data);
-  };
+  const form = useForm({
+    defaultValues: {
+      title: '',
+      customerId: '',
+      notes: '',
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        const submitValue = { ...value, notes: value.notes === '' ? null : value.notes };
+        await createQuoteMutation.mutateAsync(submitValue);
+      } catch (error) {
+        console.error('Submission Error caught in onSubmit:', error);
+      }
+    },
+    validators: {
+      onChange: createQuoteSchema,
+    },
+  });
 
-  const handleCustomerChange = (id: string | null, customerData?: CustomerData) => {
-    setValue('customerId', id || '');
-  };
+  useEffect(() => {
+    if (!isOpen) {
+      setTimeout(() => form.reset(), 150);
+    }
+  }, [isOpen, form]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <ModalContent>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <ModalHeader>Create New Quote</ModalHeader>
-          <ModalBody>
-            <Input
-              label="Project Name"
-              {...register('title')}
-              errorMessage={errors.title?.message}
-              isInvalid={!!errors.title}
-            />
-            <div className="space-y-1">
-              <CustomerSelect
-                value={customerId || null}
-                onChange={handleCustomerChange}
-              />
-              {errors.customerId && (
-                <p className="text-danger text-sm">{errors.customerId.message}</p>
-              )}
-            </div>
-            <Textarea
-              label="Notes"
-              {...register('notes')}
-              errorMessage={errors.notes?.message}
-              isInvalid={!!errors.notes}
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button color="danger" onPress={onClose}>
-              Cancel
-            </Button>
-            <Button color="primary" type="submit" isLoading={createQuote.isPending}>
-              Create
-            </Button>
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} backdrop="blur">
+        <ModalContent>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+            className="flex flex-col"
+          >
+            <ModalHeader className="text-lg font-semibold">Create New Quote</ModalHeader>
+            <ModalBody className="space-y-4">
+              <form.Field name="title">
+                {(field) => (
+                  <>
+                    <label htmlFor={field.name} className="block text-sm font-medium text-gray-700">
+                      {t('quotes.fields.title')} <span className="text-danger">*</span>
+                    </label>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      placeholder="Enter quote title (e.g., Kitchen Remodel - Smith)"
+                    />
+                    <FieldInfo errors={field.state.meta.errors as { message: string }[]} />
+                  </>
+                )}
+              </form.Field>
+
+              <form.Field name="customerId">
+                {(field) => (
+                  <>
+                    <label htmlFor={field.name} className="block text-sm font-medium text-gray-700">
+                      {t('quotes.fields.customer')} <span className="text-danger">*</span>
+                    </label>
+                    <CustomerSelector
+                      value={field.state.value}
+                      onChange={(id) => field.handleChange(id ?? '')}
+                      placeholder={t('quotes.placeholders.selectCustomer')}
+                      className="mt-1"
+                    />
+                    <FieldInfo errors={field.state.meta.errors as { message: string }[]} />
+                  </>
+                )}
+              </form.Field>
+
+              <form.Field name="notes">
+                {(field) => (
+                  <>
+                    <label htmlFor={field.name} className="block text-sm font-medium text-gray-700">
+                      {t('quotes.fields.notes')}
+                    </label>
+                    <Textarea
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      placeholder={t('quotes.placeholders.notes')}
+                      className="mt-1"
+                    />
+                    <FieldInfo errors={field.state.meta.errors as { message: string }[]} />
+                  </>
+                )}
+              </form.Field>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" color="default" onPress={onClose}>
+                {t('button.cancel')}
+              </Button>
+              <Button
+                color="primary"
+                type="submit"
+                isLoading={form.state.isSubmitting}
+                isDisabled={!form.state.isValid}
+              >
+                {t('button.create')}
+              </Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+    </>
   );
 }

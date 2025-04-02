@@ -8,6 +8,9 @@ export * from './entityStore';
 export * from './toastStore';
 export * from './configStore';
 
+// Import useEntityStore for the helper function
+import { useEntityStore } from './entityStore';
+
 /**
  * Creates an entity store with the specified settings
  * @param entityType The type of entity
@@ -15,7 +18,6 @@ export * from './configStore';
  * @param displayNameField The field to use for display names
  */
 export function createEntityStore(entityType: string, baseUrl: string, displayNameField: string = 'name') {
-  const { useEntityStore } = require('./entityStore');
   useEntityStore.getState().setEntitySettings({
     entityName: entityType,
     entityType,

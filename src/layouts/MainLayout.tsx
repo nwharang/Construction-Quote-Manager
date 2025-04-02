@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { useTranslation } from '~/utils/i18n';
+import { useTranslation } from '~/hooks/useTranslation';
 import { Navigation } from '~/components/shared/Navigation';
 import { Sidebar } from '~/components/shared/Sidebar';
 
@@ -13,8 +13,9 @@ interface MainLayoutProps {
  * Includes sidebar navigation, top navbar, and content area
  */
 export function MainLayout({ children }: MainLayoutProps) {
-  const { data: session } = useSession();
-  const { t } = useTranslation();
+  useSession();
+  useTranslation();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const toggleSidebar = () => {
@@ -41,5 +42,3 @@ export function MainLayout({ children }: MainLayoutProps) {
     </div>
   );
 }
-
-export default MainLayout;

@@ -4,8 +4,6 @@ import type { AppProps } from 'next/app';
 import { api } from '~/utils/api';
 import { Providers } from '~/components/providers';
 import { MainLayout, PrintLayout } from '~/layouts';
-import { useRouter } from 'next/router';
-import type { NextPageWithLayout } from "~/types/next";
 
 // Define AppPropsWithLayout type using the imported NextPageWithLayout
 type AppPropsWithLayout = AppProps & {

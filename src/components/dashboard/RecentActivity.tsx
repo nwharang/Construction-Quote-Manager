@@ -1,17 +1,11 @@
 import React from 'react';
 import { Card, CardHeader, CardBody, Chip, Button } from '@heroui/react';
 import { FileText, Plus } from 'lucide-react';
-import { QuoteStatus } from '~/server/db/schema';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useRouter } from 'next/router';
+import type { RouterOutputs } from '~/utils/api';
 
-interface Quote {
-  id: string;
-  title: string;
-  customerName: string;
-  status: keyof typeof QuoteStatus;
-  grandTotal: string;
-}
+type Quote = RouterOutputs['quote']['getAll']['items'][number];
 
 interface RecentActivityProps {
   quotes: Quote[];
@@ -23,6 +17,28 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ quotes }) => {
 
   const goToNewQuote = () => {
     router.push('/admin/quotes/new');
+  };
+
+  // Render the status chip for a quote
+  const renderStatusChip = (status: string) => {
+    const statusMap: Record<
+      string,
+      { color: 'default' | 'primary' | 'success' | 'danger'; label: string }
+    > = {
+      // Use string literals
+      DRAFT: { color: 'default', label: 'Draft' },
+      SENT: { color: 'primary', label: 'Sent' },
+      ACCEPTED: { color: 'success', label: 'Accepted' },
+      REJECTED: { color: 'danger', label: 'Rejected' },
+    };
+
+    const { color, label } = statusMap[status] || { color: 'default', label: status };
+
+    return (
+      <Chip size="sm" variant="flat" color={color}>
+        {label}
+      </Chip>
+    );
   };
 
   return (
@@ -45,28 +61,14 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ quotes }) => {
                   </div>
                   <div>
                     <p className="text-foreground/90 text-sm font-medium">{quote.title}</p>
-                    <p className="text-muted-foreground/80 text-sm">{quote.customerName}</p>
+                    <p className="text-muted-foreground/80 text-sm">{quote.customer.name}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
                   <span className="text-muted-foreground/80 text-sm">
                     {formatCurrency(Number(quote.grandTotal))}
                   </span>
-                  <Chip
-                    size="sm"
-                    variant="flat"
-                    color={
-                      quote.status === QuoteStatus.ACCEPTED
-                        ? 'success'
-                        : quote.status === QuoteStatus.REJECTED
-                          ? 'danger'
-                          : quote.status === QuoteStatus.SENT
-                            ? 'primary'
-                            : 'default'
-                    }
-                  >
-                    {quote.status.toLowerCase()}
-                  </Chip>
+                  {renderStatusChip(quote.status)}
                 </div>
               </div>
             ))}

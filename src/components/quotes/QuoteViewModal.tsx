@@ -23,7 +23,6 @@ import {
 } from '@heroui/react';
 import { api, type RouterOutputs } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
-import { formatCurrency, formatDate, formatUserFriendlyId, formatPercentage } from '~/utils/formatters';
 
 // Type for the fetched quote data
 type QuoteData = NonNullable<RouterOutputs['quote']['getById']>;
@@ -31,7 +30,10 @@ type QuoteData = NonNullable<RouterOutputs['quote']['getById']>;
 type MaterialItem = NonNullable<QuoteData['tasks'][number]['materials']>[number];
 
 // Define QuoteStatusSettings locally or import if shared
-const QuoteStatusSettings: Record<string, { color: 'default' | 'primary' | 'success' | 'danger'; labelKey: string }> = {
+const QuoteStatusSettings: Record<
+  string,
+  { color: 'default' | 'primary' | 'success' | 'danger'; labelKey: string }
+> = {
   DRAFT: { color: 'default', labelKey: 'quotes.status.draft' },
   SENT: { color: 'primary', labelKey: 'quotes.status.sent' },
   ACCEPTED: { color: 'success', labelKey: 'quotes.status.accepted' },
@@ -44,18 +46,18 @@ interface QuoteViewModalProps {
   onClose: () => void;
 }
 
-export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
-  quoteId,
-  isOpen,
-  onClose,
-}) => {
-  const { t } = useTranslation();
+export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({ quoteId, isOpen, onClose }) => {
+  const { t, formatCurrency, formatDate } = useTranslation();
   const router = useRouter();
 
   // Fetch quote data
-  const { data: quoteData, isLoading, isError } = api.quote.getById.useQuery(
-    { 
-      id: quoteId!, 
+  const {
+    data: quoteData,
+    isLoading,
+    isError,
+  } = api.quote.getById.useQuery(
+    {
+      id: quoteId!,
       // includeRelated: true // Removed - Input schema doesn't support this
     },
     {
@@ -65,10 +67,22 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
     }
   );
 
+  const formatUserFriendlyId = (uuid: string, sequentialId: number | null): string => {
+    const shortUuid = uuid.substring(0, 8);
+    return sequentialId ? `#${sequentialId} (${shortUuid})` : uuid;
+  };
+
   const handlePrint = () => {
     if (quoteId) {
       router.push(`/admin/quotes/${quoteId}/print`);
     }
+  };
+
+  const toNumber = (value: string | number | null | undefined): number => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
   };
 
   return (
@@ -78,14 +92,16 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
           {isLoading
             ? t('common.loading')
             : isError
-            ? t('common.error')
-            : quoteData
-            ? `${t('quotes.viewModalTitle')} ${formatUserFriendlyId(quoteData.id, quoteData.sequentialId)}`
-            : t('quotes.viewModalTitle')}
+              ? t('common.error')
+              : quoteData
+                ? t('quotes.viewModalTitle', {
+                    id: formatUserFriendlyId(quoteData.id, quoteData.sequentialId),
+                  })
+                : t('quotes.viewModalTitle')}
         </ModalHeader>
         <ModalBody>
           {isLoading ? (
-            <div className="flex justify-center items-center h-48">
+            <div className="flex h-48 items-center justify-center">
               <Spinner label={t('common.loading')} />
             </div>
           ) : isError ? (
@@ -96,21 +112,26 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
               {/* Basic Info Card */}
               <Card>
                 <CardBody>
-                  <h3 className="text-lg font-semibold mb-2">{t('quotes.detailsSectionTitle', { defaultValue: 'Details' })}</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                  <h3 className="mb-2 text-lg font-semibold">{t('quotes.detailsSectionTitle')}</h3>
+                  <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
                     <div>
                       <p className="text-sm text-gray-500">{t('quotes.titleLabel')}</p>
                       <p className="font-medium">{quoteData.title}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">{t('quotes.customerLabel')}</p>
-                      <p className="font-medium">{quoteData.customer?.name || t('common.notAvailable')}</p>
+                      <p className="font-medium">
+                        {quoteData.customer?.name || t('common.notAvailable')}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">{t('common.status')}</p>
                       {(() => {
                         const statusKey = (quoteData.status ?? 'UNKNOWN').toUpperCase();
-                        const setting = QuoteStatusSettings[statusKey] || { color: 'default', labelKey: 'common.unknown' };
+                        const setting = QuoteStatusSettings[statusKey] || {
+                          color: 'default',
+                          labelKey: 'common.unknown',
+                        };
                         return (
                           <Chip size="sm" color={setting.color}>
                             {t(setting.labelKey)}
@@ -120,14 +141,14 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">{t('quotes.createdDateLabel')}</p>
-                      <p className="font-medium">{formatDate(quoteData.createdAt)}</p>
+                      <p className="font-medium">{formatDate(quoteData.createdAt, 'long')}</p>
                     </div>
                   </div>
                   {quoteData.notes && (
                     <>
                       <Divider className="my-3" />
                       <div>
-                        <p className="text-sm text-gray-500 mb-1">{t('quotes.notesLabel')}</p>
+                        <p className="mb-1 text-sm text-gray-500">{t('quotes.notesLabel')}</p>
                         {/* Display notes, consider formatting if needed */}
                         <p className="text-sm whitespace-pre-wrap">{quoteData.notes}</p>
                       </div>
@@ -139,49 +160,75 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
               {/* Tasks/Materials Card */}
               <Card>
                 <CardBody>
-                  <h3 className="text-lg font-semibold mb-2">{t('quotes.tasksSectionTitle')}</h3>
+                  <h3 className="mb-2 text-lg font-semibold">{t('quotes.tasksSectionTitle')}</h3>
                   {quoteData.tasks && quoteData.tasks.length > 0 ? (
                     <div className="space-y-4">
                       {quoteData.tasks.map((task: QuoteData['tasks'][number], index: number) => (
-                        <div key={task.id || index} className="p-3 border rounded-md">
-                          <div className="flex justify-between items-start mb-2">
-                            <p className="font-medium">{task.description || t('common.noDescription')}</p>
-                            <p className="font-medium text-right">{formatCurrency(task.price)}</p>
+                        <div key={task.id || index} className="rounded-md border p-3">
+                          <div className="mb-2 flex items-start justify-between">
+                            <p className="font-medium">
+                              {task.description || t('common.noDescription')}
+                            </p>
+                            <p className="text-right font-medium">{formatCurrency(task.price)}</p>
                           </div>
-                          
-                          {task.materialType === 'lumpsum' && (
-                            <p className="text-sm text-gray-600 pl-2">
-                              {t('quotes.materialTypeLumpSum')}: {formatCurrency(task.estimatedMaterialsCost ?? 0)}
+
+                          {task.materialType === 'LUMPSUM' && (
+                            <p className="pl-2 text-sm text-gray-600">
+                              {t('quotes.materialTypeLumpSum')}:{' '}
+                              {formatCurrency(task.estimatedMaterialsCost ?? 0)}
                             </p>
                           )}
 
-                          {task.materialType === 'itemized' && task.materials && task.materials.length > 0 && (
-                            <div className="pl-2 mt-2">
-                              <p className="text-sm font-medium mb-1">{t('quotes.materialsSectionTitle')}:</p>
-                              <Table removeWrapper aria-label={`Materials for task ${index + 1}`}>
-                                <TableHeader>
-                                  {/* TODO: Add Product Name column later */}
-                                  <TableColumn>{t('quotes.materialProductIdHeader')}</TableColumn>
-                                  <TableColumn className="text-right">{t('quotes.materialQuantityHeader')}</TableColumn>
-                                  <TableColumn className="text-right">{t('quotes.materialUnitPriceHeader')}</TableColumn>
-                                  <TableColumn className="text-right">{t('quotes.materialLineTotalHeader')}</TableColumn>
-                                </TableHeader>
-                                <TableBody items={task.materials as MaterialItem[]}>
-                                  {(material) => (
-                                    <TableRow key={material.id}>
-                                      <TableCell>{material.productId || t('common.notAvailable')}</TableCell>
-                                      <TableCell className="text-right">{material.quantity}</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(material.unitPrice)}</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(material.quantity * material.unitPrice)}</TableCell>
-                                    </TableRow>
-                                  )}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          )}
-                          {task.materialType === 'itemized' && (!task.materials || task.materials.length === 0) && (
-                             <p className="text-sm text-gray-500 pl-2 italic">{t('quotes.noMaterialsForItemized')}</p>
-                          )}
+                          {task.materialType === 'ITEMIZED' &&
+                            task.materials &&
+                            task.materials.length > 0 && (
+                              <div className="mt-2 pl-2">
+                                <p className="mb-1 text-sm font-medium">
+                                  {t('quotes.materialsSectionTitle')}:
+                                </p>
+                                <Table removeWrapper aria-label={`Materials for task ${index + 1}`}>
+                                  <TableHeader>
+                                    {/* TODO: Add Product Name column later */}
+                                    <TableColumn>{t('quotes.materialProductIdHeader')}</TableColumn>
+                                    <TableColumn className="text-right">
+                                      {t('quotes.materialQuantityHeader')}
+                                    </TableColumn>
+                                    <TableColumn className="text-right">
+                                      {t('quotes.materialUnitPriceHeader')}
+                                    </TableColumn>
+                                    <TableColumn className="text-right">
+                                      {t('quotes.materialLineTotalHeader')}
+                                    </TableColumn>
+                                  </TableHeader>
+                                  <TableBody items={task.materials as MaterialItem[]}>
+                                    {(material) => (
+                                      <TableRow key={material.id}>
+                                        <TableCell>
+                                          {material.productId || t('common.notAvailable')}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                          {material.quantity}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                          {formatCurrency(toNumber(material.unitPrice))}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                          {formatCurrency(
+                                            (material.quantity ?? 0) * toNumber(material.unitPrice)
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            )}
+                          {task.materialType === 'ITEMIZED' &&
+                            (!task.materials || task.materials.length === 0) && (
+                              <p className="pl-2 text-sm text-gray-500 italic">
+                                {t('quotes.noMaterialsForItemized')}
+                              </p>
+                            )}
                         </div>
                       ))}
                     </div>
@@ -190,44 +237,57 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
                   )}
                 </CardBody>
               </Card>
-              
+
               {/* Quote Summary Card */}
               <Card>
                 <CardBody>
-                   <h3 className="text-lg font-semibold mb-2">{t('quoteSummary.title')}</h3>
-                   <div className="space-y-2">
-                     <div className="flex justify-between items-center">
-                       <span className="text-gray-600">{t('quoteSummary.subtotalTasks')}</span>
-                       <span className="font-medium">{formatCurrency(quoteData.subtotalTasks ?? 0)}</span>
-                     </div>
-                     <div className="flex justify-between items-center">
-                       <span className="text-gray-600">{t('quoteSummary.subtotalMaterials')}</span>
-                       <span className="font-medium">{formatCurrency(quoteData.subtotalMaterials ?? 0)}</span>
-                     </div>
-                     <div className="flex justify-between items-center border-t pt-2 mt-2">
-                       <span className="text-gray-600 font-semibold">{t('quoteSummary.subtotalCombined')}</span>
-                       <span className="font-semibold">{formatCurrency((quoteData.subtotalTasks ?? 0) + (quoteData.subtotalMaterials ?? 0))}</span>
-                     </div>
-                      {/* Display Markup if present */} 
-                     {quoteData.markupCharge > 0 && (
-                       <div className="flex justify-between items-center">
-                         <span className="text-gray-600">{t('quoteSummary.markupCalculated')} ({formatPercentage(quoteData.markupPercentage)})</span>
-                         <span className="font-medium">{formatCurrency(quoteData.markupCharge)}</span>
-                       </div>
-                     )}
-                      {/* TODO: Add Tax display if applicable later */} 
-                      {/* <div className="flex justify-between items-center">
+                  <h3 className="mb-2 text-lg font-semibold">{t('quoteSummary.title')}</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">{t('quoteSummary.subtotalTasks')}</span>
+                      <span className="font-medium">{formatCurrency(quoteData.subtotalTasks)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">{t('quoteSummary.subtotalMaterials')}</span>
+                      <span className="font-medium">
+                        {formatCurrency(quoteData.subtotalMaterials)}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t pt-2">
+                      <span className="font-semibold text-gray-600">
+                        {t('quoteSummary.subtotalCombined')}
+                      </span>
+                      <span className="font-semibold">
+                        {formatCurrency(
+                          (quoteData.subtotalTasks ?? 0) + (quoteData.subtotalMaterials ?? 0)
+                        )}
+                      </span>
+                    </div>
+                    {/* Display Markup if present */}
+                    {quoteData.markupCharge > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">
+                          {t('quoteSummary.markupCalculated')} (
+                          {quoteData.markupPercentage?.toFixed(1)}%)
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(quoteData.markupCharge)}
+                        </span>
+                      </div>
+                    )}
+                    {/* TODO: Add Tax display if applicable later */}
+                    {/* <div className="flex justify-between items-center">
                        <span className="text-gray-600">{t('quoteSummary.tax')} (Calculated %)</span>
                        <span className="font-medium">{formatCurrency(CALCULATED_TAX)}</span>
-                     </div> */} 
+                     </div> */}
 
-                     <Divider className="my-2" />
+                    <Divider className="my-2" />
 
-                     <div className="flex justify-between items-center text-lg font-bold">
-                       <span>{t('quoteSummary.grandTotal')}</span>
-                       <span>{formatCurrency(quoteData.grandTotal ?? 0)}</span>
-                     </div>
-                   </div>
+                    <div className="flex items-center justify-between text-lg font-bold">
+                      <span>{t('quoteSummary.grandTotal')}</span>
+                      <span>{formatCurrency(quoteData.grandTotal ?? 0)}</span>
+                    </div>
+                  </div>
                 </CardBody>
               </Card>
             </div>
@@ -236,12 +296,12 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
           )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="ghost" onClick={onClose}>{
-            t('common.close')
-          }</Button>
-          <Button 
-            color="primary" 
-            onClick={handlePrint} 
+          <Button variant="ghost" onPress={onClose}>
+            {t('common.close')}
+          </Button>
+          <Button
+            color="primary"
+            onPress={handlePrint}
             disabled={isLoading || isError || !quoteData}
           >
             {t('common.print')} / {t('common.export')}
@@ -250,4 +310,4 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({
       </ModalContent>
     </Modal>
   );
-}; 
+};

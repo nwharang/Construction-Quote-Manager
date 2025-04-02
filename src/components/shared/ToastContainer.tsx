@@ -1,6 +1,5 @@
 import React from 'react';
 import { ToastProvider as HeroUIToastProvider } from '@heroui/toast';
-import { useToastStore } from '~/store';
 
 /**
  * Toast container that uses HeroUI's ToastProvider

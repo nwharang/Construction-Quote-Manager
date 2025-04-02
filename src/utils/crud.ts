@@ -1,4 +1,4 @@
-import { useTranslation } from '~/utils/i18n';
+import { useTranslation } from '~/hooks/useTranslation';
 import { useToastStore } from '~/store';
 
 /**

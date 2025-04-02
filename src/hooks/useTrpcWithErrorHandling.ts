@@ -9,7 +9,7 @@ import { type AppRouter } from '~/server/api/root';
  * @param query The tRPC query result object
  * @param options Options for error handling
  */
-export function useTrpcErrorHandling<TData, TError>(
+export function useTrpcErrorHandling<TData>(
   query: UseTRPCQueryResult<TData, TRPCClientErrorLike<AppRouter>>,
   options?: {
     fallbackMessage?: string;

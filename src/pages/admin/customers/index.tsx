@@ -18,7 +18,7 @@ import {
   Spinner,
 } from '@heroui/react';
 import { Plus, Search, MoreVertical, Edit, Trash, Mail, Phone, Eye } from 'lucide-react';
-import MainLayout from '~/layouts/MainLayout';
+import { MainLayout } from '~/layouts/MainLayout';
 import { api } from '~/utils/api';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '~/server/api/root';
@@ -42,10 +42,8 @@ type CustomerFormData = {
 
 const CustomersPage: NextPageWithLayout = () => {
   const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const rowsPerPage = 10;
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState('name');
-  const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('ascending');
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
 
   // Fetch customers data with sorting
@@ -64,21 +62,21 @@ const CustomersPage: NextPageWithLayout = () => {
   // API mutations
   const utils = api.useUtils();
   
-  const { mutate: createCustomer, isPending: isCreating } = api.customer.create.useMutation({
+  const { mutate: createCustomer } = api.customer.create.useMutation({
     onSuccess: () => {
       utils.customer.getAll.invalidate();
       modal.handleCreateSuccess();
     },
   });
   
-  const { mutate: updateCustomer, isPending: isUpdating } = api.customer.update.useMutation({
+  const { mutate: updateCustomer } = api.customer.update.useMutation({
     onSuccess: () => {
       utils.customer.getAll.invalidate();
       modal.handleUpdateSuccess();
     },
   });
   
-  const { mutate: deleteCustomer, isPending: isDeleting } = api.customer.delete.useMutation({
+  const { mutate: deleteCustomer } = api.customer.delete.useMutation({
     onSuccess: () => {
       utils.customer.getAll.invalidate();
       modal.handleDeleteSuccess();
@@ -112,53 +110,6 @@ const CustomersPage: NextPageWithLayout = () => {
   useEffect(() => {
     refetch();
   }, [page, rowsPerPage, searchQuery, refetch]);
-
-  // Handle sort change
-  const handleSortChange = (columnKey: string) => {
-    if (columnKey === sortColumn) {
-      setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending');
-    } else {
-      setSortColumn(columnKey);
-      setSortDirection('ascending');
-    }
-    // Reset to first page when sorting changes
-    setPage(1);
-  };
-
-  // Submit handlers
-  const handleCreateSubmit = async (data: CustomerFormData) => {
-    modal.setLoading(true);
-    try {
-      await createCustomer(data);
-    } finally {
-      modal.setLoading(false);
-    }
-  };
-
-  const handleUpdateSubmit = async (data: CustomerFormData) => {
-    if (modal.modalState.entityId) {
-      modal.setLoading(true);
-      try {
-        await updateCustomer({
-          id: modal.modalState.entityId,
-          ...data,
-        });
-      } finally {
-        modal.setLoading(false);
-      }
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (modal.modalState.entityId) {
-      modal.setLoading(true);
-      try {
-        await deleteCustomer({ id: modal.modalState.entityId });
-      } finally {
-        modal.setLoading(false);
-      }
-    }
-  };
 
   const renderCell = (customer: CustomerItem, columnKey: string) => {
     switch (columnKey) {
@@ -230,8 +181,45 @@ const CustomersPage: NextPageWithLayout = () => {
           </div>
         );
       default:
-        const value = customer[columnKey as keyof CustomerItem];
-        return typeof value === 'object' ? JSON.stringify(value) : String(value || '');
+        {
+          const value = customer[columnKey as keyof CustomerItem];
+          return typeof value === 'object' ? JSON.stringify(value) : String(value || '');
+        }
+    }
+  };
+
+  // Submit handlers
+  const handleCreateSubmit = async (data: CustomerFormData) => {
+    modal.setLoading(true);
+    try {
+      await createCustomer(data);
+    } finally {
+      modal.setLoading(false);
+    }
+  };
+
+  const handleUpdateSubmit = async (data: CustomerFormData) => {
+    if (modal.modalState.entityId) {
+      modal.setLoading(true);
+      try {
+        await updateCustomer({
+          id: modal.modalState.entityId,
+          ...data,
+        });
+      } finally {
+        modal.setLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (modal.modalState.entityId) {
+      modal.setLoading(true);
+      try {
+        await deleteCustomer({ id: modal.modalState.entityId });
+      } finally {
+        modal.setLoading(false);
+      }
     }
   };
 

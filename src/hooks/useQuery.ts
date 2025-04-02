@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToastStore } from '@/store/toastStore';
 
-interface QueryOptions {
+interface QueryOptions<T> {
   enabled?: boolean;
-  onSuccess?: (data: any) => void;
+  onSuccess?: (data: T) => void;
   onError?: (error: Error) => void;
 }
 
 /**
  * Simple query hook for fetching data
  */
-export function useQuery<T = any>(
+export function useQuery<T = unknown>(
   url: string,
-  params: Record<string, any> = {},
-  options: QueryOptions = {}
+  params: Record<string, string | number | boolean | null | undefined> = {},
+  options: QueryOptions<T> = {}
 ) {
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,7 +21,7 @@ export function useQuery<T = any>(
   const { error: showErrorToast } = useToastStore();
   const { enabled = true, onSuccess, onError } = options;
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!enabled) {
       setIsLoading(false);
       return;
@@ -71,11 +71,11 @@ export function useQuery<T = any>(
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [enabled, url, params, onSuccess, onError, showErrorToast]);
 
   useEffect(() => {
     fetchData();
-  }, [url, JSON.stringify(params), enabled]);
+  }, [fetchData]);
 
   return {
     data,

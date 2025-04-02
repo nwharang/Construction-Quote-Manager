@@ -19,7 +19,7 @@ importers:
         version: 2.0.6(@heroui/system@2.4.13-beta.2(@heroui/theme@2.4.13-beta.2(tailwindcss@4.0.17))(framer-motion@11.18.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(@heroui/theme@2.4.13-beta.2(tailwindcss@4.0.17))(framer-motion@11.18.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@hookform/resolvers':
         specifier: ^4.1.3
-        version: 4.1.3(react-hook-form@7.54.2(react@19.0.0))
+        version: 4.1.3(react-hook-form@7.55.0(react@19.0.0))
       '@internationalized/date':
         specifier: ^3.7.0
         version: 3.7.0
@@ -38,9 +38,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.18.1
         version: 5.69.0(react@19.0.0)
-      '@tanstack/zod-form-adapter':
-        specifier: ^0.42.1
-        version: 0.42.1(zod@3.24.2)
       '@trpc/client':
         specifier: ^11.0.0-next-beta.293
         version: 11.0.0(@trpc/server@11.0.0(typescript@5.8.2))(typescript@5.8.2)
@@ -80,6 +77,9 @@ importers:
       html2canvas:
         specifier: ^1.4.1
         version: 1.4.1
+      i18next:
+        specifier: ^24.2.3
+        version: 24.2.3(typescript@5.8.2)
       jspdf:
         specifier: ^2.5.1
         version: 2.5.2
@@ -98,9 +98,6 @@ importers:
       postgres:
         specifier: ^3.4.5
         version: 3.4.5
-      punycode:
-        specifier: ^2.3.1
-        version: 2.3.1
       react:
         specifier: ^19.0.0
         version: 19.0.0
@@ -108,8 +105,11 @@ importers:
         specifier: ^19.0.0
         version: 19.0.0(react@19.0.0)
       react-hook-form:
-        specifier: ^7.54.2
-        version: 7.54.2(react@19.0.0)
+        specifier: ^7.55.0
+        version: 7.55.0(react@19.0.0)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
       superjson:
         specifier: ^2.2.1
         version: 2.2.2
@@ -2042,9 +2042,6 @@ packages:
   '@tailwindcss/postcss@4.0.17':
     resolution: {integrity: sha512-qeJbRTB5FMZXmuJF+eePd235EGY6IyJZF0Bh0YM6uMcCI4L9Z7dy+lPuLAhxOJzxnajsbjPoDAKOuAqZRtf1PQ==}
 
-  '@tanstack/form-core@0.42.1':
-    resolution: {integrity: sha512-jTU0jyHqFceujdtPNv3jPVej1dTqBwa8TYdIyWB5BCwRVUBZEp1PiYEBkC9r92xu5fMpBiKc+JKud3eeVjuMiA==}
-
   '@tanstack/form-core@1.2.3':
     resolution: {integrity: sha512-1QWUO4gbqsinlymie5J5y+h5FH1llBmqkfcAVKzWenqNQ2k3PTV5uwaDajIfXpKkGggRFUyLQklJHDlMRu2Lvw==}
 
@@ -2085,11 +2082,6 @@ packages:
 
   '@tanstack/virtual-core@3.11.3':
     resolution: {integrity: sha512-v2mrNSnMwnPJtcVqNvV0c5roGCBqeogN8jDtgtuHCphdwBasOZ17x8UV8qpHUh+u0MLfX43c0uUHKje0s+Zb0w==}
-
-  '@tanstack/zod-form-adapter@0.42.1':
-    resolution: {integrity: sha512-hPRM0lawVKP64yurW4c6KHZH6altMo2MQN14hfi+GMBTKjO9S7bW1x5LPZ5cayoJE3mBvdlahpSGT5rYZtSbXQ==}
-    peerDependencies:
-      zod: ^3.x
 
   '@trpc/client@11.0.0':
     resolution: {integrity: sha512-U2THlxsdr4ykAX5lpTU8k5WRADPQ+68Ex2gfUht3MlCxGK7njBmNSSzjpQSWNt7tMI/xsYrddFiRlmEPrh+Cbg==}
@@ -3048,6 +3040,14 @@ packages:
     resolution: {integrity: sha512-fPU6BHNpsyIhr8yyMpTLLxAbkaK8ArIBcmZIRiBLiDhjeqvXolaEmDGmELFuX9I4xDcaKKcJl+TKZLqruBbmWA==}
     engines: {node: '>=8.0.0'}
 
+  i18next@24.2.3:
+    resolution: {integrity: sha512-lfbf80OzkocvX7nmZtu7nSTNbrTYR52sLWxPtlXX1zAhVw8WEnFk4puUkCR4B1dNQwbSpEHHHemcZu//7EcB7A==}
+    peerDependencies:
+      typescript: ^5
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
@@ -3645,8 +3645,8 @@ packages:
     peerDependencies:
       react: ^19.0.0
 
-  react-hook-form@7.54.2:
-    resolution: {integrity: sha512-eHpAUgUjWbZocoQYUHposymRb4ZP6d0uwUnooL2uOybA9/3tPUvoAKqEWK1WaSiTxxOfTpffNZP7QwlnM3/gEg==}
+  react-hook-form@7.55.0:
+    resolution: {integrity: sha512-XRnjsH3GVMQz1moZTW53MxfoWN7aDpUg/GpVNc4A3eXRVNdGXfbzJ4vM4aLQ8g6XCUh1nIbx70aaNCl7kxnjog==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
@@ -3736,6 +3736,9 @@ packages:
     resolution: {integrity: sha512-hlq8tAfn0m/61p4BVRcPzIGr6LKiMwo4VM6dGi6pt4qcRkmNzTcWq6eCEjEh+qXjkMDvPlOFFSGwQjoEa6gyMA==}
     engines: {node: '>=10'}
     hasBin: true
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   set-cookie-parser@2.7.1:
     resolution: {integrity: sha512-IOc8uWeOZgnb3ptbCURJWNjWUPcO3ZnTTdzsurqERrP6nPyv+paC55vJM0LpOlT2ne+Ix+9+CRG1MNLlyZ4GjQ==}
@@ -5484,10 +5487,10 @@ snapshots:
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
 
-  '@hookform/resolvers@4.1.3(react-hook-form@7.54.2(react@19.0.0))':
+  '@hookform/resolvers@4.1.3(react-hook-form@7.55.0(react@19.0.0))':
     dependencies:
       '@standard-schema/utils': 0.3.0
-      react-hook-form: 7.54.2(react@19.0.0)
+      react-hook-form: 7.55.0(react@19.0.0)
 
   '@humanwhocodes/config-array@0.13.0':
     dependencies:
@@ -6749,10 +6752,6 @@ snapshots:
       postcss: 8.5.3
       tailwindcss: 4.0.17
 
-  '@tanstack/form-core@0.42.1':
-    dependencies:
-      '@tanstack/store': 0.7.0
-
   '@tanstack/form-core@1.2.3':
     dependencies:
       '@tanstack/store': 0.7.0
@@ -6791,11 +6790,6 @@ snapshots:
   '@tanstack/store@0.7.0': {}
 
   '@tanstack/virtual-core@3.11.3': {}
-
-  '@tanstack/zod-form-adapter@0.42.1(zod@3.24.2)':
-    dependencies:
-      '@tanstack/form-core': 0.42.1
-      zod: 3.24.2
 
   '@trpc/client@11.0.0(@trpc/server@11.0.0(typescript@5.8.2))(typescript@5.8.2)':
     dependencies:
@@ -7874,6 +7868,12 @@ snapshots:
       css-line-break: 2.1.0
       text-segmentation: 1.0.3
 
+  i18next@24.2.3(typescript@5.8.2):
+    dependencies:
+      '@babel/runtime': 7.27.0
+    optionalDependencies:
+      typescript: 5.8.2
+
   ignore@5.3.2: {}
 
   import-fresh@3.3.1:
@@ -8404,7 +8404,7 @@ snapshots:
       react: 19.0.0
       scheduler: 0.25.0
 
-  react-hook-form@7.54.2(react@19.0.0):
+  react-hook-form@7.55.0(react@19.0.0):
     dependencies:
       react: 19.0.0
 
@@ -8503,6 +8503,8 @@ snapshots:
   semver@6.3.1: {}
 
   semver@7.7.1: {}
+
+  server-only@0.0.1: {}
 
   set-cookie-parser@2.7.1: {}
 

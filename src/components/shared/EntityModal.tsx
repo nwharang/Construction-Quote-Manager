@@ -57,7 +57,7 @@ export interface EntityModalProps {
   /**
    * Function to handle submission
    */
-  onSubmit?: () => void;
+  onSubmit?: () => void | Promise<void>;
   
   /**
    * Custom submit button text
@@ -73,11 +73,6 @@ export interface EntityModalProps {
    * Whether to hide the footer
    */
   hideFooter?: boolean;
-  
-  /**
-   * Whether to show a divider before the footer
-   */
-  showDivider?: boolean;
 }
 
 /**
@@ -96,7 +91,6 @@ export function EntityModal({
   submitText = 'Save',
   cancelText = 'Cancel',
   hideFooter = false,
-  showDivider = true,
 }: EntityModalProps) {
   const handleSubmit = () => {
     if (onSubmit) {

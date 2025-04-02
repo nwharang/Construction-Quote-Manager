@@ -24,7 +24,7 @@ export function useErrorHandler() {
       logError?: boolean;
     }
   ) => {
-    const { type, message } = handleClientError(error, options?.fallbackMessage);
+    const { type } = handleClientError(error, options?.fallbackMessage);
     
     // Show toast notification
     showErrorToast(error, options?.fallbackMessage);

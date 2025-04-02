@@ -4,7 +4,6 @@ import {
   Users,
   Package,
   FileText,
-  CreditCard,
   ArrowUp,
   ArrowDown,
   AlertTriangle,
@@ -14,17 +13,12 @@ import {
 import { Card, CardHeader, CardBody, Chip, Spinner, Button, Alert } from '@heroui/react';
 import { api } from '~/utils/api';
 import { formatCurrency } from '~/utils/currency';
-import { formatDate, formatRelativeTime } from '~/utils/date';
+import { formatRelativeTime } from '~/utils/date';
 import { useToastStore } from '~/store';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { TRPCClientErrorLike } from '@trpc/client';
 import type { AppRouter } from '~/server/api/root';
-import type { inferRouterOutputs } from '@trpc/server';
 import { withMainLayout } from '~/utils/withAuth';
-
-type RouterOutput = inferRouterOutputs<AppRouter>;
-type DashboardStats = RouterOutput['dashboard']['getStats'];
-type QuoteListResponse = RouterOutput['quote']['getAll'];
 
 // Types
 interface StatCardProps {
@@ -59,10 +53,6 @@ const DashboardPage: NextPage = () => {
   const toast = useToastStore();
 
   // Handle tRPC errors
-  const handleError = (error: TRPCClientErrorLike<AppRouter>) => {
-    console.error('Error fetching data:', error);
-    toast.error(`Error: ${error.message}`);
-  };
 
   const {
     data: statsData,
@@ -72,13 +62,6 @@ const DashboardPage: NextPage = () => {
     retry: 1,
     retryDelay: 1000,
   });
-
-  // Show toast on error
-  useEffect(() => {
-    if (statsError) {
-      handleError(statsError);
-    }
-  }, [statsError]);
 
   const {
     data: recentQuotesData,
@@ -93,12 +76,27 @@ const DashboardPage: NextPage = () => {
     }
   );
 
+  const handleError = useCallback(
+    (error: TRPCClientErrorLike<AppRouter>) => {
+      console.error('Error fetching data:', error);
+      toast.error(`Error: ${error.message}`);
+    },
+    [statsError]
+  );
+
+  // Show toast on error
+  useEffect(() => {
+    if (statsError) {
+      handleError(statsError);
+    }
+  }, [statsError, handleError]);
+
   // Show toast for quotes error
   useEffect(() => {
     if (quotesError) {
       handleError(quotesError);
     }
-  }, [quotesError]);
+  }, [quotesError, handleError]);
 
   // State is derived from query results
   const stats = statsData || {

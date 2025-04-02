@@ -1,7 +1,7 @@
 import { TransactionService } from './transactionService';
 import { QuoteService } from './quoteService';
 import { DashboardService } from './dashboardService';
-import { AppService } from './appService';
+import { SettingsService } from './settingService';
 import { db } from '../db';
 import type { Session } from 'next-auth';
 
@@ -17,9 +17,9 @@ export function createServices(ctx: { session: Session | null }) {
     transaction: new TransactionService(db, ctx),
     quote: new QuoteService(db, ctx),
     dashboard: new DashboardService(db, ctx),
-    app: new AppService(db, ctx),
+    settings: new SettingsService(db, ctx),
   };
 }
 
 // Export service classes
-export { TransactionService, QuoteService, DashboardService, AppService };
+export { TransactionService, QuoteService, DashboardService, SettingsService };

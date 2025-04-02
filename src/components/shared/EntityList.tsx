@@ -10,7 +10,6 @@ import {
   TableRow, 
   TableCell,
   Button, 
-  Spinner,
   Pagination,
   Input,
   Dropdown,
@@ -368,7 +367,7 @@ export function EntityList<T extends { id: string }>({
 // Factory function to create specialized EntityList instances for different entity types
 export function createEntityList<T extends { id: string }>(entityType: string, baseUrl: string, displayNameField: string = 'name') {
   // Initialize entity store with settings for this entity type
-  createEntityStore(entityType as any, baseUrl, displayNameField);
+  createEntityStore(entityType, baseUrl, displayNameField);
   
   // Return a component that will use these settings
   return function SpecializedEntityList(props: Omit<EntityListProps<T>, 'baseUrl'>) {

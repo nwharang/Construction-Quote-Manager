@@ -1,14 +1,9 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import {
-  quotes,
-  tasks,
-  materials,
   QuoteStatus,
-  customers,
   type QuoteStatusType,
 } from '~/server/db/schema';
-import { and, eq, ilike, or, sql, desc, type SQL, ne, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { createServices } from '~/server/services';
 

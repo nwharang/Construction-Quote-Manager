@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -21,38 +21,28 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
-  Select,
-  SelectItem,
   useDisclosure,
-  Card,
-  CardBody,
+  // Remove unused Card, CardBody
+  // Card,
+  // CardBody,
 } from '@heroui/react';
-import { api } from '~/utils/api';
+import { api, type RouterOutputs } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
-import { useEntityStore, useToastStore } from '~/store';
-import MainLayout from '~/layouts/MainLayout';
-import { Plus, Search, MoreVertical, Edit, Eye, Send } from 'lucide-react';
-import type { inferRouterOutputs, inferRouterInputs } from '@trpc/server';
-import type { AppRouter } from '~/server/api/root';
-import { CreateQuoteModal } from '~/components/quotes/CreateQuoteModal';
+import { MainLayout } from '~/layouts/MainLayout';
+import { Plus, Search, MoreVertical, Edit, Trash } from 'lucide-react';
 import { QuoteDetailModal } from '~/components/quotes/QuoteDetailModal';
-import { QuoteViewModal } from '~/components/quotes/QuoteViewModal';
-import { formatCurrency } from '~/utils/currency';
-import { formatDate, formatUserFriendlyId } from '~/utils/formatters';
+import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
 import type { QuoteStatusType } from '~/server/db/schema-exports';
+import { useAppToast } from '~/components/providers/ToastProvider';
+import { APP_NAME } from '~/config/constants';
 
-// Get the types from the router
-type RouterOutput = inferRouterOutputs<AppRouter>;
-
-// Get the type from the getAll procedure's return type
-type QuoteListResponse = RouterOutput['quote']['getAll'];
-// Correctly type QuoteItem based on the actual response shape (`items`)
-type QuoteItem = NonNullable<QuoteListResponse['items']>[number];
+// Use inferred type from the API output for the list items
+type QuoteListItem = RouterOutputs['quote']['getAll']['items'][number];
 
 // Map status to display settings
 const QuoteStatusSettings: Record<
   QuoteStatusType,
-  { color: 'default' | 'primary' | 'success' | 'danger'; label: string }
+  { color: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger'; label: string }
 > = {
   DRAFT: { color: 'default', label: 'Draft' },
   SENT: { color: 'primary', label: 'Sent' },
@@ -60,101 +50,220 @@ const QuoteStatusSettings: Record<
   REJECTED: { color: 'danger', label: 'Rejected' },
 };
 
-// Define table columns - Use t() for labels
-const getColumns = (t: Function) => [
-  { key: 'id', label: t('common.id'), allowSort: false },
-  { key: 'title', label: t('quotes.quote'), allowSort: true },
-  { key: 'customer', label: t('quotes.customer'), allowSort: false },
-  { key: 'status', label: t('common.status'), allowSort: true },
-  { key: 'total', label: t('common.total'), allowSort: true },
+// Define table columns - Use inferred type for t
+const getColumns = (t: ReturnType<typeof useTranslation>['t']) => [
+  { key: 'sequentialId', label: t('quotes.list.id'), allowSort: false },
+  { key: 'title', label: t('quotes.list.title'), allowSort: true },
+  { key: 'customerName', label: t('quotes.list.customer'), allowSort: false },
+  { key: 'status', label: t('quotes.list.status'), allowSort: true },
+  { key: 'createdAt', label: t('quotes.list.created'), allowSort: true },
+  { key: 'grandTotal', label: t('quotes.list.total'), allowSort: true },
   { key: 'actions', label: t('common.actions'), allowSort: false },
 ];
 
 const QuotesPage: NextPageWithLayout = () => {
   const router = useRouter();
   const { status: sessionStatus } = useSession();
-  // Correct useTranslation destructuring if formatters aren't used
-  const { t } = useTranslation();
+  const { t, formatDate, formatCurrency } = useTranslation();
+  const toast = useAppToast();
   const [mounted, setMounted] = useState(false);
-  const entityStore = useEntityStore();
-  const toast = useToastStore();
   const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const rowsPerPage = 10;
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter] = useState<string>('all');
   const [sortColumn, setSortColumn] = useState<string>('title');
   const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('descending');
-  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [quoteToDelete, setQuoteToDelete] = useState<QuoteListItem | null>(null);
+  const [quoteIdForDetail, setQuoteIdForDetail] = useState<string | null>(null);
 
   // Modal state management
-  const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
   const { isOpen: isDetailOpen, onOpen: onDetailOpen, onClose: onDetailClose } = useDisclosure();
-  const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
-  // Define columns using t
-  const columns = useMemo(() => getColumns(t), [t]);
+  const utils = api.useUtils();
 
-  // Get all quotes
-  const {
-    data: quotesData,
-    isLoading,
-    refetch,
-  } = api.quote.getAll.useQuery(
+  // === START: Define Callbacks at Top Level ===
+
+  // Handle sort change
+  const handleSortChange = useCallback(
+    ({
+      column,
+      direction,
+    }: {
+      column: React.Key | null;
+      direction: 'ascending' | 'descending' | null;
+    }) => {
+      if (column && direction) {
+        const columnKey = String(column);
+        if (columnKey === sortColumn) {
+          setSortDirection(direction);
+        } else {
+          setSortColumn(columnKey);
+          setSortDirection(direction);
+        }
+        setPage(1);
+      }
+    },
+    [sortColumn, setSortColumn, setSortDirection, setPage]
+  );
+
+  // Handle opening Detail modal for CREATION
+  const handleCreateQuote = useCallback(() => {
+    setQuoteIdForDetail(null); // Set ID to null for create mode
+    onDetailOpen();
+  }, [onDetailOpen]);
+
+  // Handle opening Detail modal for EDITING
+  const handleEdit = useCallback(
+    (quote: QuoteListItem) => {
+      setQuoteIdForDetail(quote.id); // Set the ID for edit mode
+      onDetailOpen();
+    },
+    [onDetailOpen]
+  );
+
+  const handleDeleteRequest = useCallback(
+    (quote: QuoteListItem) => {
+      setQuoteToDelete(quote);
+      onDeleteOpen();
+    },
+    [onDeleteOpen]
+  );
+
+  // Delete mutation (Needs to be defined before confirmDelete)
+  const deleteMutation = api.quote.delete.useMutation({
+    onSuccess: () => {
+      toast.success(t('quotes.deleteSuccess'));
+      void utils.quote.getAll.invalidate();
+      onDeleteClose();
+      setQuoteToDelete(null);
+    },
+    onError: (error) => {
+      toast.error(t('quotes.deleteError', { message: error.message }));
+      onDeleteClose();
+    },
+  });
+
+  // Confirm Delete
+  const confirmDelete = useCallback(async () => {
+    if (quoteToDelete) {
+      await deleteMutation.mutateAsync({ id: quoteToDelete.id });
+    }
+  }, [quoteToDelete, deleteMutation]);
+
+  // Get quote data query (Needs to be defined before handleDetailClose)
+  const { data: quotesData, isLoading } = api.quote.getAll.useQuery(
     {
       page,
       limit: rowsPerPage,
       search: searchQuery,
-      status: statusFilter !== 'all' ? (statusFilter as QuoteItem['status']) : undefined,
+      status: statusFilter !== 'all' ? (statusFilter as QuoteListItem['status']) : undefined,
+      sortBy: sortColumn,
+      sortOrder: sortDirection === 'ascending' ? 'asc' : 'desc',
     },
     {
       enabled: sessionStatus === 'authenticated' && mounted,
     }
   );
 
+  // Render Cell Content
+  const renderCellContent = useCallback(
+    (quote: QuoteListItem, columnKey: React.Key) => {
+      const cellValue = quote[columnKey as keyof QuoteListItem];
+
+      switch (columnKey) {
+        case 'customerName':
+          return quote.customer?.name ?? 'N/A';
+        case 'status': {
+          const statusInfo = QuoteStatusSettings[quote.status];
+          return (
+            <Chip
+              color={statusInfo?.color ?? 'default'}
+              variant="flat"
+              size="sm"
+              className="capitalize"
+            >
+              {statusInfo?.label ?? quote.status}
+            </Chip>
+          );
+        }
+        case 'createdAt':
+          return formatDate(quote.createdAt, 'short');
+        case 'grandTotal':
+          return formatCurrency(quote.grandTotal);
+        case 'actions':
+          return (
+            <div className="relative flex items-center justify-end gap-1">
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button isIconOnly variant="light" size="sm">
+                    <MoreVertical size={16} />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu aria-label="Quote Actions">
+                  <DropdownItem
+                    key="edit"
+                    startContent={<Edit size={16} />}
+                    onPress={() => handleEdit(quote)}
+                  >
+                    {t('common.edit')}
+                  </DropdownItem>
+                  <DropdownItem
+                    key="print"
+                    onPress={() => window.open(`/admin/quotes/${quote.id}/print`, '_blank')}
+                  >
+                    {t('quotes.actions.print')}
+                  </DropdownItem>
+                  <DropdownItem
+                    key="delete"
+                    startContent={<Trash size={16} />}
+                    className="text-danger"
+                    color="danger"
+                    onPress={() => handleDeleteRequest(quote)}
+                  >
+                    {t('common.delete')}
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </div>
+          );
+        default:
+          return cellValue?.toString() ?? '-';
+      }
+    },
+    [t, formatDate, formatCurrency, handleEdit, handleDeleteRequest]
+  );
+
+  // Memoize the renderCell function - Add renderCellContent dependency
+  const renderCell = useCallback(renderCellContent, [
+    t,
+    formatDate,
+    formatCurrency,
+    handleEdit,
+    handleDeleteRequest,
+    renderCellContent, // Add missing dependency
+  ]);
+
+  // === END: Define Callbacks at Top Level ===
+
+  // Define columns using t
+  const columns = useMemo(() => getColumns(t), [t]);
+
   // Safely extract quotes using useMemo for stability
   const quotes = useMemo(() => {
-    return (quotesData?.items ?? []) as QuoteItem[];
+    return (quotesData?.items ?? []) as QuoteListItem[];
   }, [quotesData]);
 
-  // Get total count from response
-  const totalQuotes = useMemo(() => {
-    return quotesData?.total ?? 0;
-  }, [quotesData]);
+  const totalPages = useMemo(() => {
+    return quotesData?.totalPages ?? 1;
+  }, [quotesData?.totalPages]);
 
   // Set mounted state
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Set global entity settings once when component mounts
-  useEffect(() => {
-    if (mounted) {
-      entityStore.setEntitySettings({
-        entityName: t('quotes.entityName', {}),
-        entityType: 'quotes',
-        baseUrl: '/admin/quotes',
-        displayNameField: 'title',
-        canView: true,
-        canEdit: true,
-        canDelete: false,
-        listPath: '/admin/quotes',
-        createPath: '#',
-        editPath: '#',
-        viewPath: '#',
-      });
-    }
-  }, [mounted]); // Only depend on mounted state
-
-  // Clean up entity settings when component unmounts
-  useEffect(() => {
-    return () => {
-      if (mounted) {
-        entityStore.resetEntitySettings();
-      }
-    };
-  }, [mounted]); // Only depend on mounted state
-
-  // Render loading state
+  // *** Early Returns ***
   if (!mounted || sessionStatus === 'loading') {
     return (
       <div className="flex h-full items-center justify-center p-8">
@@ -163,291 +272,125 @@ const QuotesPage: NextPageWithLayout = () => {
     );
   }
 
-  // Redirect if not authenticated
   if (sessionStatus === 'unauthenticated') {
-    router.push('/auth/signin');
+    router.push('/api/auth/signin');
     return null;
   }
+  // *** End Early Returns ***
 
-  // Handle sort change - Update signature to match Table prop
-  const handleSortChange = ({
-    column,
-    direction,
-  }: {
-    column: React.Key | null;
-    direction: 'ascending' | 'descending' | null;
-  }) => {
-    if (column && direction) {
-      const columnKey = String(column); // Convert React.Key to string
-      if (columnKey === sortColumn) {
-        setSortDirection(direction);
-      } else {
-        setSortColumn(columnKey);
-        setSortDirection(direction);
-      }
-      // Reset to first page when sorting changes
-      setPage(1);
-    }
-  };
-
-  // Open Create Modal
-  const handleCreateQuote = () => {
-    onCreateOpen();
-  };
-
-  // Open View Modal
-  const handleViewQuote = (quoteId: string) => {
-    setSelectedQuoteId(quoteId);
-    onViewOpen();
-  };
-
-  // Open Edit Modal
-  const handleEditQuote = (quoteId: string) => {
-    setSelectedQuoteId(quoteId);
-    onDetailOpen();
-  };
-
-  // Function to handle opening Detail modal after creation
-  const handleCreateSuccess = (newQuoteId: string) => {
-    onCreateClose(); // Close the create modal
-    handleEditQuote(newQuoteId); // Open the detail/edit modal for the new quote
-  };
-
-  const handleSendQuote = async (quote: QuoteItem) => {
-    try {
-      // TODO: Implement quote sending logic
-      toast.success('Quote sent successfully');
-    } catch (error) {
-      toast.error('Failed to send quote');
-    }
-  };
-
-  // Render cell content for table - Use t() for status labels
-  const renderCell = (quote: QuoteItem, columnKey: string) => {
-    switch (columnKey) {
-      case 'id':
-        return <div>#{quote.sequentialId}</div>;
-      case 'title':
-        return (
-          <div className="flex flex-col">
-            <p className="text-foreground font-medium">{quote.title}</p>
-            <p className="text-default-500 text-xs">{formatDate(quote.createdAt)}</p>
-          </div>
-        );
-      case 'customer':
-        if (quote.customer) {
-          return (
-            <div className="flex flex-col">
-              <p className="font-medium">{quote.customer.name}</p>
-              {quote.customer.email && (
-                <p className="text-default-500 text-xs">{quote.customer.email}</p>
-              )}
-            </div>
-          );
-        }
-        return <span className="text-default-500 text-sm">{t('common.notAvailable')}</span>;
-      case 'status': {
-        const statusKey = (quote.status ?? 'UNKNOWN').toUpperCase();
-        const baseSetting = QuoteStatusSettings[statusKey as QuoteStatusType] || {
-          color: 'default',
-          label: 'Unknown',
-        };
-        // Add empty object {} as second argument
-        const label = t(`quotes.status.${statusKey.toLowerCase()}`, {});
-        return (
-          <Chip color={baseSetting.color} size="sm">
-            {label}
-          </Chip>
-        );
-      }
-      case 'total':
-        return formatCurrency(Number(quote.grandTotal));
-      case 'actions':
-        return (
-          <Dropdown>
-            <DropdownTrigger>
-              <Button isIconOnly variant="light">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownTrigger>
-            {/* Add empty object {} */}
-            <DropdownMenu aria-label={t('quotes.actionsLabel')}>
-              <DropdownItem
-                key="view"
-                startContent={<Eye className="h-4 w-4" />}
-                onClick={() => handleViewQuote(quote.id)}
-              >
-                {/* Add empty object {} */}
-                {t('common.view')}
-              </DropdownItem>
-              <DropdownItem
-                key="edit"
-                startContent={<Edit className="h-4 w-4" />}
-                onClick={() => handleEditQuote(quote.id)}
-              >
-                {/* Add empty object {} */}
-                {t('common.edit')}
-              </DropdownItem>
-              <DropdownItem
-                key="send"
-                startContent={<Send size={16} />}
-                onPress={() => handleSendQuote(quote)}
-              >
-                {/* Add empty object {} */}
-                {t('quotes.sendAction')}
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-        );
-      default:
-        return null;
-    }
-  };
-
+  // JSX Return - Keep the rest of the component structure
   return (
     <>
       <Head>
-        {/* Add empty object {} */}
-        <title>{t('quotes.pageTitle')}</title>
+        <title>
+          {t('quotes.list.title')} | {APP_NAME}
+        </title>
       </Head>
-      <div className="flex flex-col gap-4 p-4 sm:p-6">
-        {/* Top Bar - Actions */}
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{t('quotes.listTitle')}</h1>
-          <div className="flex gap-2">
-            {/* Search Input */}
-            <Input
-              isClearable
-              placeholder={t('common.searchPlaceholder')}
-              startContent={<Search size={18} />}
-              value={searchQuery}
-              onValueChange={setSearchQuery}
-              className="w-full sm:max-w-[44%]"
-            />
-            {/* Status Filter */}
-            <Select
-              label={t('common.statusFilterLabel')}
-              placeholder={t('common.allStatuses')}
-              selectedKeys={statusFilter !== 'all' ? [statusFilter] : []}
-              onSelectionChange={(keys) => {
-                // Handle Set<React.Key> type for selectedKeys
-                const selectedKey = Array.from(keys)[0];
-                setStatusFilter(selectedKey ? String(selectedKey) : 'all');
-                setPage(1); // Reset page when filter changes
-              }}
-              size="md"
-              className="max-w-[150px]"
-            >
-              <SelectItem key="all">{t('common.allStatuses')}</SelectItem>
-              <>
-                {Object.entries(QuoteStatusSettings).map(([key, setting]) => (
-                  <SelectItem key={key}>
-                    {t(`quotes.status.${key.toLowerCase()}`, { defaultValue: setting.label })}
-                  </SelectItem>
-                ))}
-              </>
-            </Select>
-            {/* Create Button */}
-            <Button color="primary" startContent={<Plus size={18} />} onClick={handleCreateQuote}>
-              {t('quotes.createButton')}
-            </Button>
-          </div>
+
+      {/* Main content area */}
+      <div className="space-y-4 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+        {/* Header and Actions */}
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <h1 className="text-xl font-semibold">{t('quotes.list.header')}</h1>
+          <Button color="primary" startContent={<Plus size={16} />} onPress={handleCreateQuote}>
+            {t('quotes.createButton')}
+          </Button>
         </div>
 
-        {/* Loading state for table */}
-        {isLoading ? (
-          <div className="flex h-64 items-center justify-center">
-            <Spinner />
-          </div>
-        ) : (
-          <Card>
-            <CardBody>
-              {/* Main Table */}
-              <Table
-                aria-label={t('quotes.listAriaLabel')}
-                sortDescriptor={{
-                  column: sortColumn,
-                  direction: sortDirection,
-                }}
-                onSortChange={handleSortChange}
-                bottomContent={
-                  totalQuotes > 0 ? (
-                    <div className="flex w-full justify-center">
-                      <Pagination
-                        isCompact
-                        showControls
-                        showShadow
-                        color="primary"
-                        page={page}
-                        total={Math.ceil(totalQuotes / rowsPerPage)}
-                        onChange={(newPage) => setPage(newPage)}
-                      />
-                    </div>
-                  ) : null
-                }
+        {/* Filters */}
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <Input
+            isClearable
+            className="w-full sm:max-w-[44%]"
+            placeholder={t('common.search')}
+            startContent={<Search size={16} />}
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+            onClear={() => setSearchQuery('')}
+          />
+          {/* TODO: Add Status Filter Select component here if needed */}
+        </div>
+
+        {/* Table */}
+        <Table
+          aria-label="Quotes Table"
+          isHeaderSticky
+          bottomContent={
+            totalPages > 1 ? (
+              <div className="flex w-full justify-center">
+                <Pagination
+                  isCompact
+                  showControls
+                  showShadow
+                  color="primary"
+                  page={page}
+                  total={totalPages}
+                  onChange={setPage}
+                />
+              </div>
+            ) : null
+          }
+          classNames={{
+            wrapper: 'max-h-[calc(100vh-350px)]',
+            table: 'min-h-[200px]',
+          }}
+          sortDescriptor={{
+            column: sortColumn,
+            direction: sortDirection,
+          }}
+          onSortChange={handleSortChange}
+        >
+          <TableHeader columns={columns}>
+            {(column) => (
+              <TableColumn
+                key={column.key}
+                align={column.key === 'actions' ? 'end' : 'start'}
+                allowsSorting={column.allowSort}
               >
-                <TableHeader columns={columns}>
-                  {(column) => (
-                    <TableColumn
-                      key={column.key}
-                      // Add conditional alignment for total column
-                      className={column.key === 'total' ? 'text-right' : 'text-left'}
-                      allowsSorting={column.allowSort}
-                    >
-                      {column.label}
-                    </TableColumn>
-                  )}
-                </TableHeader>
-                <TableBody items={quotes} emptyContent={t('quotes.noQuotesFound')}>
-                  {(item) => (
-                    <TableRow key={item.id}>
-                      {(columnKey) => (
-                        <TableCell className={columnKey === 'total' ? 'text-right' : 'text-left'}>
-                          {renderCell(item, String(columnKey))}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardBody>
-          </Card>
-        )}
-
-        {/* Create Modal */}
-        <CreateQuoteModal
-          isOpen={isCreateOpen}
-          onClose={onCreateClose}
-          onSuccess={handleCreateSuccess} // Pass the success handler
-        />
-
-        {/* Detail/Edit Modal */}
-        <QuoteDetailModal
-          quoteId={selectedQuoteId}
-          isOpen={isDetailOpen}
-          onClose={() => {
-            setSelectedQuoteId(null);
-            onDetailClose();
-          }}
-          onSaveSuccess={() => refetch()} // Refetch list after saving changes
-        />
-
-        {/* View Modal */}
-        <QuoteViewModal
-          quoteId={selectedQuoteId}
-          isOpen={isViewOpen}
-          onClose={() => {
-            setSelectedQuoteId(null);
-            onViewClose();
-          }}
-        />
+                {column.label}
+              </TableColumn>
+            )}
+          </TableHeader>
+          <TableBody
+            items={quotes ?? []}
+            isLoading={isLoading}
+            loadingContent={<Spinner label="Loading quotes..." />}
+            emptyContent={t('quotes.list.noQuotesFound')}
+          >
+            {(item) => (
+              <TableRow key={item.id}>
+                {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
+
+      {/* Unified Detail Modal (handles create/edit) */}
+      {isDetailOpen && (
+        <QuoteDetailModal
+          isOpen={isDetailOpen}
+          onClose={onDetailClose}
+          quoteId={quoteIdForDetail} // Pass null for create, ID for edit
+        />
+      )}
+
+      {/* Delete Dialog */}
+      {isDeleteOpen && quoteToDelete && (
+        <DeleteEntityDialog
+          isOpen={isDeleteOpen}
+          onClose={onDeleteClose}
+          onConfirm={confirmDelete}
+          isLoading={deleteMutation.isPending}
+          entityName={t('quotes.entityName')}
+          entityLabel={quoteToDelete.title}
+        />
+      )}
     </>
   );
 };
 
-// Define the getLayout function
-QuotesPage.getLayout = (page: React.ReactNode) => {
+QuotesPage.getLayout = function getLayout(page: React.ReactElement) {
   return <MainLayout>{page}</MainLayout>;
 };
 

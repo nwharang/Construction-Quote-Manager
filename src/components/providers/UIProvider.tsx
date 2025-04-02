@@ -1,9 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useMemo, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { api } from '~/utils/api';
-import { useTheme } from './ThemeProvider';
 
 // Define the types for our UI context
 interface UIContextType {
@@ -69,20 +66,11 @@ interface UIProviderProps {
 }
 
 export function UIProvider({ children }: UIProviderProps) {
-  const { data: session } = useSession();
-  const { isDark } = useTheme();
-  
   // State for our settings
   const [formSettings, setFormSettings] = useState(defaultFormSettings);
   const [buttonSettings, setButtonSettings] = useState(defaultButtonSettings);
   const [modalSettings, setModalSettings] = useState(defaultModalSettings);
   const [tableSettings, setTableSettings] = useState(defaultTableSettings);
-
-  // Fetch user preferences if logged in
-  const { data: settings } = api.settings.get.useQuery(undefined, {
-    enabled: !!session,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  });
 
   // Update functions
   const updateFormSettings = (newSettings: Partial<UIContextType['formSettings']>) => {

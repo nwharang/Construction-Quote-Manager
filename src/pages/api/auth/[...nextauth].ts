@@ -1,12 +1,13 @@
+#!/usr/bin/env node
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import GitHubProvider from 'next-auth/providers/github';
-import GoogleProvider from 'next-auth/providers/google';
-import bcrypt from 'bcryptjs';
-import { db } from '../../../server/db';
-import { eq } from 'drizzle-orm';
-import { users } from '../../../server/db/schema';
 import type { NextAuthOptions } from 'next-auth';
+// Removed tRPC client imports
+// import { createTRPCProxyClient, httpBatchLink, TRPCClientError } from '@trpc/client';
+// import { type AppRouter } from '~/server/api/root';
+// import superjson from 'superjson';
+
+// Removed getBaseUrl function
 
 // Extend the built-in session types
 declare module 'next-auth' {
@@ -30,14 +31,6 @@ declare module 'next-auth' {
  */
 export const authOptions: NextAuthOptions = {
   providers: [
-    // GitHubProvider({
-    //   clientId: process.env.GITHUB_ID || '',
-    //   clientSecret: process.env.GITHUB_SECRET || '',
-    // }),
-    // GoogleProvider({
-    //   clientId: process.env.GOOGLE_CLIENT_ID || '',
-    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    // }),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -45,36 +38,35 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        // Re-add direct import of getUserFromDb
+        const { getUserFromDb } = await import('~/server/utils/get-user-from-db');
+
         if (!credentials?.email || !credentials?.password) {
+          console.log('Auth: Missing credentials');
           return null;
         }
 
+        // Remove temporary client creation
+
         try {
-          // Find user by email
-          const userResults = await db
-            .select()
-            .from(users)
-            .where(eq(users.email, credentials.email.toLowerCase()));
-          const user = userResults[0];
+          // Revert to calling getUserFromDb directly
+          const user = await getUserFromDb(credentials.email, credentials.password);
 
-          if (!user || !user.hashedPassword) {
+          if (!user) {
+            console.log('Auth: getUserFromDb returned null (user not found or invalid password)');
             return null;
           }
 
-          // Verify password using bcrypt
-          const passwordMatches = await bcrypt.compare(credentials.password, user.hashedPassword);
-
-          if (!passwordMatches) {
-            return null;
-          }
-
+          console.log(`Auth: User ${user.email} authorized successfully`);
           return {
             id: user.id,
             email: user.email,
             name: user.name,
           };
+
         } catch (error) {
-          console.error('Error in auth:', error);
+          // Simplified error handling for direct call
+          console.error('Error during direct authorization call:', error);
           return null;
         }
       },

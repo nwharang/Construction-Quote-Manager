@@ -3,13 +3,15 @@ import { and, eq, sql, desc, gte, lte } from 'drizzle-orm';
 import {
   transactions,
   TransactionType,
-  TransactionCategory,
   type TransactionTypeType,
   type TransactionCategoryType,
 } from '../db/schema';
 import { type DB } from './index';
 import type { Session } from 'next-auth';
 import { BaseService } from './baseService';
+
+// Define SelectTransaction type
+type SelectTransaction = typeof transactions.$inferSelect;
 
 /**
  * Service layer for handling transaction-related business logic
@@ -74,7 +76,7 @@ export class TransactionService extends BaseService {
       .offset(offset);
 
     // Convert numeric string values to numbers for client consumption
-    const processedItems = items.map((item: any) => this.processTransaction(item));
+    const processedItems = items.map((item: SelectTransaction) => this.processTransaction(item));
 
     // Return paginated results with metadata
     return {
@@ -264,12 +266,12 @@ export class TransactionService extends BaseService {
       totalExpenses: parseFloat(totals[0]?.totalExpenses || '0'),
     };
 
-    const processedExpensesByCategory = expensesByCategory.map((item: any) => ({
+    const processedExpensesByCategory = expensesByCategory.map((item) => ({
       category: item.category,
       total: parseFloat(item.total || '0'),
     }));
 
-    const processedMonthlyBreakdown = monthlyBreakdown.map((item: any) => ({
+    const processedMonthlyBreakdown = monthlyBreakdown.map((item) => ({
       month: item.month,
       income: parseFloat(item.income || '0'),
       expenses: parseFloat(item.expenses || '0'),
@@ -288,7 +290,7 @@ export class TransactionService extends BaseService {
   /**
    * Helper function to convert string numeric values to actual numbers
    */
-  private processTransaction(transactionData: any) {
+  private processTransaction(transactionData: SelectTransaction) {
     return {
       ...transactionData,
       amount: this.toNumber(transactionData.amount),

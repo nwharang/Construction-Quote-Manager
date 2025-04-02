@@ -1,8 +1,6 @@
 import React from 'react';
 import { Card, CardBody } from '@heroui/react';
 import { 
-  ChevronUpIcon, 
-  ChevronDownIcon, 
   DollarSignIcon, 
   UsersIcon, 
   BarChart3Icon, 
@@ -23,7 +21,6 @@ export const StatCards: React.FC<StatCardsProps> = ({
   totalQuotes = 0,
   totalCustomers = 0,
   conversionRate = 0,
-  isLoading = false,
 }) => {
   // Helper function to format currency
   const formatCurrency = (value: number) => {

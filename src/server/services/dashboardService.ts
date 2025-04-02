@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import { sql, eq, desc } from 'drizzle-orm';
-import { quotes, customers, type QuoteStatusType } from '../db/schema';
+import { quotes, customers } from '../db/schema';
 import { type DB } from './index';
 import { BaseService } from './baseService';
 import type { Session } from 'next-auth';
@@ -65,35 +65,23 @@ export class DashboardService extends BaseService {
       }
 
       // Process quotes to convert string numeric values to numbers
-      const processedRecentQuotes = recentQuotes.map(
-        ({ quote, customer }: { quote: any; customer: any }) => ({
-          ...quote,
-          customer: customer || null,
-          subtotalTasks: this.toNumber(quote.subtotalTasks),
-          subtotalMaterials: this.toNumber(quote.subtotalMaterials),
-          complexityCharge: this.toNumber(quote.complexityCharge),
-          markupCharge: this.toNumber(quote.markupCharge),
-          markupPercentage: this.toNumber(quote.markupPercentage),
-          grandTotal: this.toNumber(quote.grandTotal),
-        })
-      );
+      const processedRecentQuotes = recentQuotes.map(({ quote, customer }) => ({
+        ...quote,
+        customer: customer || null,
+        subtotalTasks: this.toNumber(quote.subtotalTasks),
+        subtotalMaterials: this.toNumber(quote.subtotalMaterials),
+        complexityCharge: this.toNumber(quote.complexityCharge),
+        markupCharge: this.toNumber(quote.markupCharge),
+        markupPercentage: this.toNumber(quote.markupPercentage),
+        grandTotal: this.toNumber(quote.grandTotal),
+      }));
 
       // Process top customers to convert string numeric values to numbers
-      const processedTopCustomers = topCustomers.map(
-        ({
-          customer,
-          totalRevenue,
-          quoteCount,
-        }: {
-          customer: any;
-          totalRevenue: string;
-          quoteCount: number;
-        }) => ({
-          ...customer,
-          totalRevenue: this.toNumber(totalRevenue),
-          quoteCount: this.toNumber(quoteCount || 0),
-        })
-      );
+      const processedTopCustomers = topCustomers.map(({ customer, totalRevenue, quoteCount }) => ({
+        ...customer,
+        totalRevenue: this.toNumber(totalRevenue),
+        quoteCount: this.toNumber(quoteCount || 0),
+      }));
 
       return {
         totalQuotes: this.toNumber(stats[0].totalQuotes || 0),

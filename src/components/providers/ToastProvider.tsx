@@ -23,7 +23,7 @@ const MAX_VISIBLE_TOASTS = 2;
 const cleanupOldToasts = () => {
   const now = Date.now();
   // Remove toasts older than 3 seconds
-  const index = activeToasts.findIndex(toast => now - toast.timestamp > 3000);
+  const index = activeToasts.findIndex((toast) => now - toast.timestamp > 3000);
   if (index !== -1) {
     activeToasts.splice(index, 1);
   }
@@ -36,14 +36,14 @@ export function ToastProvider({ children }: ToastProviderProps) {
       <HeroUIToastProvider
         toastProps={{
           classNames: {
-            base: "bg-background/95 backdrop-blur border border-border shadow-md",
-            content: "flex gap-2 text-foreground",
-            title: "text-sm font-medium",
-            description: "text-xs",
-            closeButton: "text-foreground"
+            base: 'bg-background/95 backdrop-blur border border-border shadow-md',
+            content: 'flex gap-2 text-foreground',
+            title: 'text-sm font-medium',
+            description: 'text-xs',
+            closeButton: 'text-foreground',
           },
           timeout: 3000,
-          variant: "solid",
+          variant: 'solid',
           hideIcon: false,
         }}
       />
@@ -56,24 +56,24 @@ export function useAppToast() {
   return {
     success: (message: string) => {
       // Check for duplicate success messages
-      if (activeToasts.some(toast => toast.message === message && toast.type === 'success')) {
+      if (activeToasts.some((toast) => toast.message === message && toast.type === 'success')) {
         return null; // Prevent duplicate success messages
       }
-      
+
       // Manage active toasts to limit number displayed
       cleanupOldToasts();
-      
+
       // Create a unique ID based on timestamp
       const id = `toast-${Date.now()}`;
-      
+
       // Track this toast
       activeToasts.push({
         id,
         message,
         timestamp: Date.now(),
-        type: 'success'
+        type: 'success',
       });
-      
+
       // Limit visible toasts
       if (activeToasts.length > MAX_VISIBLE_TOASTS) {
         // We have too many toasts, only show the newest ones
@@ -83,40 +83,40 @@ export function useAppToast() {
         activeToasts.length = 0;
         activeToasts.push(...toKeep);
       }
-      
+
       return addToast({
-        title: "Success",
+        title: 'Success',
         description: message,
-        variant: "bordered",
-        color: "success",
+        variant: 'bordered',
+        color: 'success',
         onClose: () => {
           // Remove from tracking when closed
-          const index = activeToasts.findIndex(t => t.id === id);
+          const index = activeToasts.findIndex((t) => t.id === id);
           if (index !== -1) {
             activeToasts.splice(index, 1);
           }
-        }
+        },
       });
     },
     error: (message: string) => {
       // Check for duplicate error messages
-      if (activeToasts.some(toast => toast.message === message && toast.type === 'error')) {
+      if (activeToasts.some((toast) => toast.message === message && toast.type === 'error')) {
         return null; // Prevent duplicate errors
       }
-      
+
       cleanupOldToasts();
-      
+
       // Create a unique ID based on timestamp
       const id = `toast-${Date.now()}`;
-      
+
       // Track this toast
       activeToasts.push({
         id,
         message,
         timestamp: Date.now(),
-        type: 'error'
+        type: 'error',
       });
-      
+
       // Limit visible toasts
       if (activeToasts.length > MAX_VISIBLE_TOASTS) {
         // We have too many toasts, only show the newest ones
@@ -126,54 +126,54 @@ export function useAppToast() {
         activeToasts.length = 0;
         activeToasts.push(...toKeep);
       }
-      
+
       return addToast({
-        title: "Error",
+        title: 'Error',
         description: message,
-        variant: "bordered",
-        color: "danger",
+        variant: 'bordered',
+        color: 'danger',
         onClose: () => {
           // Remove from tracking when closed
-          const index = activeToasts.findIndex(t => t.id === id);
+          const index = activeToasts.findIndex((t) => t.id === id);
           if (index !== -1) {
             activeToasts.splice(index, 1);
           }
-        }
+        },
       });
     },
     loading: (message: string) => {
       // Check for duplicate loading messages
-      if (activeToasts.some(toast => toast.message === message && toast.type === 'loading')) {
+      if (activeToasts.some((toast) => toast.message === message && toast.type === 'loading')) {
         return null; // Prevent duplicate loading messages
       }
-      
+
       cleanupOldToasts();
-      
+
       // Create a unique ID based on timestamp
       const id = `toast-${Date.now()}`;
-      
+
       // Track this toast
       activeToasts.push({
         id,
         message,
         timestamp: Date.now(),
-        type: 'loading'
+        type: 'loading',
       });
-      
+
       return addToast({
-        title: "Loading",
+        title: 'Loading',
         description: message,
-        variant: "bordered",
-        color: "primary",
+        variant: 'bordered',
+        color: 'primary',
         timeout: 10000, // Longer timeout for loading toasts
         onClose: () => {
           // Remove from tracking when closed
-          const index = activeToasts.findIndex(t => t.id === id);
+          const index = activeToasts.findIndex((t) => t.id === id);
           if (index !== -1) {
             activeToasts.splice(index, 1);
           }
-        }
+        },
       });
-    }
+    },
   };
-} 
+}

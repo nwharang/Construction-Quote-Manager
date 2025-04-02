@@ -1,26 +1,13 @@
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import { useConfigStore } from '~/store';
-import { locales, useTranslation } from '~/utils/i18n';
-import { api } from '~/utils/api';
-import { useSession } from 'next-auth/react';
-
-interface I18nContextType {
-  changeLocale: (locale: string) => void;
-  currentLocale: string;
-  availableLocales: typeof locales;
-}
-
-const I18nContext = createContext<I18nContextType | null>(null);
-
-export function useI18n() {
-  const context = useContext(I18nContext);
-  if (!context) {
-    throw new Error('useI18n must be used within an I18nProvider');
-  }
-  return context;
-}
+import { locales, type AppLocale } from '~/i18n/locales';
+import { I18nContext } from '~/hooks/useI18n';
+// import { api } from '~/utils/api'; // Removed unused api import
+// import { useSession } from 'next-auth/react'; // Commented out
+// import type { Settings } from '~/store/configStore'; // Commented out
 
 interface I18nProviderProps {
   children: ReactNode;
@@ -28,71 +15,63 @@ interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const router = useRouter();
-  const { changeLocale: i18nChangeLocale } = useTranslation();
-  const { settings, setSettings } = useConfigStore();
-  const { data: session } = useSession();
-  const isChangingLocale = useRef(false);
+  const { settings, setSettings: setStoreSettings } = useConfigStore();
+  // const { data: session } = useSession(); // Commented out
 
-  // Get the settings from the database when logged in
-  const { data: dbSettings } = api.settings.get.useQuery(undefined, {
-    enabled: !!session,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  });
+  const changeLocale = useCallback(
+    (newLocale: AppLocale) => {
+      // 1. Update Zustand store
+      setStoreSettings({ locale: newLocale });
 
-  const handleLocaleChange = (newLocale: string) => {
-    if (locales[newLocale as keyof typeof locales] && newLocale !== settings.locale) {
-      // Set flag to prevent circular updates
-      isChangingLocale.current = true;
+      // 2. Update Next.js router locale
+      if (router.locale !== newLocale) {
+        router.replace(router.pathname, router.asPath, { locale: newLocale, scroll: false });
+      }
 
-      // Update the config store
-      setSettings({ locale: newLocale });
+      // 3. Update document attributes (handled by useEffect below)
 
-      // Update the i18n system
-      i18nChangeLocale(newLocale);
-
-      // Reset the changing flag after a short delay
-      setTimeout(() => {
-        isChangingLocale.current = false;
-      }, 200);
+      // 4. REMOVE database update logic
+      // Persistence handled explicitly on settings page
+      /* 
+    if (session) {
+      const currentSettings = useConfigStore.getState().settings;
+      const updatePayload = { ... }; // Payload construction removed
+      updateSettingsMutation.mutate(updatePayload); // MUTATION CALL REMOVED
     }
-  };
+    */
+    },
+    [router, setStoreSettings]
+  );
 
-  // Handle router locale changes
   useEffect(() => {
-    // Skip effect if we're in the middle of a change
-    if (isChangingLocale.current) return;
-
-    const routerLocale = router.locale || 'en';
-    
-    // Update from DB settings but only if both values exist and are different
-    if (dbSettings?.locale && dbSettings.locale !== settings.locale) {
-      isChangingLocale.current = true;
-      setSettings({ locale: dbSettings.locale });
-      setTimeout(() => {
-        isChangingLocale.current = false;
-      }, 200);
-      return; // Exit early to prevent multiple updates
+    const routerLocale = router.locale as AppLocale | undefined;
+    if (settings && routerLocale && locales[routerLocale] && routerLocale !== settings.locale) {
+      setStoreSettings({ locale: routerLocale });
     }
+  }, [router.locale, settings, setStoreSettings]);
 
-    // Only update from router if different from current setting
-    if (routerLocale !== settings.locale) {
-      isChangingLocale.current = true;
-      setSettings({ locale: routerLocale });
-      setTimeout(() => {
-        isChangingLocale.current = false;
-      }, 200);
+  useEffect(() => {
+    if (settings && typeof document !== 'undefined') {
+      document.documentElement.lang = settings.locale;
+      document.documentElement.setAttribute('dir', 'ltr');
     }
-  }, [router.locale, dbSettings]);
+  }, [settings]);
 
-  // Handle locale change
+  const value = useMemo(
+    () => ({
+      changeLocale,
+      currentLocale: (settings?.locale as AppLocale) ?? 'en',
+      availableLocales: locales,
+    }),
+    [settings?.locale, changeLocale]
+  );
 
-  const value = {
-    changeLocale: handleLocaleChange,
-    currentLocale: settings.locale || router.locale || 'en',
-    availableLocales: locales,
-  };
-
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return (
+    <I18nContext.Provider value={value}>
+      <Head>
+        <meta httpEquiv="content-language" content={value.currentLocale} />
+      </Head>
+      {children}
+    </I18nContext.Provider>
+  );
 }
-
-export default I18nProvider;

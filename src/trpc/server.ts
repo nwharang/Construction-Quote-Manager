@@ -1,42 +1,33 @@
 import "server-only";
 
-import { appRouter, type AppRouter } from "@/server/api/root";
-import { createTRPCContext } from "@/server/api/trpc";
+import { appRouter, type AppRouter } from "~/server/api/root";
+import { createInnerTRPCContext } from "~/server/api/trpc";
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 /**
  * Creates a server-side tRPC caller with properly constructed context
- * This is async to support Next.js 15's API changes
+ * for calling procedures from server-side code (e.g., NextAuth authorize).
  */
 export async function createCaller() {
-  // Create a new Headers object manually without using the Next.js headers API
-  // This avoids the async headers issue in Next.js 15
-  const heads = new Headers();
-  heads.set("x-trpc-source", "server");
-  
-  // Create context with our manually created headers
-  const context = await createTRPCContext({
-    headers: heads,
+  // Create minimal placeholder req/res objects.
+  // These might not be fully functional for all context needs,
+  // but are sufficient for createInnerTRPCContext to provide the db instance.
+  const req = {} as NextApiRequest;
+  const res = {} as NextApiResponse;
+
+  // Create context using the Pages Router context function
+  const context = await createInnerTRPCContext({
+    req,
+    res,
+    // No actual session or full request details needed for this server-side call
   });
-  
+
   // Return a caller with the context
   return appRouter.createCaller(context);
 }
 
 /**
- * Export methods for server-side tRPC calls
- */
-export const serverTRPC = {
-  quote: {
-    getAll: async () => {
-      const caller = await createCaller();
-      return caller.quote.getAll();
-    },
-    // Add other procedures as needed
-  },
-  // Add other routers as needed
-};
-
-/**
- * Re-export the appRouter for use in other files
+ * Re-export the appRouter for use in other files if needed elsewhere
+ * (though createCaller is the primary intended use from this file)
  */
 export { appRouter, type AppRouter };

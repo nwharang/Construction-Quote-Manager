@@ -93,7 +93,7 @@ export function usePagination({
     if (limit !== urlLimit) {
       setLimitInternal(urlLimit);
     }
-  }, [router.query, syncWithUrl, defaultPage, defaultLimit]);
+  }, [router.query, syncWithUrl, defaultPage, defaultLimit, page, limit]);
   
   // Calculate pagination info
   const pageInfo = {

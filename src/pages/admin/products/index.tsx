@@ -1,5 +1,5 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
-import type { NextPage } from 'next';
 import Head from 'next/head';
 import {
   Button,
@@ -16,63 +16,74 @@ import {
   DropdownMenu,
   DropdownItem,
   Spinner,
+  useDisclosure,
 } from '@heroui/react';
 import { Plus, Search, MoreVertical, Edit, Trash, Eye } from 'lucide-react';
 import { api } from '~/utils/api';
-import { useEntityStore, useToastStore } from '~/store';
-import { formatCurrency } from '~/utils/currency';
-import { formatUserFriendlyId } from '~/utils/formatters';
 import { MainLayout } from '~/layouts';
 import type { NextPageWithLayout } from '~/types/next';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '~/server/api/root';
-import { ProductFormModal } from '~/components/products/ProductFormModal';
+import { ProductFormModal, type ProductSubmitData } from '~/components/products/ProductFormModal';
 import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
+import { useTranslation } from '~/hooks/useTranslation';
+import { useAppToast } from '~/components/providers/ToastProvider';
+import type { ProductCategoryType } from '~/server/db/schema';
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type ProductListResponse = RouterOutput['product']['getAll'];
 type ProductItem = NonNullable<ProductListResponse['items']>[number];
 
-// API product type may have unitPrice as string
-interface ApiProduct extends Omit<ProductItem, 'unitPrice'> {
-  unitPrice: string | number;
-}
+// Helper to convert nulls to undefined for optional server fields
+const transformNullToUndefined = <T extends Record<string, any>>(
+  data: T,
+  // Keep category as potentially null initially, others become undefined
+  keysToTransform: Exclude<keyof T, 'category'>[]
+): {
+  [K in keyof T]: K extends (typeof keysToTransform)[number]
+    ? T[K] extends null
+      ? undefined
+      : T[K]
+    : T[K];
+} => {
+  const transformed = { ...data };
+  keysToTransform.forEach((key) => {
+    if (transformed[key] === null) {
+      transformed[key] = undefined as any; // Reverted to 'as any'
+    }
+  });
+  return transformed as any; // Reverted to 'as any'
+};
 
 const ProductsPage: NextPageWithLayout = () => {
-  const toast = useToastStore();
-  const entityStore = useEntityStore();
+  const { t, formatCurrency } = useTranslation();
+  const toast = useAppToast();
   const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const rowsPerPage = 10;
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState('name');
-  const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('ascending');
-  
+
   // Modal states
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const {
+    isOpen: isCreateModalOpen,
+    onOpen: onCreateModalOpen,
+    onClose: onCreateModalClose,
+  } = useDisclosure();
+  const {
+    isOpen: isEditModalOpen,
+    onOpen: onEditModalOpen,
+    onClose: onEditModalClose,
+  } = useDisclosure();
+  const {
+    isOpen: isViewModalOpen,
+    onOpen: onViewModalOpen,
+    onClose: onViewModalClose,
+  } = useDisclosure();
+  const {
+    isOpen: isDeleteDialogOpen,
+    onOpen: onDeleteDialogOpen,
+    onClose: onDeleteDialogClose,
+  } = useDisclosure();
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
-
-  // Set global entity settings for the EntityList component
-  useEffect(() => {
-    entityStore.setEntitySettings({
-      entityName: 'Products',
-      entityType: 'products',
-      baseUrl: '/admin/products',
-      displayNameField: 'name',
-      canView: true,
-      canEdit: true,
-      canDelete: true,
-      listPath: '/admin/products',
-      createPath: '/admin/products/new',
-      editPath: '/admin/products/:id/edit',
-      viewPath: '/admin/products/:id',
-    });
-
-    // Clean up
-    return () => entityStore.resetEntitySettings();
-  }, []);
 
   // Query for products with pagination, search, and sort
   const { data, isLoading, refetch } = api.product.getAll.useQuery({
@@ -85,7 +96,8 @@ const ProductsPage: NextPageWithLayout = () => {
   const products: ProductItem[] = data?.items
     ? data.items.map((product) => ({
         ...product,
-        unitPrice: typeof product.unitPrice === 'string' ? product.unitPrice : String(product.unitPrice),
+        unitPrice:
+          typeof product.unitPrice === 'string' ? product.unitPrice : String(product.unitPrice),
         // Ensure all required fields are present
         manufacturer: product.manufacturer ?? null,
         supplier: product.supplier ?? null,
@@ -99,35 +111,35 @@ const ProductsPage: NextPageWithLayout = () => {
 
   // API mutations
   const utils = api.useUtils();
-  
+
   const { mutate: createProduct, isPending: isCreating } = api.product.create.useMutation({
     onSuccess: () => {
       toast.success('Product created successfully');
-      utils.product.getAll.invalidate();
-      setIsCreateModalOpen(false);
+      onCreateModalClose();
+      void utils.product.getAll.invalidate();
     },
     onError: (error) => {
       toast.error(`Error creating product: ${error.message}`);
-    }
+    },
   });
 
   const { mutate: updateProduct, isPending: isUpdating } = api.product.update.useMutation({
     onSuccess: () => {
       toast.success('Product updated successfully');
-      utils.product.getAll.invalidate();
-      setIsEditModalOpen(false);
+      onEditModalClose();
+      void utils.product.getAll.invalidate();
       setSelectedProduct(null);
     },
     onError: (error) => {
       toast.error(`Error updating product: ${error.message}`);
-    }
+    },
   });
 
   const { mutate: deleteProduct, isPending: isDeleting } = api.product.delete.useMutation({
     onSuccess: () => {
       toast.success('Product deleted successfully');
-      utils.product.getAll.invalidate();
-      setIsDeleteDialogOpen(false);
+      onDeleteDialogClose();
+      void utils.product.getAll.invalidate();
       setSelectedProduct(null);
     },
     onError: (error) => {
@@ -140,59 +152,99 @@ const ProductsPage: NextPageWithLayout = () => {
     refetch();
   }, [page, rowsPerPage, searchQuery, refetch]);
 
-  // Handle sort change
-  const handleSortChange = (columnKey: string) => {
-    if (columnKey === sortColumn) {
-      setSortDirection(sortDirection === 'ascending' ? 'descending' : 'ascending');
-    } else {
-      setSortColumn(columnKey);
-      setSortDirection('ascending');
-    }
-    // Reset to first page when sorting changes
-    setPage(1);
-  };
-
   // Open create product modal
   const handleCreateProduct = () => {
     setSelectedProduct(null);
-    setIsCreateModalOpen(true);
+    onCreateModalOpen();
   };
 
   // Open view product modal
   const handleViewProduct = (product: ProductItem) => {
     setSelectedProduct(product);
-    setIsViewModalOpen(true);
+    onViewModalOpen();
   };
 
   // Open edit product modal
   const handleEditProduct = (product: ProductItem) => {
     setSelectedProduct(product);
-    setIsEditModalOpen(true);
+    onEditModalOpen();
   };
 
   // Open delete product dialog
   const handleDeleteProduct = (product: ProductItem) => {
     setSelectedProduct(product);
-    setIsDeleteDialogOpen(true);
+    onDeleteDialogOpen();
   };
 
   // Submit handlers
-  const handleCreateSubmit = async (data: any) => {
-    await createProduct(data);
+  const handleCreateSubmit = async (data: ProductSubmitData) => {
+    if (!data.category) {
+      toast.error(t('validation.selectOption', { field: t('productFields.category') }));
+      return;
+    }
+    const { ...createData } = data;
+
+    // Transform nulls to undefined for server compatibility
+    const transformedData = transformNullToUndefined(createData, [
+      'description',
+      'sku',
+      'manufacturer',
+      'supplier',
+      'location',
+      'notes',
+    ]) as Omit<typeof createData, 'category'> & {
+      description?: string;
+      sku?: string;
+      manufacturer?: string;
+      supplier?: string;
+      location?: string;
+      notes?: string;
+    };
+
+    createProduct({
+      ...transformedData,
+      category: createData.category as ProductCategoryType,
+    });
   };
 
-  const handleUpdateSubmit = async (data: any) => {
+  const handleUpdateSubmit = async (data: ProductSubmitData) => {
     if (selectedProduct) {
-      await updateProduct({
+      if (!data.category) {
+        toast.error(t('validation.selectOption', { field: t('productFields.category') }));
+        return;
+      }
+      const { ...updateData } = data;
+
+      // Transform nulls to undefined for server compatibility
+      const transformedData = transformNullToUndefined(updateData, [
+        'description',
+        'sku',
+        'manufacturer',
+        'supplier',
+        'location',
+        'notes',
+      ]) as Omit<typeof updateData, 'category'> & {
+        description?: string;
+        sku?: string;
+        manufacturer?: string;
+        supplier?: string;
+        location?: string;
+        notes?: string;
+      };
+
+      updateProduct({
         id: selectedProduct.id,
-        ...data,
+        data: {
+          ...transformedData,
+          category: updateData.category as ProductCategoryType,
+        },
       });
     }
   };
 
   const handleDeleteConfirm = async () => {
     if (selectedProduct) {
-      await deleteProduct({ id: selectedProduct.id });
+      deleteProduct({ id: selectedProduct.id });
     }
   };
 
@@ -200,47 +252,36 @@ const ProductsPage: NextPageWithLayout = () => {
   const renderCell = (product: ProductItem, columnKey: string) => {
     switch (columnKey) {
       case 'id':
-        return (
-          <span className="font-mono text-xs">
-            {formatUserFriendlyId(product.id, product.sequentialId)}
-          </span>
-        );
+        return `#${product.sequentialId}`;
       case 'name':
-        return (
-          <div className="flex flex-col">
-            <span className="font-medium">{product.name}</span>
-            {product.description && (
-              <span className="text-default-500 line-clamp-1 text-xs">{product.description}</span>
-            )}
-          </div>
-        );
+        return product.name;
       case 'category':
-        return <span>{product.category}</span>;
+        return product.category ?? '-';
       case 'unitPrice':
-        return <span className="font-medium">{formatCurrency(product.unitPrice)}</span>;
+        return formatCurrency(product.unitPrice);
       case 'actions':
         return (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-1">
             <Dropdown>
               <DropdownTrigger>
                 <Button isIconOnly variant="light" size="sm">
                   <MoreVertical size={16} />
                 </Button>
               </DropdownTrigger>
-              <DropdownMenu aria-label="Product actions">
+              <DropdownMenu aria-label={t('products.actionsLabel')}>
                 <DropdownItem
                   key="view"
                   startContent={<Eye size={16} />}
                   onPress={() => handleViewProduct(product)}
                 >
-                  View
+                  {t('common.view')}
                 </DropdownItem>
                 <DropdownItem
                   key="edit"
                   startContent={<Edit size={16} />}
                   onPress={() => handleEditProduct(product)}
                 >
-                  Edit
+                  {t('common.edit')}
                 </DropdownItem>
                 <DropdownItem
                   key="delete"
@@ -249,22 +290,23 @@ const ProductsPage: NextPageWithLayout = () => {
                   color="danger"
                   onPress={() => handleDeleteProduct(product)}
                 >
-                  Delete
+                  {t('common.delete')}
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
           </div>
         );
-      default:
+      default: {
         const value = product[columnKey as keyof ProductItem];
-        return typeof value === 'object' ? JSON.stringify(value) : String(value || '');
+        return typeof value === 'object' ? JSON.stringify(value) : String(value || '-');
+      }
     }
   };
 
   return (
     <>
       <Head>
-        <title>Products | Construction Quote Manager</title>
+        <title>{t('products.list.title')} | Construction Quote Manager</title>
       </Head>
       <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
         {/* Top Content */}
@@ -296,22 +338,18 @@ const ProductsPage: NextPageWithLayout = () => {
           }}
         >
           <TableHeader>
-            <TableColumn key="id" allowsSorting onClick={() => handleSortChange('id')}>
-              ID
+            <TableColumn key="id" allowsSorting>
+              {t('products.list.id')}
             </TableColumn>
-            <TableColumn key="name" allowsSorting onClick={() => handleSortChange('name')}>
-              Name
+            <TableColumn key="name" allowsSorting>
+              {t('products.list.name')}
             </TableColumn>
-            <TableColumn key="category">Category</TableColumn>
-            <TableColumn
-              key="unitPrice"
-              allowsSorting
-              onClick={() => handleSortChange('unitPrice')}
-            >
-              Unit Price
+            <TableColumn key="category">{t('products.list.category')}</TableColumn>
+            <TableColumn key="unitPrice" allowsSorting>
+              {t('products.list.price')}
             </TableColumn>
             <TableColumn key="actions" align="end">
-              Actions
+              {t('common.actions')}
             </TableColumn>
           </TableHeader>
           <TableBody
@@ -371,40 +409,47 @@ const ProductsPage: NextPageWithLayout = () => {
       </div>
 
       {/* Create Product Modal */}
-      <ProductFormModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSubmit={handleCreateSubmit}
-        isLoading={isCreating}
-      />
+      {isCreateModalOpen && (
+        <ProductFormModal
+          isOpen={isCreateModalOpen}
+          onClose={onCreateModalClose}
+          onSubmit={handleCreateSubmit}
+          isSubmitting={isCreating}
+        />
+      )}
 
       {/* Edit Product Modal */}
-      <ProductFormModal
-        product={selectedProduct || undefined}
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSubmit={handleUpdateSubmit}
-        isLoading={isUpdating}
-      />
+      {isEditModalOpen && selectedProduct && (
+        <ProductFormModal
+          initialData={selectedProduct}
+          isOpen={isEditModalOpen}
+          onClose={onEditModalClose}
+          onSubmit={handleUpdateSubmit}
+          isSubmitting={isUpdating}
+        />
+      )}
 
       {/* View Product Modal */}
-      <ProductFormModal
-        product={selectedProduct || undefined}
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
-        onSubmit={() => Promise.resolve()}
-        isLoading={false}
-        readOnly={true}
-      />
+      {isViewModalOpen && selectedProduct && (
+        <ProductFormModal
+          initialData={selectedProduct}
+          isOpen={isViewModalOpen}
+          onClose={onViewModalClose}
+          onSubmit={async () => {
+            onViewModalClose();
+          }}
+          isReadOnly={true}
+        />
+      )}
 
       {/* Delete Product Dialog */}
       <DeleteEntityDialog
         isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
+        onClose={onDeleteDialogClose}
         onConfirm={handleDeleteConfirm}
         isLoading={isDeleting}
         entityName="Product"
-        entityLabel={selectedProduct?.name || ""}
+        entityLabel={selectedProduct?.name || ''}
       />
     </>
   );

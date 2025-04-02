@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { TRPCError } from '@trpc/server';
-import { ProductCategory, products } from '~/server/db/schema';
-import { eq, and, ilike, or, sql, desc } from 'drizzle-orm';
+import { ProductCategory, products, productCategoryEnum } from '~/server/db/schema';
+import { eq, and, ilike, or, sql, desc, asc } from 'drizzle-orm';
 import { createId } from '@paralleldrive/cuid2';
 
 const productInput = z.object({
@@ -33,7 +33,6 @@ export const productRouter = createTRPCRouter({
         const { search, category, page, limit } = input;
         const offset = (page - 1) * limit;
 
-        // Build where clause for filtering
         const whereClause = and(
           eq(products.userId, ctx.session.user.id),
           ...(search
@@ -48,7 +47,6 @@ export const productRouter = createTRPCRouter({
           ...(category ? [eq(products.category, category)] : [])
         );
 
-        // Get total count
         const countResult = await ctx.db
           .select({ count: sql<number>`count(*)` })
           .from(products)
@@ -56,14 +54,13 @@ export const productRouter = createTRPCRouter({
 
         const total = Number(countResult[0]?.count ?? 0);
 
-        // Get products with pagination
         const items = await ctx.db
           .select()
           .from(products)
           .where(whereClause)
+          .orderBy(desc(products.createdAt))
           .limit(limit)
-          .offset(offset)
-          .orderBy(desc(products.createdAt));
+          .offset(offset);
 
         return {
           items,
@@ -82,11 +79,73 @@ export const productRouter = createTRPCRouter({
       }
     }),
 
+  getInfiniteList: protectedProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        category: z.nativeEnum(ProductCategory).optional(),
+        limit: z.number().min(1).max(100).default(20),
+        cursor: z.string().uuid().nullish(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const { search, category, limit, cursor } = input;
+        const { gt } = await import('drizzle-orm');
+        
+        const orderBy = [asc(products.id)]; 
+
+        const whereClause = and(
+          eq(products.userId, ctx.session.user.id),
+          cursor ? gt(products.id, cursor) : undefined,
+          ...(search
+            ? [
+                or(
+                  ilike(products.name, `%${search}%`),
+                  ilike(products.description, `%${search}%`),
+                  ilike(products.sku, `%${search}%`)
+                ),
+              ]
+            : []),
+          ...(category ? [eq(products.category, category)] : [])
+        );
+
+        const items = await ctx.db
+          .select()
+          .from(products)
+          .where(whereClause)
+          .orderBy(...orderBy)
+          .limit(limit + 1);
+
+        let nextCursor: typeof cursor | undefined = undefined;
+        if (items.length > limit) {
+          const nextItem = items.pop(); 
+          nextCursor = nextItem!.id;
+        }
+
+        return {
+          items,
+          nextCursor,
+        };
+      } catch (error) {
+        console.error("Error fetching infinite product list:", error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch product list for selection',
+          cause: error,
+        });
+      }
+    }),
+
+  getProductCategories: protectedProcedure
+    .query(() => {
+      return productCategoryEnum.enumValues;
+    }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       try {
-        // Verify ownership and get product data
         const product = await ctx.db
           .select()
           .from(products)
@@ -119,14 +178,11 @@ export const productRouter = createTRPCRouter({
     .input(productInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        // 1. Generate unique identifiers
         const sku = input.sku || `SKU-${createId()}`;
         const id = createId();
 
-        // 2. Ensure unit is a string even if nullish from input
         const unit = input.unit || '';
 
-        // 3. Create the product
         const [createdProduct] = await ctx.db
           .insert(products)
           .values({
@@ -173,7 +229,6 @@ export const productRouter = createTRPCRouter({
       try {
         const { id, data } = input;
 
-        // 1. Verify product exists and belongs to user
         const existingProduct = await ctx.db
           .select()
           .from(products)
@@ -190,10 +245,8 @@ export const productRouter = createTRPCRouter({
           });
         }
 
-        // 2. Ensure unit is a string even if nullish from input
         const unit = data.unit || '';
 
-        // 3. Update the product
         const [updatedProduct] = await ctx.db
           .update(products)
           .set({
@@ -238,7 +291,6 @@ export const productRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       try {
-        // 1. Verify product exists and belongs to user
         const existingProduct = await ctx.db
           .select()
           .from(products)
@@ -255,7 +307,6 @@ export const productRouter = createTRPCRouter({
           });
         }
 
-        // 2. Delete the product
         await ctx.db
           .delete(products)
           .where(and(

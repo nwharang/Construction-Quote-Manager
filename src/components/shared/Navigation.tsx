@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import {
   Navbar,
-  NavbarBrand,
   NavbarContent,
   NavbarItem,
   Dropdown,
@@ -13,11 +11,11 @@ import {
   DropdownItem,
   Avatar,
   Button,
-  Badge,
 } from '@heroui/react';
-import { Menu, Bell, Settings, LogOut, Users } from 'lucide-react';
+import { Menu, Settings, LogOut, Users } from 'lucide-react';
 import { ThemeToggle } from '~/components/ThemeToggle';
 import { LocaleSwitch } from '~/components/LocaleSwitch';
+import { useTranslation } from '~/hooks/useTranslation';
 
 interface NavigationProps {
   onMenuClick: () => void;
@@ -27,6 +25,7 @@ interface NavigationProps {
  * Top navigation bar component with user dropdown and theme toggle
  */
 export function Navigation({ onMenuClick }: NavigationProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: session, status } = useSession();
   const [isMounted, setIsMounted] = useState(false);
@@ -57,7 +56,7 @@ export function Navigation({ onMenuClick }: NavigationProps) {
     <Navbar maxWidth="full" position="sticky">
       {/* Mobile menu button */}
       <NavbarContent className="md:hidden" justify="start">
-        <Button isIconOnly variant="light" onClick={onMenuClick} aria-label="Open menu">
+        <Button isIconOnly variant="light" onClick={onMenuClick} aria-label={t('common.openMenu')}>
           <Menu size={24} />
         </Button>
       </NavbarContent>
@@ -104,25 +103,27 @@ export function Navigation({ onMenuClick }: NavigationProps) {
                 className="transition-transform"
                 size="sm"
                 src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  session?.user?.name || 'User'
+                  session?.user?.name || t('common.user')
                 )}`}
-                fallback={session?.user?.name?.[0] || 'U'}
+                fallback={session?.user?.name?.[0] || t('common.user')[0]}
               />
             </DropdownTrigger>
-            <DropdownMenu aria-label="User menu">
+            <DropdownMenu aria-label={t('userMenu.title')}>
               <DropdownItem
                 key="profile"
                 startContent={<Users size={16} />}
                 className={isProfileActive ? 'text-primary' : ''}
+                href="/admin/profile"
               >
-                <Link href="/admin/profile">Profile</Link>
+                {t('userMenu.profile')}
               </DropdownItem>
               <DropdownItem
                 key="settings"
                 startContent={<Settings size={16} />}
                 className={isSettingsActive ? 'text-primary' : ''}
+                href="/admin/settings"
               >
-                <Link href="/admin/settings">Settings</Link>
+                {t('userMenu.settings')}
               </DropdownItem>
               <DropdownItem
                 key="logout"
@@ -130,7 +131,7 @@ export function Navigation({ onMenuClick }: NavigationProps) {
                 startContent={<LogOut size={16} />}
                 onPress={handleSignOut}
               >
-                Sign Out
+                {t('userMenu.signOut')}
               </DropdownItem>
             </DropdownMenu>
           </Dropdown>

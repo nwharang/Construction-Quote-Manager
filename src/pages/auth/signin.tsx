@@ -1,6 +1,5 @@
 import React from 'react';
 import { type NextPage } from 'next';
-import Head from 'next/head';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
@@ -8,8 +7,10 @@ import { api } from '~/utils/api';
 import { routes } from '~/config/routes';
 import { Card, CardBody, CardHeader, Input, Button, Link, CardFooter } from '@heroui/react';
 import { withAuthLayout } from '~/utils/withAuth';
+import { useTranslation } from '~/hooks/useTranslation';
 
 const SignIn: NextPage = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
@@ -21,7 +22,6 @@ const SignIn: NextPage = () => {
   // tRPC mutation for login
   const { mutate: login } = api.auth.login.useMutation({
     onSuccess: async () => {
-      // After successful login, sign in with NextAuth
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
@@ -29,15 +29,14 @@ const SignIn: NextPage = () => {
       });
 
       if (result?.error) {
-        setError(result.error);
+        setError(t('auth.signIn.errorInvalidCredentials'));
         setIsLoading(false);
       } else {
-        // Redirect to dashboard
         await router.push(routes.admin.dashboard);
       }
     },
     onError: (error) => {
-      setError(error.message);
+      setError(error.message || t('auth.signIn.errorUnexpected'));
       setIsLoading(false);
     },
   });
@@ -54,22 +53,20 @@ const SignIn: NextPage = () => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
+      setError(t('auth.signIn.errorRequiredFields'));
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Call tRPC login mutation
       login({
         email: formData.email,
         password: formData.password,
       });
-    } catch (error) {
-      setError('An unexpected error occurred');
+    } catch {
+      setError(t('auth.signIn.errorUnexpected'));
       setIsLoading(false);
     }
   };
@@ -77,14 +74,14 @@ const SignIn: NextPage = () => {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold">Sign In</h2>
-        <p className="text-sm text-gray-500">Enter your credentials to access your account</p>
+        <h2 className="text-2xl font-bold">{t('auth.signIn.title')}</h2>
+        <p className="text-sm text-gray-500">{t('auth.signIn.subtitle')}</p>
       </CardHeader>
       <CardBody>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="text-sm text-red-500">{error}</div>}
           <Input
-            label="Email"
+            label={t('auth.signIn.emailLabel')}
             type="email"
             name="email"
             value={formData.email}
@@ -92,7 +89,7 @@ const SignIn: NextPage = () => {
             isRequired
           />
           <Input
-            label="Password"
+            label={t('auth.signIn.passwordLabel')}
             type="password"
             name="password"
             value={formData.password}
@@ -100,16 +97,16 @@ const SignIn: NextPage = () => {
             isRequired
           />
           <Button type="submit" color="primary" className="w-full" isLoading={isLoading}>
-            Sign In
+            {t('auth.signIn.submitButton')}
           </Button>
         </form>
       </CardBody>
       <CardFooter>
         <div className="relative z-10">
           <p className="text-sm opacity-80">
-            Don&apos;t have an account?{' '}
+            {t('auth.signIn.signUpPrompt')}{' '}
             <Link href={routes.auth.signUp} className="text-sm underline hover:opacity-100">
-              Sign up
+              {t('auth.signIn.signUpLink')}
             </Link>
           </p>
         </div>
@@ -118,5 +115,6 @@ const SignIn: NextPage = () => {
   );
 };
 
-// Pass title "Sign In" to the HOC
-export default withAuthLayout(SignIn, 'Sign In');
+// Pass translated title to HOC
+const SignInPageWithLayout = withAuthLayout(SignIn);
+export default SignInPageWithLayout;

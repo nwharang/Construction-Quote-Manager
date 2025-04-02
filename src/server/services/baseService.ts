@@ -1,4 +1,4 @@
-import { getServerSession, type Session } from 'next-auth';
+import { type Session } from 'next-auth';
 import { type DB, type ServiceContext, ServiceError, ServiceErrorCode } from './types';
 
 /**
@@ -57,5 +57,9 @@ export abstract class BaseService {
     if (value === null || value === undefined) return 0;
     if (typeof value === 'number') return value;
     return parseFloat(value) || 0;
+  }
+
+  generateId(): string {
+    return crypto.randomUUID();
   }
 }

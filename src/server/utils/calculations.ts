@@ -4,7 +4,13 @@
  * Follows the requirements in Context.md to ensure backend authority
  */
 
-import { type Task, type Material } from '~/types/quote';
+// Define Task interface inline
+interface Task {
+  price?: number;
+  materialType?: 'lumpsum' | 'itemized';
+  estimatedMaterialsCostLumpSum?: number;
+  materials?: Array<{ quantity: number; unitPrice: number }>;
+}
 
 /**
  * Rounds a number to 2 decimal places for consistent currency handling

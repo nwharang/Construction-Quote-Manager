@@ -22,7 +22,7 @@ const nextConfig = {
   // i18n configuration for pages directory
   i18n: {
     // These are all the locales supported in the application
-    locales: ['en', 'vi', 'es'],
+    locales: ['en', 'vi'],
     // Default locale used when a non-locale path is visited
     defaultLocale: 'en',
     // Set to false to let our custom middleware handle detection

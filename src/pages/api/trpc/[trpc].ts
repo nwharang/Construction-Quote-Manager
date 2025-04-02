@@ -6,47 +6,37 @@ import { createTRPCContext } from '~/server/api/trpc';
 export default createNextApiHandler({
   router: appRouter,
   createContext: ({ req, res }) => createTRPCContext({ req, res }),
-  onError: ({ path, error, req }) => {
+  onError: ({ path, error }) => {
     // Always log errors, regardless of environment
-    console.error(`❌ tRPC error on ${path ?? "<no-path>"}: ${error.message}`);
-    
+    console.error(`❌ tRPC error on ${path ?? '<no-path>'}: ${error.message}`);
+
     // Log additional details about the error
-    if (error.code === "INTERNAL_SERVER_ERROR") {
-      console.error("Error cause:", error.cause);
-      
+    if (error.code === 'INTERNAL_SERVER_ERROR') {
+      console.error('Error cause:', error.cause);
+
       // Check for database-specific errors
-      if (error.cause && typeof error.cause === "object" && "code" in error.cause) {
-        console.error("Database error code:", (error.cause as { code: string }).code);
+      if (error.cause && typeof error.cause === 'object' && 'code' in error.cause) {
+        console.error('Database error code:', (error.cause as { code: string }).code);
       }
     }
-    
+
     // In development mode, also log the full stack trace
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === 'development') {
       console.error(error.stack);
     }
   },
   batching: {
     enabled: true,
   },
-  responseMeta({ ctx, paths, type, errors }) {
+  responseMeta() {
     // Allow CORS
-    const newHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+
+    return {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
     };
-    
-    // Set more appropriate cache headers
-    if (paths?.every((path) => path.startsWith('customer.'))) {
-      // Add cache control for all customer endpoints
-      return {
-        headers: {
-          ...newHeaders,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      };
-    }
-    
-    return { headers: newHeaders };
   },
 });

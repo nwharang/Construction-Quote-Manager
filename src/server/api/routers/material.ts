@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
-import { materials, tasks, quotes, products } from '~/server/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { materials, tasks, products } from '~/server/db/schema';
+import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { type InferInsertModel } from 'drizzle-orm';
 
