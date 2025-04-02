@@ -42,6 +42,7 @@ interface CustomerFormModalProps {
   onClose: () => void;
   onSubmit: (data: CustomerFormData) => Promise<void>;
   isLoading?: boolean;
+  isReadOnly?: boolean;
 }
 
 export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
@@ -50,6 +51,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onClose,
   onSubmit,
   isLoading = false,
+  isReadOnly = false,
 }) => {
   const [formData, setFormData] = useState<CustomerFormState>({
     name: '',
@@ -123,15 +125,24 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   };
 
   const isEditMode = !!customer?.id;
+  let modalTitle = isEditMode ? 'Edit Customer' : 'Create Customer';
+  if (isReadOnly) {
+    modalTitle = 'View Customer';
+  }
+  let submitButtonText = isEditMode ? 'Update Customer' : 'Create Customer';
+  if (isReadOnly) {
+    submitButtonText = 'Close';
+  }
 
   return (
     <EntityModal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditMode ? 'Edit Customer' : 'Create Customer'}
+      title={modalTitle}
       isSubmitting={isLoading}
-      onSubmit={handleModalSubmit}
-      submitText={isEditMode ? 'Update Customer' : 'Create Customer'}
+      onSubmit={isReadOnly ? onClose : handleModalSubmit}
+      submitText={submitButtonText}
+      hideSubmitButton={isReadOnly}
     >
       <div className="space-y-6">
         <FormField
@@ -142,7 +153,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           onChange={handleInputChange}
           placeholder="Customer Name"
           error={errors.name}
-          isRequired
+          isRequired={!isReadOnly}
+          isDisabled={isReadOnly}
         />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -155,6 +167,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             onChange={handleInputChange}
             placeholder="Email Address"
             error={errors.email}
+            isDisabled={isReadOnly}
           />
 
           <FormField
@@ -164,6 +177,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             value={formData.phone || ''}
             onChange={handleInputChange}
             placeholder="Phone Number"
+            isDisabled={isReadOnly}
           />
         </div>
 
@@ -174,6 +188,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           value={formData.address || ''}
           onChange={handleInputChange}
           placeholder="Customer Address"
+          isDisabled={isReadOnly}
         />
 
         <FormField
@@ -184,6 +199,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           value={formData.notes || ''}
           onChange={handleInputChange}
           placeholder="Additional notes about the customer"
+          isDisabled={isReadOnly}
         />
       </div>
     </EntityModal>

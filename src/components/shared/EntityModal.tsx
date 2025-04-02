@@ -73,6 +73,11 @@ export interface EntityModalProps {
    * Whether to hide the footer
    */
   hideFooter?: boolean;
+  
+  /**
+   * Whether to hide the submit button
+   */
+  hideSubmitButton?: boolean;
 }
 
 /**
@@ -91,6 +96,7 @@ export function EntityModal({
   submitText = 'Save',
   cancelText = 'Cancel',
   hideFooter = false,
+  hideSubmitButton = false,
 }: EntityModalProps) {
   const handleSubmit = () => {
     if (onSubmit) {
@@ -110,7 +116,7 @@ export function EntityModal({
       >
         {cancelText}
       </Button>
-      {onSubmit && (
+      {onSubmit && !hideSubmitButton && (
         <Button
           color="primary"
           onPress={handleSubmit}

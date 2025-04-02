@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import {
   Button,
@@ -34,224 +33,204 @@ type RouterOutput = inferRouterOutputs<AppRouter>;
 type ProductListResponse = RouterOutput['product']['getAll'];
 type ProductItem = NonNullable<ProductListResponse['items']>[number];
 
-// Helper to convert nulls to undefined for optional server fields
-const transformNullToUndefined = <T extends Record<string, any>>(
-  data: T,
-  // Keep category as potentially null initially, others become undefined
-  keysToTransform: Exclude<keyof T, 'category'>[]
-): {
-  [K in keyof T]: K extends (typeof keysToTransform)[number]
-    ? T[K] extends null
-      ? undefined
-      : T[K]
-    : T[K];
-} => {
-  const transformed = { ...data };
-  keysToTransform.forEach((key) => {
-    if (transformed[key] === null) {
-      transformed[key] = undefined as any; // Reverted to 'as any'
-    }
-  });
-  return transformed as any; // Reverted to 'as any'
-};
-
 const ProductsPage: NextPageWithLayout = () => {
   const { t, formatCurrency } = useTranslation();
   const toast = useAppToast();
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Modal states
-  const {
-    isOpen: isCreateModalOpen,
-    onOpen: onCreateModalOpen,
-    onClose: onCreateModalClose,
-  } = useDisclosure();
-  const {
-    isOpen: isEditModalOpen,
-    onOpen: onEditModalOpen,
-    onClose: onEditModalClose,
-  } = useDisclosure();
-  const {
-    isOpen: isViewModalOpen,
-    onOpen: onViewModalOpen,
-    onClose: onViewModalClose,
-  } = useDisclosure();
-  const {
-    isOpen: isDeleteDialogOpen,
-    onOpen: onDeleteDialogOpen,
-    onClose: onDeleteDialogClose,
-  } = useDisclosure();
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
 
-  // Query for products with pagination, search, and sort
-  const { data, isLoading, refetch } = api.product.getAll.useQuery({
+  // --- Define useDisclosure hooks FIRST ---
+  const {
+    isOpen: isCreateOpen,
+    onOpen: onCreateOpen,
+    onClose: onCreateClose,
+  } = useDisclosure();
+  const {
+    isOpen: isEditOpen,
+    onOpen: onEditOpen,
+    onClose: onEditClose,
+  } = useDisclosure();
+  const {
+    isOpen: isViewOpen,
+    onOpen: onViewOpen,
+    onClose: onViewClose,
+  } = useDisclosure();
+  const {
+    isOpen: isDeleteOpen,
+    onOpen: onDeleteOpen,
+    onClose: onDeleteClose,
+  } = useDisclosure();
+  // --- End useDisclosure hooks ---
+
+  // Query for products list
+  const { data, isLoading: isListLoading, refetch } = api.product.getAll.useQuery({
     page,
     limit: rowsPerPage,
     search: searchQuery,
   });
 
-  // Convert data to Product type
+  // Format products data
   const products: ProductItem[] = data?.items
     ? data.items.map((product) => ({
         ...product,
         unitPrice:
           typeof product.unitPrice === 'string' ? product.unitPrice : String(product.unitPrice),
-        // Ensure all required fields are present
         manufacturer: product.manufacturer ?? null,
         supplier: product.supplier ?? null,
         location: product.location ?? null,
         notes: product.notes ?? null,
       }))
     : [];
-
-  // Get total products count
   const totalProducts = data?.total || products.length;
 
-  // API mutations
+  // API Utils
   const utils = api.useUtils();
 
+  // Fetch data for View Modal
+  const productDataForViewQuery = api.product.getById.useQuery(
+    { id: selectedProduct?.id || '' },
+    {
+      enabled: !!selectedProduct?.id && isViewOpen,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // --- Define Mutations AFTER useDisclosure hooks ---
   const { mutate: createProduct, isPending: isCreating } = api.product.create.useMutation({
     onSuccess: () => {
-      toast.success('Product created successfully');
-      onCreateModalClose();
+      toast.success(t('products.createSuccess'));
+      onCreateClose(); // Use specific close hook
       void utils.product.getAll.invalidate();
     },
     onError: (error) => {
-      toast.error(`Error creating product: ${error.message}`);
+      toast.error(`${t('products.createError')}: ${error.message}`);
     },
   });
 
   const { mutate: updateProduct, isPending: isUpdating } = api.product.update.useMutation({
     onSuccess: () => {
-      toast.success('Product updated successfully');
-      onEditModalClose();
+      toast.success(t('products.updateSuccess'));
+      onEditClose(); // Use specific close hook
       void utils.product.getAll.invalidate();
       setSelectedProduct(null);
     },
     onError: (error) => {
-      toast.error(`Error updating product: ${error.message}`);
+      toast.error(`${t('products.updateError')}: ${error.message}`);
     },
   });
 
   const { mutate: deleteProduct, isPending: isDeleting } = api.product.delete.useMutation({
     onSuccess: () => {
-      toast.success('Product deleted successfully');
-      onDeleteDialogClose();
+      toast.success(t('products.deleteSuccess'));
+      onDeleteClose(); // Use specific close hook
       void utils.product.getAll.invalidate();
       setSelectedProduct(null);
     },
     onError: (error) => {
-      toast.error(`Error deleting product: ${error.message}`);
+      toast.error(`${t('products.deleteError')}: ${error.message}`);
     },
   });
+  // --- End Mutations ---
 
-  // Refetch data when sort or search parameters change
+  // Refetch list data when parameters change
   useEffect(() => {
     refetch();
   }, [page, rowsPerPage, searchQuery, refetch]);
 
-  // Open create product modal
-  const handleCreateProduct = () => {
+  // === START: Define Modal Handlers ===
+  const handleCreate = useCallback(() => {
     setSelectedProduct(null);
-    onCreateModalOpen();
-  };
+    onCreateOpen();
+  }, [onCreateOpen]);
 
-  // Open view product modal
-  const handleViewProduct = (product: ProductItem) => {
+  const handleEdit = useCallback((product: ProductItem) => {
     setSelectedProduct(product);
-    onViewModalOpen();
-  };
+    onEditOpen();
+  }, [onEditOpen]);
 
-  // Open edit product modal
-  const handleEditProduct = (product: ProductItem) => {
+  const handleView = useCallback((product: ProductItem) => {
     setSelectedProduct(product);
-    onEditModalOpen();
-  };
+    onViewOpen();
+  }, [onViewOpen]);
 
-  // Open delete product dialog
-  const handleDeleteProduct = (product: ProductItem) => {
+  const handleDeleteRequest = useCallback((product: ProductItem) => {
     setSelectedProduct(product);
-    onDeleteDialogOpen();
-  };
+    onDeleteOpen();
+  }, [onDeleteOpen]);
+  // === END: Define Modal Handlers ===
 
-  // Submit handlers
-  const handleCreateSubmit = async (data: ProductSubmitData) => {
+  // === START: Define Submit Handlers ===
+  const handleCreateSubmit = useCallback(async (data: ProductSubmitData) => {
     if (!data.category) {
       toast.error(t('validation.selectOption', { field: t('productFields.category') }));
       return;
     }
-    const { ...createData } = data;
+    try {
+        await createProduct({
+            name: data.name,
+            description: data.description ?? undefined,
+            sku: data.sku ?? undefined,
+            unitPrice: data.unitPrice,
+            unit: data.unit ?? undefined, // Ensure unit is passed
+            manufacturer: data.manufacturer ?? undefined,
+            supplier: data.supplier ?? undefined,
+            location: data.location ?? undefined,
+            notes: data.notes ?? undefined,
+            category: data.category as ProductCategoryType,
+        });
+    } catch (error) {
+        console.error("Create product failed:", error);
+        // Error toast is handled by mutation onError
+    }
+  }, [createProduct, t, toast]);
 
-    // Transform nulls to undefined for server compatibility
-    const transformedData = transformNullToUndefined(createData, [
-      'description',
-      'sku',
-      'manufacturer',
-      'supplier',
-      'location',
-      'notes',
-    ]) as Omit<typeof createData, 'category'> & {
-      description?: string;
-      sku?: string;
-      manufacturer?: string;
-      supplier?: string;
-      location?: string;
-      notes?: string;
-    };
-
-    createProduct({
-      ...transformedData,
-      category: createData.category as ProductCategoryType,
-    });
-  };
-
-  const handleUpdateSubmit = async (data: ProductSubmitData) => {
+  const handleUpdateSubmit = useCallback(async (data: ProductSubmitData) => {
     if (selectedProduct) {
       if (!data.category) {
         toast.error(t('validation.selectOption', { field: t('productFields.category') }));
         return;
       }
-      const { ...updateData } = data;
-
-      // Transform nulls to undefined for server compatibility
-      const transformedData = transformNullToUndefined(updateData, [
-        'description',
-        'sku',
-        'manufacturer',
-        'supplier',
-        'location',
-        'notes',
-      ]) as Omit<typeof updateData, 'category'> & {
-        description?: string;
-        sku?: string;
-        manufacturer?: string;
-        supplier?: string;
-        location?: string;
-        notes?: string;
-      };
-
-      updateProduct({
-        id: selectedProduct.id,
-        data: {
-          ...transformedData,
-          category: updateData.category as ProductCategoryType,
-        },
-      });
+      try {
+          await updateProduct({
+            id: selectedProduct.id,
+            data: {
+              name: data.name,
+              description: data.description ?? undefined,
+              sku: data.sku ?? undefined,
+              unitPrice: data.unitPrice,
+              unit: data.unit ?? undefined, // Ensure unit is passed
+              manufacturer: data.manufacturer ?? undefined,
+              supplier: data.supplier ?? undefined,
+              location: data.location ?? undefined,
+              notes: data.notes ?? undefined,
+              category: data.category as ProductCategoryType,
+            },
+          });
+      } catch (error) {
+          console.error("Update product failed:", error);
+          // Error toast is handled by mutation onError
+      }
     }
-  };
+  }, [updateProduct, selectedProduct, t, toast]);
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (selectedProduct) {
-      deleteProduct({ id: selectedProduct.id });
+        try {
+            await deleteProduct({ id: selectedProduct.id });
+        } catch (error) {
+            console.error("Delete product failed:", error);
+             // Error toast is handled by mutation onError
+        }
     }
-  };
+  }, [deleteProduct, selectedProduct]);
+  // === END: Define Submit Handlers ===
 
   // Render cell content based on column
   const renderCell = (product: ProductItem, columnKey: string) => {
     switch (columnKey) {
-      case 'id':
+      case 'sequentialId': // Use sequentialId for display
         return `#${product.sequentialId}`;
       case 'name':
         return product.name;
@@ -272,14 +251,14 @@ const ProductsPage: NextPageWithLayout = () => {
                 <DropdownItem
                   key="view"
                   startContent={<Eye size={16} />}
-                  onPress={() => handleViewProduct(product)}
+                  onPress={() => handleView(product)} // Use correct handler
                 >
                   {t('common.view')}
                 </DropdownItem>
                 <DropdownItem
                   key="edit"
                   startContent={<Edit size={16} />}
-                  onPress={() => handleEditProduct(product)}
+                  onPress={() => handleEdit(product)} // Use correct handler
                 >
                   {t('common.edit')}
                 </DropdownItem>
@@ -288,7 +267,7 @@ const ProductsPage: NextPageWithLayout = () => {
                   startContent={<Trash size={16} />}
                   className="text-danger"
                   color="danger"
-                  onPress={() => handleDeleteProduct(product)}
+                  onPress={() => handleDeleteRequest(product)} // Use correct handler
                 >
                   {t('common.delete')}
                 </DropdownItem>
@@ -296,167 +275,114 @@ const ProductsPage: NextPageWithLayout = () => {
             </Dropdown>
           </div>
         );
-      default: {
+      default:
+        // Handle potential non-string values gracefully
         const value = product[columnKey as keyof ProductItem];
-        return typeof value === 'object' ? JSON.stringify(value) : String(value || '-');
-      }
+        return typeof value === 'number' || typeof value === 'string' ? String(value) : '-';
     }
   };
+
+  // Determine which product data to pass to the modal
+  const productForModal = isViewOpen
+     ? productDataForViewQuery.data as ProductItem | undefined
+     : (isCreateOpen ? undefined : selectedProduct ?? undefined);
 
   return (
     <>
       <Head>
-        <title>{t('products.list.title')} | Construction Quote Manager</title>
+        <title>{t('products.title')}</title>
       </Head>
+
       <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-        {/* Top Content */}
-        <div className="mb-4 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold">Products</h1>
-            <Button color="primary" startContent={<Plus size={16} />} onPress={handleCreateProduct}>
-              New Product
-            </Button>
-          </div>
-          <div className="flex items-center justify-between">
+        {/* Top Bar: Title, Search, Create Button */}
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-xl font-bold">{t('products.title')}</h1>
+          <div className="flex w-full gap-3 sm:w-auto">
             <Input
-              placeholder="Search products..."
+              isClearable
+              placeholder={t('products.searchPlaceholder')}
+              startContent={<Search size={16} />}
               value={searchQuery}
               onValueChange={setSearchQuery}
-              startContent={<Search size={16} className="text-default-300" />}
-              className="w-full sm:max-w-[44%]"
+              className="w-full sm:max-w-xs"
             />
+            <Button
+              color="primary"
+              startContent={<Plus size={16} />}
+              onPress={handleCreate} // Use correct handler
+            >
+              {t('products.new')}
+            </Button>
           </div>
         </div>
 
         {/* Table */}
-        <Table
-          aria-label="Products table"
-          isHeaderSticky
-          classNames={{
-            wrapper: 'max-h-[calc(100vh-300px)]',
-            table: 'min-h-[150px]',
-          }}
-        >
-          <TableHeader>
-            <TableColumn key="id" allowsSorting>
-              {t('products.list.id')}
-            </TableColumn>
-            <TableColumn key="name" allowsSorting>
-              {t('products.list.name')}
-            </TableColumn>
-            <TableColumn key="category">{t('products.list.category')}</TableColumn>
-            <TableColumn key="unitPrice" allowsSorting>
-              {t('products.list.price')}
-            </TableColumn>
-            <TableColumn key="actions" align="end">
-              {t('common.actions')}
-            </TableColumn>
-          </TableHeader>
-          <TableBody
-            isLoading={isLoading}
-            loadingContent={
-              <div className="flex items-center justify-center py-8">
-                <Spinner size="md" color="primary" />
-                <span className="ml-2">Loading products...</span>
-              </div>
-            }
-            emptyContent={
-              <div className="py-8 text-center">
-                <p className="text-gray-500">No products found</p>
-                <Button color="primary" className="mt-4" onPress={handleCreateProduct}>
-                  Create your first product
-                </Button>
-              </div>
-            }
-            items={products}
-          >
-            {(item) => (
-              <TableRow key={item.id}>
-                {(columnKey) => <TableCell>{renderCell(item, columnKey.toString())}</TableCell>}
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-
-        {/* Bottom Content - Pagination */}
-        <div className="mt-4 flex items-center justify-between px-2 py-4">
-          <span className="text-default-400 text-sm">{`Total ${totalProducts} products`}</span>
-          <Pagination
-            isCompact
-            showControls
-            showShadow
-            color="primary"
-            page={page}
-            total={Math.ceil(totalProducts / rowsPerPage)}
-            onChange={setPage}
-          />
-          <div className="hidden w-[30%] justify-end gap-2 sm:flex">
-            <Button isDisabled={page === 1} variant="flat" onPress={() => setPage(1)}>
-              First
-            </Button>
-            <Button
-              isDisabled={
-                Math.ceil(totalProducts / rowsPerPage) <= 1 ||
-                page === Math.ceil(totalProducts / rowsPerPage)
-              }
-              variant="flat"
-              onPress={() => setPage(Math.ceil(totalProducts / rowsPerPage))}
-            >
-              Last
-            </Button>
+        {isListLoading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <Spinner size="lg" />
           </div>
-        </div>
+        ) : (
+          <Table aria-label={t('products.tableLabel')}>
+            <TableHeader>
+              <TableColumn key="sequentialId">{t('products.list.id')}</TableColumn>
+              <TableColumn key="name">{t('products.list.name')}</TableColumn>
+              <TableColumn key="category">{t('products.list.category')}</TableColumn>
+              <TableColumn key="unitPrice">{t('products.list.price')}</TableColumn>
+              <TableColumn key="actions" className="text-right">{t('common.actions')}</TableColumn>
+            </TableHeader>
+            <TableBody items={products} emptyContent={t('products.noProductsFound')}>
+              {(item) => (
+                <TableRow key={item.id}>
+                  {(columnKey) => (
+                    <TableCell>{renderCell(item, columnKey as string)}</TableCell>
+                  )}
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
+
+        {/* Pagination */}
+        {!isListLoading && totalProducts > rowsPerPage && (
+          <div className="mt-4 flex w-full justify-center">
+            <Pagination
+              isCompact
+              showControls
+              showShadow
+              color="primary"
+              page={page}
+              total={Math.ceil(totalProducts / rowsPerPage)}
+              onChange={setPage}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Create Product Modal */}
-      {isCreateModalOpen && (
-        <ProductFormModal
-          isOpen={isCreateModalOpen}
-          onClose={onCreateModalClose}
-          onSubmit={handleCreateSubmit}
-          isSubmitting={isCreating}
-        />
-      )}
-
-      {/* Edit Product Modal */}
-      {isEditModalOpen && selectedProduct && (
-        <ProductFormModal
-          initialData={selectedProduct}
-          isOpen={isEditModalOpen}
-          onClose={onEditModalClose}
-          onSubmit={handleUpdateSubmit}
-          isSubmitting={isUpdating}
-        />
-      )}
-
-      {/* View Product Modal */}
-      {isViewModalOpen && selectedProduct && (
-        <ProductFormModal
-          initialData={selectedProduct}
-          isOpen={isViewModalOpen}
-          onClose={onViewModalClose}
-          onSubmit={async () => {
-            onViewModalClose();
-          }}
-          isReadOnly={true}
-        />
-      )}
+      {/* Product Form Modal (Handles Create/Edit/View) */}
+      <ProductFormModal
+        initialData={productForModal} // Pass the correct data
+        isOpen={isCreateOpen || isEditOpen || isViewOpen} // Combine open states
+        onClose={isEditOpen ? onEditClose : (isViewOpen ? onViewClose : onCreateClose)} // Correct close handler
+        onSubmit={isEditOpen ? handleUpdateSubmit : handleCreateSubmit} // Correct submit handler
+        // Pass the loading state using the expected 'isSubmitting' prop
+        isSubmitting={isEditOpen ? isUpdating : (isViewOpen ? productDataForViewQuery.isLoading : isCreating)}
+        isReadOnly={isViewOpen} // Set read-only for view mode
+      />
 
       {/* Delete Product Dialog */}
       <DeleteEntityDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={onDeleteDialogClose}
+        isOpen={isDeleteOpen} // Use specific open state
+        onClose={onDeleteClose} // Use specific close handler
         onConfirm={handleDeleteConfirm}
-        isLoading={isDeleting}
-        entityName="Product"
+        isLoading={isDeleting} // Use specific loading state
+        entityName={t('products.entityName')}
         entityLabel={selectedProduct?.name || ''}
       />
     </>
   );
 };
 
-// Define the getLayout function
-ProductsPage.getLayout = (page: React.ReactNode) => {
+ProductsPage.getLayout = (page) => {
   return <MainLayout>{page}</MainLayout>;
 };
 

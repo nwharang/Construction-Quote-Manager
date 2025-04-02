@@ -26,12 +26,14 @@ import { TaskList } from './TaskList'; // Uncomment TaskList import
 import { QuoteSummary } from './QuoteSummary';
 import { CustomerSelector } from '~/components/customers/CustomerSelector'; // Ensure CustomerSelect is imported
 import type { QuoteStatusType } from '~/server/db/schema-exports'; // Import QuoteStatusType
+import { EntityModal } from '~/components/shared/EntityModal';
 
 // Interface for props
 interface QuoteDetailModalProps {
   quoteId: string | null; // Allow null for create mode
   isOpen: boolean;
   onClose: () => void;
+  isReadOnly?: boolean; // Add isReadOnly prop
 }
 
 // --- API Types ---
@@ -170,16 +172,23 @@ function getInitialCreateFormValues(defaultMarkup: number): QuoteDetailFormValue
 }
 
 // --- Main Modal Component ---
-export const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({ quoteId, isOpen, onClose }) => {
+export const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({ quoteId, isOpen, onClose, isReadOnly = false }) => {
   const { t } = useTranslation();
   const toast = useAppToast();
   const utils = api.useUtils();
   const isEditMode = !!quoteId;
 
-  // Fetch quote data only in edit mode
+  // Fetch global settings for defaults
+  const { data: settings } = api.settings.get.useQuery(undefined, {
+    staleTime: Infinity, // Settings rarely change
+    refetchOnWindowFocus: false,
+  });
+  const defaultMarkup = useMemo(() => Number(settings?.defaultMarkupCharge ?? 0), [settings]);
+
+  // Fetch quote data only in edit or view mode
   const { data: quoteData, isLoading: isLoadingQuote } = api.quote.getById.useQuery(
     { id: quoteId! },
-    { enabled: isEditMode, refetchOnWindowFocus: false }
+    { enabled: isOpen && !!quoteId, refetchOnWindowFocus: false } // Fetch if modal open and ID exists
   );
 
   // --- Mutations ---
@@ -205,17 +214,17 @@ export const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({ quoteId, isO
     },
   });
 
-  const isLoading = isEditMode && isLoadingQuote;
+  const isLoading = (isEditMode || isReadOnly) && isLoadingQuote;
   const isSubmitting = updateQuoteMutation.isPending || createQuoteMutation.isPending;
 
-  // Determine if the form should be read-only based on status (only in edit mode)
+  // Determine if the form should be disabled based on status OR explicit isReadOnly prop
   const isReadOnlyBasedOnStatus = useMemo(() => {
+    if (isReadOnly) return true; // Always read-only if prop is set
     if (!isEditMode || !quoteData) {
       return false; // Not read-only in create mode or before data loads
     }
-    // Explicitly check if status is NOT DRAFT
     return quoteData.status !== ('DRAFT' as QuoteStatusType);
-  }, [isEditMode, quoteData]);
+  }, [isEditMode, quoteData, isReadOnly]);
 
   // Combine read-only status with submission status for disabling fields
   const isDisabled = isReadOnlyBasedOnStatus || isSubmitting;
@@ -263,243 +272,173 @@ export const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({ quoteId, isO
   }
 
   // --- Form Initialization (React Hook Form) --- //
-  // Get the default markup from settings or use a fallback
-  const { data: settings } = api.settings.get.useQuery();
-  const defaultMarkup = useMemo(() => Number(settings?.defaultMarkupCharge ?? 10), [settings]);
-
-  // Use useForm hook - THIS IS THE FORM OBJECT WE NEED TO PASS
   const form = useForm<QuoteDetailFormValues>({
     resolver: zodResolver(quoteDetailSchema),
-    defaultValues: useMemo(
-      () =>
-        isEditMode && quoteData
-          ? mapQuoteDataToFormValues(quoteData, defaultMarkup)
-          : getInitialCreateFormValues(defaultMarkup),
-      [isEditMode, quoteData, defaultMarkup]
-    ),
-    mode: 'onBlur', // Trigger validation on blur
+    // Initialize with default values or fetched data
+    defaultValues: getInitialCreateFormValues(defaultMarkup),
   });
 
-  // Destructure methods AFTER form is defined
-  const {
-    control,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { errors },
-  } = form;
+  const { control, handleSubmit, reset, watch, formState: { errors, isSubmitting: formIsSubmitting } } = form;
 
-  // --- Effects --- //
-  // Reset form when quoteData changes (for edit mode)
+  // Reset form when modal opens or data changes
   useEffect(() => {
-    if (isEditMode && quoteData) {
-      reset(mapQuoteDataToFormValues(quoteData, defaultMarkup));
+    if (isOpen) {
+      if (isEditMode || isReadOnly) {
+        if (quoteData) {
+          reset(mapQuoteDataToFormValues(quoteData, defaultMarkup));
+        }
+      } else {
+        reset(getInitialCreateFormValues(defaultMarkup));
+      }
+    } else {
+      // Optionally reset when closing if needed
+      // reset(getInitialCreateFormValues(defaultMarkup));
     }
-    // If switching to create mode (quoteId becomes null), reset to initial create values
-    else if (!isEditMode) {
-      reset(getInitialCreateFormValues(defaultMarkup));
-    }
-  }, [quoteData, isEditMode, reset, defaultMarkup]);
-
-  // Effect to reset form when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      const timer = setTimeout(() => {
-        // Reset based on the mode it *should* be in when reopened
-        reset(
-          isEditMode && quoteData
-            ? mapQuoteDataToFormValues(quoteData, defaultMarkup)
-            : getInitialCreateFormValues(defaultMarkup)
-        );
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]); // Only depend on isOpen
-
-  // --- Calculations --- //
-  const watchedValues = watch();
-  const calculatedTotals = useMemo(() => {
-    return calculateQuoteTotals(watchedValues);
-  }, [watchedValues]);
+  }, [isOpen, isEditMode, isReadOnly, quoteData, reset, defaultMarkup]);
 
   // --- Submit Handler ---
   const onSubmitHandler = async (data: QuoteDetailFormValues) => {
+    if (isReadOnly || isReadOnlyBasedOnStatus) {
+      onClose(); // Just close if read-only
+      return;
+    }
+    const apiInput = formatFormValuesToApiInput(data);
     try {
-      // Ensure ID from form state matches quoteId prop in edit mode
-      if (isEditMode && data.id !== quoteId) {
-        console.error('Form ID mismatch');
-        toast.error('An internal error occurred. Please try again.');
-        return;
-      }
-      const apiInput = formatFormValuesToApiInput(data);
-      if (isEditMode) {
-        await updateQuoteMutation.mutateAsync(apiInput as QuoteUpdateInput);
+      if (isEditMode && quoteId) {
+        await updateQuoteMutation.mutateAsync({ id: quoteId, ...apiInput });
       } else {
         await createQuoteMutation.mutateAsync(apiInput as QuoteCreateInput);
       }
     } catch (error) {
-      console.error('Submission Error caught in onSubmitHandler:', error);
-      // Errors should be handled by mutation's onError, but maybe add generic toast?
-      toast.error('Failed to save quote. Please check your input.');
+      // Errors are handled in mutation onError callbacks
+      console.error("Submission failed:", error);
     }
   };
 
-  // --- Render Logic ---
-  const modalTitle = isEditMode ? t('quotes.editModalTitle') : t('quotes.createModalTitle');
-  const submitButtonText = isEditMode ? t('common.saveChanges') : t('common.create');
+  // --- Calculate Totals --- //
+  const watchedValues = watch(); // Watch all form values
+  const totals = useMemo(() => calculateQuoteTotals(watchedValues), [watchedValues]);
+
+  let modalTitle = isEditMode ? t('quotes.editModalTitle') : t('quotes.createModalTitle');
+  if (isReadOnly) {
+    modalTitle = quoteData ? t('quotes.viewModalTitle', { id: `#${quoteData.sequentialId}` }) : t('quotes.viewModalTitle', {id: '...'});
+  }
 
   return (
-    <Modal size="4xl" isOpen={isOpen} onClose={onClose} backdrop="blur" scrollBehavior="inside">
-      <ModalContent>
-        <ModalHeader className="text-lg font-semibold">
-          {isLoading ? <Spinner size="sm" className="mr-2" /> : null}
-          {modalTitle}
-          {isEditMode && quoteData && ` (#${quoteData.sequentialId})`}
-        </ModalHeader>
-        <ModalBody>
-          {isLoading ? (
-            <div className="flex h-64 items-center justify-center">
-              <Spinner label="Loading quote data..." />
-            </div>
-          ) : (
-            <form
-              onSubmit={handleSubmit(onSubmitHandler)}
-              id="quote-detail-form"
-              className="space-y-6"
-            >
-              {/* --- Basic Info Card --- */}
-              <Card>
-                <CardBody className="space-y-4">
-                  {/* Title */}
+    <EntityModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={modalTitle}
+      size="5xl" // Use a larger size for quote details
+      isSubmitting={isSubmitting}
+      isLoading={isLoading}
+      onSubmit={handleSubmit(onSubmitHandler)}
+      submitText={
+        isReadOnly ? t('common.close') : isEditMode ? t('common.update') : t('common.create')
+      }
+      hideSubmitButton={isReadOnly} // Hide submit if read-only
+      hideFooter={isReadOnlyBasedOnStatus && !isReadOnly} // Hide footer completely if non-draft status (but not explicit view)
+    >
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit(onSubmitHandler)} className="space-y-6">
+          {/* Quote Header Section */}
+          <Card>
+            <CardBody>
+              <h3 className="mb-4 text-lg font-semibold">{t('quotes.detailsSectionTitle')}</h3>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+                {/* Title */}
+                <div>
+                  <label htmlFor="title" className="mb-1.5 block text-sm font-medium">
+                    {t('quotes.fields.title')} <span className="text-danger">*</span>
+                  </label>
                   <Controller
                     name="title"
                     control={control}
                     render={({ field }) => (
-                      <div>
-                        <label htmlFor={field.name} className="block text-sm font-medium">
-                          {t('quotes.fields.title')} <span className="text-danger">*</span>
-                        </label>
-                        <Input
-                          {...field}
-                          id={field.name}
-                          placeholder="Enter quote title"
-                          disabled={isDisabled}
-                          className="mt-1"
-                        />
-                        <FieldInfo error={errors.title} />
-                      </div>
+                      <Input
+                        {...field}
+                        id="title"
+                        placeholder={t('quotes.placeholders.title')}
+                        isInvalid={!!errors.title}
+                        isDisabled={isDisabled}
+                      />
                     )}
                   />
-                  {/* Customer */}
+                  <FieldInfo error={errors.title} />
+                </div>
+
+                {/* Customer Selector */}
+                <div>
+                  <label htmlFor="customerId" className="mb-1.5 block text-sm font-medium">
+                    {t('quotes.fields.customer')} <span className="text-danger">*</span>
+                  </label>
                   <Controller
                     name="customerId"
                     control={control}
                     render={({ field }) => (
-                      <div>
-                        <label htmlFor={field.name} className="block text-sm font-medium">
-                          {t('quotes.fields.customer')} <span className="text-danger">*</span>
-                        </label>
-                        <CustomerSelector
-                          value={field.value}
-                          onChange={(id) => field.onChange(id ?? '')}
-                          placeholder={t('quotes.placeholders.selectCustomer')}
-                          className="mt-1"
-                          disabled={isDisabled}
-                        />
-                        <FieldInfo error={errors.customerId} />
-                      </div>
+                      <CustomerSelector
+                        value={field.value}
+                        onChange={(id) => field.onChange(id)}
+                        placeholder={t('quotes.placeholders.selectCustomer')}
+                        isInvalid={!!errors.customerId}
+                        errorMessage={errors.customerId?.message}
+                        disabled={isDisabled}
+                      />
                     )}
                   />
-                  {/* Notes */}
-                  <Controller
+                   {/* No need for FieldInfo here as CustomerSelector handles its error display */}
+                </div>
+
+                 {/* Notes */}
+                 <div className="md:col-span-2">
+                  <label htmlFor="notes" className="mb-1.5 block text-sm font-medium">
+                    {t('quotes.fields.notes')}
+                  </label>
+                   <Controller
                     name="notes"
                     control={control}
                     render={({ field }) => (
-                      <div>
-                        <label htmlFor={field.name} className="block text-sm font-medium">
-                          {t('quotes.fields.notes')}
-                        </label>
-                        <Textarea
-                          {...field}
-                          id={field.name}
-                          value={field.value ?? ''}
-                          placeholder={t('quotes.placeholders.notes')}
-                          disabled={isDisabled}
-                          className="mt-1"
-                        />
-                        <FieldInfo error={errors.notes} />
-                      </div>
+                      <Textarea
+                        {...field}
+                        id="notes"
+                        value={field.value ?? ''} // Handle null value for textarea
+                        placeholder={t('quotes.placeholders.notes')}
+                        minRows={2}
+                        isDisabled={isDisabled}
+                        isInvalid={!!errors.notes}
+                      />
                     )}
                   />
-                </CardBody>
-              </Card>
+                  <FieldInfo error={errors.notes} />
+                </div>
+              </div>
+            </CardBody>
+          </Card>
 
-              {/* --- Task List Section --- */}
-              <TaskList form={form} readOnly={isDisabled} />
+          {/* Tasks Section - Corrected Props */}
+          <TaskList form={form} readOnly={isDisabled} />
 
-              {/* --- Charges & Summary Card --- */}
-              <Card>
-                <CardBody>
-                  <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-3">
-                    {/* Markup Percentage */}
-                    <Controller
-                      name="markupPercentage"
-                      control={control}
-                      render={({ field }) => (
-                        <div>
-                          <label htmlFor={field.name} className="block text-sm font-medium">
-                            {t('quoteSummary.markupInputLabel')}
-                          </label>
-                          <NumberInput
-                            {...field}
-                            id={field.name}
-                            value={field.value}
-                            onValueChange={(v) => field.onChange(v ?? 0)}
-                            placeholder="Enter markup percentage"
-                            min={0}
-                            max={100}
-                            step={1}
-                            formatOptions={{ style: 'decimal', maximumFractionDigits: 1 }}
-                            endContent="%"
-                            isDisabled={isDisabled}
-                            className="mt-1"
-                          />
-                          <FieldInfo error={errors.markupPercentage} />
-                        </div>
-                      )}
-                    />
-                    {/* Quote Summary */}
-                    <div className="md:col-span-2">
-                      <QuoteSummary
-                        {...calculatedTotals}
-                        markupPercentage={watchedValues.markupPercentage}
-                        readOnly={isDisabled}
-                      />
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            </form>
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="flat" color="default" onClick={onClose} isDisabled={isSubmitting}>
-            {isReadOnlyBasedOnStatus ? t('common.close') : t('common.cancel')}
-          </Button>
-          {!isReadOnlyBasedOnStatus && (
-            <Button
-              color="primary"
-              type="submit"
-              form="quote-detail-form"
-              isLoading={isSubmitting}
-              isDisabled={isLoading || isSubmitting}
-            >
-              {submitButtonText}
-            </Button>
-          )}
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+          {/* Summary Section - Corrected Props */}
+          <QuoteSummary
+             subtotalTasks={totals.subtotalTasks}
+             subtotalMaterials={totals.subtotalMaterials}
+             markupPercentage={watchedValues.markupPercentage} // Pass watched value for input
+             markupCharge={totals.markupCharge}
+             tax={totals.tax}
+             grandTotal={totals.grandTotal}
+             readOnly={isDisabled} // Pass combined disabled state
+           />
+
+          {/* Hidden submit button to allow form submission via Enter key */}
+          {!isReadOnly && <button type="submit" className="hidden" aria-hidden="true"></button>}
+
+        </form>
+      )}
+    </EntityModal>
   );
 };
 

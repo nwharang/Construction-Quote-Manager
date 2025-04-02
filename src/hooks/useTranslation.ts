@@ -1,20 +1,15 @@
 import { useCallback } from 'react';
-import {
-  type AppLocale,
-  type TranslationKey,
-  type TranslationParamSchema,
-  type TranslationParams,
-  translations,
-} from '~/utils/translations';
-// Import the definitive locales object
+import { type AppLocale, type TranslationKey, translations } from '~/utils/translations';
+// Import the new TFunctionType
+import type { TranslationParams } from '~/types/i18n/keys'; // Adjusted path if needed
 import { locales as sourceLocales } from '~/i18n/locales';
 import { useI18n } from './useI18n';
-import { useConfigStore } from '~/store/configStore'; // Import config store
+import { useConfigStore } from '~/store/configStore';
 
 // Define the overload signatures for the translate function *outside* the hook
 // Overload 1: Key requires specific parameters defined in TranslationParamSchema
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-declare function translateFn<T extends keyof TranslationParamSchema>(
+declare function translateFn<T extends keyof TranslationParams<T>>(
   key: T,
   params: TranslationParams<T>
 ): string;

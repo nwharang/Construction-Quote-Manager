@@ -1,4 +1,5 @@
 // @ts-ignore
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 import type { NextPage } from 'next';
 import type { ReactElement, ReactNode } from 'react';
 

@@ -29,8 +29,9 @@ import {
 import { api, type RouterOutputs } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
 import { MainLayout } from '~/layouts/MainLayout';
-import { Plus, Search, MoreVertical, Edit, Trash } from 'lucide-react';
+import { Plus, Search, MoreVertical, Edit, Trash, Eye } from 'lucide-react';
 import { QuoteDetailModal } from '~/components/quotes/QuoteDetailModal';
+import { QuoteViewModal } from '~/components/quotes/QuoteViewModal';
 import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
 import type { QuoteStatusType } from '~/server/db/schema-exports';
 import { useAppToast } from '~/components/providers/ToastProvider';
@@ -75,9 +76,11 @@ const QuotesPage: NextPageWithLayout = () => {
   const [sortDirection, setSortDirection] = useState<'ascending' | 'descending'>('descending');
   const [quoteToDelete, setQuoteToDelete] = useState<QuoteListItem | null>(null);
   const [quoteIdForDetail, setQuoteIdForDetail] = useState<string | null>(null);
+  const [quoteIdForView, setQuoteIdForView] = useState<string | null>(null);
 
   // Modal state management
   const { isOpen: isDetailOpen, onOpen: onDetailOpen, onClose: onDetailClose } = useDisclosure();
+  const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
   const utils = api.useUtils();
@@ -120,6 +123,15 @@ const QuotesPage: NextPageWithLayout = () => {
       onDetailOpen();
     },
     [onDetailOpen]
+  );
+
+  // Handle opening View modal
+  const handleView = useCallback(
+    (quote: QuoteListItem) => {
+      setQuoteIdForView(quote.id); // Set the ID for view mode
+      onViewOpen();
+    },
+    [onViewOpen]
   );
 
   const handleDeleteRequest = useCallback(
@@ -202,18 +214,23 @@ const QuotesPage: NextPageWithLayout = () => {
                 </DropdownTrigger>
                 <DropdownMenu aria-label="Quote Actions">
                   <DropdownItem
-                    key="edit"
-                    startContent={<Edit size={16} />}
-                    onPress={() => handleEdit(quote)}
+                    key="view"
+                    startContent={<Eye size={16} />}
+                    onPress={() => handleView(quote)}
                   >
-                    {t('common.edit')}
+                    {t('common.view')}
                   </DropdownItem>
-                  <DropdownItem
-                    key="print"
-                    onPress={() => window.open(`/admin/quotes/${quote.id}/print`, '_blank')}
-                  >
-                    {t('quotes.actions.print')}
-                  </DropdownItem>
+                   {/* Conditionally add Edit button (e.g., based on status) */}
+                   {/* Change conditional rendering to return null instead of false */}
+                   {quote.status === 'DRAFT' ? (
+                     <DropdownItem
+                       key="edit"
+                       startContent={<Edit size={16} />}
+                       onPress={() => handleEdit(quote)}
+                     >
+                       {t('common.edit')}
+                     </DropdownItem>
+                   ) : null}
                   <DropdownItem
                     key="delete"
                     startContent={<Trash size={16} />}
@@ -231,7 +248,7 @@ const QuotesPage: NextPageWithLayout = () => {
           return cellValue?.toString() ?? '-';
       }
     },
-    [t, formatDate, formatCurrency, handleEdit, handleDeleteRequest]
+    [t, formatDate, formatCurrency, handleEdit, handleView, handleDeleteRequest]
   );
 
   // Memoize the renderCell function - Add renderCellContent dependency
@@ -240,8 +257,9 @@ const QuotesPage: NextPageWithLayout = () => {
     formatDate,
     formatCurrency,
     handleEdit,
+    handleView,
     handleDeleteRequest,
-    renderCellContent, // Add missing dependency
+    renderCellContent,
   ]);
 
   // === END: Define Callbacks at Top Level ===
@@ -366,16 +384,19 @@ const QuotesPage: NextPageWithLayout = () => {
         </Table>
       </div>
 
-      {/* Unified Detail Modal (handles create/edit) */}
-      {isDetailOpen && (
-        <QuoteDetailModal
-          isOpen={isDetailOpen}
-          onClose={onDetailClose}
-          quoteId={quoteIdForDetail} // Pass null for create, ID for edit
-        />
-      )}
-
-      {/* Delete Dialog */}
+      {/* Render Modals */}
+      {/* Detail/Create Modal */}
+      <QuoteDetailModal quoteId={quoteIdForDetail} isOpen={isDetailOpen} onClose={onDetailClose} />
+      {/* Add View Modal */}
+      <QuoteViewModal
+        quoteId={quoteIdForView}
+        isOpen={isViewOpen}
+        onClose={() => {
+          setQuoteIdForView(null); // Clear ID on close
+          onViewClose();
+        }}
+      />
+      {/* Delete Confirmation Dialog */}
       {isDeleteOpen && quoteToDelete && (
         <DeleteEntityDialog
           isOpen={isDeleteOpen}

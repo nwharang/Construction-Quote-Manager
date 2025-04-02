@@ -1,18 +1,10 @@
 import { TRPCError } from '@trpc/server';
-import { and, eq, sql, desc, asc, like, inArray } from 'drizzle-orm';
+import { and, eq, sql, desc, asc, like, inArray, SQL } from 'drizzle-orm';
 import { quotes, tasks, materials, customers, type QuoteStatusType } from '../db/schema';
-import { PgColumn, type PgTransaction } from 'drizzle-orm/pg-core';
-import { type PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
+import { PgColumn } from 'drizzle-orm/pg-core';
 import { type DB } from './index';
 import { BaseService } from './baseService';
 import type { Session } from 'next-auth';
-
-// Define Transaction type helper
-type TransactionType = PgTransaction<
-  PostgresJsQueryResultHKT,
-  typeof import('../db/schema'),
-  Record<string, never>
->;
 
 /**
  * Service layer for handling quote-related business logic
@@ -45,7 +37,7 @@ export class QuoteService extends BaseService {
     const offset = (page - 1) * limit;
 
     // Build the where clause with filters
-    const conditions: any[] = [];
+    const conditions: SQL[] = [];
 
     if (search) {
       conditions.push(like(quotes.title, `%${search}%`));
@@ -97,7 +89,7 @@ export class QuoteService extends BaseService {
   /**
    * Get a quote by ID
    */
-  async getQuoteById({ id, includeRelated = false }: { id: string; includeRelated?: boolean }) {
+  async getQuoteById({ id }: { id: string; includeRelated?: boolean }) {
     // Get the quote with customer
     const quote = await this.db.query.quotes.findFirst({
       where: eq(quotes.id, id),
@@ -193,7 +185,7 @@ export class QuoteService extends BaseService {
     };
 
     // Create quote and related tasks/materials in a transaction
-    const result = await this.db.transaction(async (tx: any) => {
+    const result = await this.db.transaction(async (tx) => {
       const [quote] = await tx.insert(quotes).values(quoteData).returning();
 
       if (!quote) {
@@ -252,13 +244,7 @@ export class QuoteService extends BaseService {
   /**
    * Recalculate all totals for a quote based on its tasks and materials
    */
-  async recalculateQuoteTotals({
-    quoteId,
-    tx = this.db,
-  }: {
-    quoteId: string;
-    tx?: DB | TransactionType;
-  }) {
+  async recalculateQuoteTotals({ quoteId, tx = this.db }: { quoteId: string; tx?: DB }) {
     // Fetch the quote to get markup percentage
     const [quote] = await tx
       .select({
@@ -329,7 +315,6 @@ export class QuoteService extends BaseService {
   async updateQuote({
     id,
     data,
-    userId,
   }: {
     id: string;
     data: {
@@ -513,7 +498,7 @@ export class QuoteService extends BaseService {
   /**
    * Delete a quote
    */
-  async deleteQuote({ id, userId }: { id: string; userId: string }) {
+  async deleteQuote({ id }: { id: string; userId: string }) {
     // Verify quote exists
     await this.getQuoteById({ id });
 
@@ -645,7 +630,7 @@ export class QuoteService extends BaseService {
     await this.getQuoteById({ id: task[0]!.quoteId });
 
     // Prepare data to update
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, string | number | undefined | null> = {};
 
     if (taskData.description) updateData.description = taskData.description;
     if (taskData.price !== undefined) updateData.price = taskData.price.toString();
@@ -791,15 +776,7 @@ export class QuoteService extends BaseService {
   /**
    * Update the status of a quote
    */
-  async updateStatus({
-    id,
-    status,
-    userId,
-  }: {
-    id: string;
-    status: QuoteStatusType;
-    userId: string;
-  }) {
+  async updateStatus({ id, status }: { id: string; status: QuoteStatusType; userId: string }) {
     // Verify quote exists
     await this.getQuoteById({ id });
 
@@ -831,7 +808,6 @@ export class QuoteService extends BaseService {
     id,
     complexityCharge,
     markupCharge,
-    userId,
   }: {
     id: string;
     complexityCharge: number;
