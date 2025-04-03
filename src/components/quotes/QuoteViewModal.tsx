@@ -23,6 +23,8 @@ import {
 } from '@heroui/react';
 import { api, type RouterOutputs } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
+import type { TranslationKey } from '~/types/i18n/keys';
+import type { QuoteStatusType } from '~/server/db/schema-exports';
 
 // Type for the fetched quote data
 type QuoteData = NonNullable<RouterOutputs['quote']['getById']>;
@@ -31,13 +33,14 @@ type MaterialItem = NonNullable<QuoteData['tasks'][number]['materials']>[number]
 
 // Define QuoteStatusSettings locally or import if shared
 const QuoteStatusSettings: Record<
-  string,
-  { color: 'default' | 'primary' | 'success' | 'danger'; labelKey: string }
+  QuoteStatusType | 'UNKNOWN',
+  { color: 'default' | 'primary' | 'success' | 'danger'; labelKey: TranslationKey }
 > = {
   DRAFT: { color: 'default', labelKey: 'quotes.status.draft' },
   SENT: { color: 'primary', labelKey: 'quotes.status.sent' },
   ACCEPTED: { color: 'success', labelKey: 'quotes.status.accepted' },
   REJECTED: { color: 'danger', labelKey: 'quotes.status.rejected' },
+  UNKNOWN: { color: 'default', labelKey: 'common.unknown' },
 };
 
 interface QuoteViewModalProps {
@@ -127,11 +130,11 @@ export const QuoteViewModal: React.FC<QuoteViewModalProps> = ({ quoteId, isOpen,
                     <div>
                       <p className="text-sm text-gray-500">{t('common.status')}</p>
                       {(() => {
-                        const statusKey = (quoteData.status ?? 'UNKNOWN').toUpperCase();
-                        const setting = QuoteStatusSettings[statusKey] || {
-                          color: 'default',
-                          labelKey: 'common.unknown',
-                        };
+                        const statusKey = quoteData.status ?? 'UNKNOWN';
+                        const setting = QuoteStatusSettings[statusKey];
+                        if (!setting) {
+                          return <span className="text-sm text-gray-500">{t('common.unknown')}</span>;
+                        }
                         return (
                           <Chip size="sm" color={setting.color}>
                             {t(setting.labelKey)}

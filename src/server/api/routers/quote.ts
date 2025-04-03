@@ -7,6 +7,27 @@ import {
 import { TRPCError } from '@trpc/server';
 import { createServices } from '~/server/services';
 
+// Define reusable nested schemas with UUIDs
+const quoteMaterialInputSchema = z.object({
+  id: z.string().uuid().optional(), // For existing materials during update
+  productId: z.string().uuid('Valid product ID is required').optional().nullable(), // Ensure UUID, allow null if product not selected
+  quantity: z.number().min(1, 'Quantity must be at least 1'),
+  unitPrice: z.number().min(0, 'Unit price must be non-negative'),
+  notes: z.string().optional().nullable(),
+});
+
+const taskInputSchema = z.object({
+  id: z.string().uuid().optional(), // For existing tasks during update
+  description: z.string().min(1, 'Task description is required'),
+  price: z.number().min(0, 'Price must be non-negative'),
+  materialType: z.enum(['lumpsum', 'itemized']), // Use lowercase as before
+  estimatedMaterialsCostLumpSum: z.number().min(0).optional().nullable(),
+  materials: z.array(quoteMaterialInputSchema).optional(),
+});
+
+// Type inferred from the material input schema
+type MaterialInputType = z.infer<typeof quoteMaterialInputSchema>;
+
 export const quoteRouter = createTRPCRouter({
   getAll: protectedProcedure
     .input(

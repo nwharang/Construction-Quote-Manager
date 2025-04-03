@@ -30,47 +30,63 @@ export const useConfigStore = create<ConfigState>((set) => ({
 
   setSettings: (newSettingsOrFull: Partial<Settings> | Settings) =>
     set((state) => {
-      let updatedSettings: Settings | null = null; // Initialize as null
-      let updatedIsLoading = state.isLoading; // Default to current loading state
+      console.log('[ConfigStore] setSettings called with:', newSettingsOrFull);
 
-      if (state.settings === null || ('id' in newSettingsOrFull && newSettingsOrFull.id)) {
-        // Handle initial hydration or explicit full replacement
-        if (!('id' in newSettingsOrFull)) {
-          return {}; // Should not happen if ConfigLoader is correct
-        }
-        updatedSettings = newSettingsOrFull as Settings;
-        updatedIsLoading = false; // Mark loading as complete on hydration
-      } else if (state.settings) {
-        // Handle partial update
-        updatedSettings = {
-          ...state.settings,
-          ...(newSettingsOrFull as Partial<Settings>), // Cast to Partial
+      // Determine if this is the initial full hydration call (assume it has an 'id')
+      const isFullHydration = 'id' in newSettingsOrFull && !!newSettingsOrFull.id;
+
+      if (isFullHydration) {
+        console.log('[ConfigStore] Handling FULL hydration.');
+        const fullSettings = newSettingsOrFull as Settings;
+
+        // Calculate isDarkMode based on the incoming theme
+        const potentialNextTheme = fullSettings.theme;
+        const updatedIsDarkMode = potentialNextTheme === 'dark' ||
+          (potentialNextTheme === 'system' &&
+            typeof window !== 'undefined' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+        const newStateSlice = {
+          settings: fullSettings,
+          isDarkMode: updatedIsDarkMode,
+          isLoading: false, // *** Set isLoading to false ONLY on full hydration ***
         };
-        // isLoading remains unchanged during partial updates
+        console.log('[ConfigStore] Returning new state slice (Full Hydration):', newStateSlice);
+        return newStateSlice;
+
+      } else if (state.settings) {
+        console.log('[ConfigStore] Handling PARTIAL update.');
+        // Handle partial update ONLY if settings already exist
+        const partialSettings = newSettingsOrFull as Partial<Settings>; // Cast to Partial
+        const updatedSettings = {
+          ...state.settings,
+          ...partialSettings,
+        };
+
+        // Recalculate isDarkMode if theme is part of the partial update
+        let updatedIsDarkMode = state.isDarkMode;
+        if ('theme' in partialSettings) {
+          const potentialNextTheme = partialSettings.theme;
+          updatedIsDarkMode = potentialNextTheme === 'dark' ||
+            (potentialNextTheme === 'system' &&
+              typeof window !== 'undefined' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+        }
+
+        const newStateSlice = {
+          settings: updatedSettings,
+          isDarkMode: updatedIsDarkMode,
+          // isLoading remains unchanged during partial updates
+        };
+        console.log('[ConfigStore] Returning new state slice (Partial Update):', newStateSlice);
+        return newStateSlice;
+
       } else {
-        return {};
+        // If it's not full hydration and settings are null, it's likely an update attempt before hydration.
+        // Log this and do nothing to prevent corrupting the state.
+        console.warn('[ConfigStore] Partial update received BEFORE initial hydration. Ignoring:', newSettingsOrFull);
+        return {}; // Return empty object, no state change
       }
-
-      // Ensure updatedSettings is not null before proceeding
-      if (updatedSettings === null) {
-        return {}; // Prevent further processing with null settings
-      }
-
-      // Calculate isDarkMode based on the potentially updated theme
-      const potentialNextTheme = updatedSettings.theme;
-      const updatedIsDarkMode =
-        potentialNextTheme === 'dark' ||
-        (potentialNextTheme === 'system' &&
-          typeof window !== 'undefined' &&
-          window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-      const newStateSlice = {
-        settings: updatedSettings, // Now guaranteed non-null
-        isDarkMode: updatedIsDarkMode,
-        isLoading: updatedIsLoading, // Include isLoading in the returned slice
-      };
-
-      return newStateSlice;
     }),
 
   setLoading: (isLoading) => set({ isLoading }),

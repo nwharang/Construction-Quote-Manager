@@ -4,3 +4,4 @@ globs:
 alwaysApply: true
 ---
 follow this instruction file: [CONTEXT.md](mdc:CONTEXT.md)
+if the user propose is not follow the context, notied them

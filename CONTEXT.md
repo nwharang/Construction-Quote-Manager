@@ -41,10 +41,11 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
 
 **Data Model & Schema (Drizzle/Postgres - Foundational Rules):**
 
-- **Tables:** `users`, `quotes`, `tasks`, `quoteMaterials`, `products`, `customers`, `settings`. (Implement schema exactly as previously detailed).
+- **Schema Location (Strict):** All Drizzle schema definitions (tables via `pgTable`, enums via `pgEnum`, and relations via `relations`) **MUST** reside exclusively within the `src/server/db/schema.ts` file. The `/lib` directory **MUST NOT** contain schema definitions. This enforces that only server-side code imports and interacts with the database schema.
+- **Tables:** `users`, `sessions`, `accounts`, `verificationTokens`, `quotes`, `tasks`, `products`, `productCategories`, `materials`, `customers`, `settings`, `transactions`. (Implement schema exactly as previously detailed within `src/server/db/schema.ts`).
 - **Types & Keys:** Use UUID `id`s, **`NUMERIC(10, 2)` for ALL currency**, `timestamptz` for dates. Enforce `NOT NULL`, Defaults, Foreign Keys precisely.
 - **User-Friendly IDs:** **Universal UI Display Format:** `"#<sequentialId> (<short_uuid>)"` (e.g., `#123 (ae42b8...)`) for Quotes, Products, Customers. Internal logic **MUST** use full UUID (`id`). `sequentialId` is `SERIAL`.
-- **Ownership:** Link `quotes`, `customers`, `products` to `userId` via Foreign Key. **Crucial for data scoping.**
+- **Ownership:** Link `quotes`, `customers`, `products` to `userId` via Foreign Key. **Can be used for tracking/auditing, but data access is generally open within the single company.**
 
 **Backend Logic & Validation (tRPC & Service Layer - Authoritative & Secure Core):**
 
@@ -54,7 +55,7 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
   - Services **MUST** extend `BaseService` or similar for dependency injection (DB) and user context.
   - Services handle direct DB interactions via Drizzle ORM.
   - **`SettingService` Specifics:** Handles fetching/creating/updating settings, including necessary data type conversions (e.g., number to string for DB storage of currency fields) before database operations and converting back (string to number/boolean) before returning data to the client router (`processSettingsForClient`, `processSettingsForDb`).
-  - Services **MUST** perform checks (existence, ownership) before mutations.
+  - Services **MUST** perform checks for data existence and appropriate authorization (e.g., user authentication) before mutations. Strict creator ownership checks are not required for general access.
   - Services contain reusable, testable functions (e.g., calculations).
   - Services **MUST** handle internal errors and throw specific `TRPCError`s (`NOT_FOUND`, `FORBIDDEN`, etc.).
 - **6.2. tRPC Router Responsibilities (`/server/api/routers/`):**
@@ -67,7 +68,7 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
 - **Zero Trust Client:** Treat ALL client input as untrusted. Rely _solely_ on backend validation (Zod in Router, checks in Service).
 - **CALCULATIONS:** Implemented precisely per formulas in **reusable, testable Service functions**.
 - **Rounding:** Backend services **MUST** round final monetary values to 2 decimal places before storage/return.
-- **User Scoping & Ownership:** All DB operations within Services **MUST** filter/check based on authenticated `userId` (from context). Use placeholder `'system-user'` ID consistently for single-user phase where schema requires `userId`.
+- **User Scoping & Ownership:** For this single-company application, filtering data based on the authenticated user (`userId` from context) is generally **not** required for read operations. All authenticated users can typically view all core data (quotes, customers, products). Authorization checks for mutations may still apply (e.g., ensuring user is authenticated, or based on potential future roles). The `creatorId` field, if present, should be set to the actual authenticated user's ID upon creation for tracking purposes.
 
 **Frontend State Management (Zustand & React State):**
 
@@ -115,10 +116,10 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
 **Component Usage Standards (Linked to UI Consistency):**
 
 - **HeroUI Exclusivity & Precision:** Use `@heroui/react` components **only** (as per Rule 7.1.2).
-- **`NumberInput` Configuration (Mandatory & Consistent):**
-  - **Currency:** `min=0, step=0.01, formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}, startContent="$"` (or dynamic symbol).
-  - **Percentage:** `min=0, step={0.1 or 1}, formatOptions={{ style: 'decimal', minimumFractionDigits: 1, maximumFractionDigits: 1 }}, endContent="%"`.
-  - **Integer Quantity:** `min=1, step=1, formatOptions={{ style: 'decimal', maximumFractionDigits: 0 }}`.
+- **Specialized Number Inputs (Mandatory & Consistent):** 
+  - **Usage:** **MUST** use the custom wrapper components `CurrencyInput`, `PercentageInput`, and `IntegerInput` (located in `src/components/ui/`) for all number inputs.
+  - **Encapsulation:** These components automatically apply consistent formatting, minimum/maximum values, step increments, and appearance (steppers hidden, wheel disabled) based on the input type (`currency`, `percentage`, `integer`) and global settings (`locale`, `currency`) from `useConfigStore`.
+  - **Base `NumberInput`:** Direct usage of `@heroui/react` `NumberInput` **MUST** be avoided for currency, percentage, or standard integer quantity inputs. Use the specialized wrappers instead.
 - **Other Inputs:** Use `Input`, `Textarea`, `DateInput`, `Select` appropriately.
 - **Labels:** **MUST** use `label` prop or (rarely, with justification) `aria-label` consistently.
 
@@ -154,3 +155,12 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
 - **Prioritize Correctness & Consistency:** Ensure type-safe, logical code matching defined patterns. Persist in resolving known flaws.
 - **Be Direct and Concise:** Provide responses directly addressing the request. Avoid unnecessary introductory phrases, summaries (like TLDRs), or overly conversational filler, especially for straightforward answers. Focus on clear, actionable information.
 - **Flag Blocking Issues & Ask for Clarification:** State ambiguities or conflicts preventing correct implementation.
+
+## FUTURE ME'S TODO
+
+- [ ] **Future: Multi-Tenancy & RBAC:** Investigate and implement a multi-tenancy model (e.g., Tenant -> Organization/Branch -> Department) and associated Role-Based Access Control (RBAC) to allow users varying levels of access across different organizational units. This was deferred to maintain initial simplicity.
+- [ ] **Caution: Denormalization vs. Foreign Keys:** Remember the trade-offs. While denormalized fields (like `creatorName`, `customerName`, `productName`) improve read performance for lists/reports by avoiding joins, they significantly increase complexity and potential performance overhead during write operations (create/update/delete) due to the need for synchronization. Standard Foreign Key constraints remain crucial for core data integrity and simpler write logic. Evaluate carefully before adding more denormalized fields.
+- [ ] **Future: Reporting on Deleted References:** Research common strategies for handling reporting when referenced records (e.g., Products) might be deleted while using `ON DELETE SET NULL`. Common approaches include Soft Deletes (flagging records instead of deleting), Snapshotting (creating historical copies), or Data Warehousing (ETL to a separate reporting DB).
+- [ ] **Future: App Router Theme Strategy:** Investigate using server-side cookies (`layout.tsx`) for initial theme setting when migrating to App Router, potentially replacing the Pages Router's `_document.tsx` script.
+- [ ] **Future: Migrate to Next.js App Router:** Plan and execute the migration from the Pages Router (`src/pages`) to the App Router (`src/app`) to leverage newer Next.js features and simplify integrations (e.g., Payload 3.0+).
+- ... (Other existing TODOs) ...

@@ -76,24 +76,16 @@ export function ConfigLoader() {
     let finalSettings: Settings;
 
     if (status === 'authenticated' && dbSettings) {
-      finalSettings = dbSettings;
+      finalSettings = { ...dbSettings }; // Clone DB settings
     } else {
       finalSettings = { ...defaultSettingsData }; // Clone defaults
-
-      // Apply localStorage override if applicable
-      if (typeof window !== 'undefined') {
-        const storedTheme = localStorage.getItem('theme');
-        if (storedTheme && ['light', 'dark', 'system'].includes(storedTheme)) {
-          finalSettings.theme = storedTheme as Theme;
-        }
-      }
     }
 
     // --- Single Hydration Call ---
     setSettings(finalSettings);
 
     initialized.current = true;
-  }, [status, dbSettings, isLoadingDbSettings, setSettings]); // Removed setLoading from dependencies
+  }, [status, dbSettings, isLoadingDbSettings, setSettings]);
 
   // This component doesn't render anything
   return null;

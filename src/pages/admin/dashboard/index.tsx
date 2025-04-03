@@ -81,7 +81,7 @@ const DashboardPage: NextPage = () => {
       console.error('Error fetching data:', error);
       toast.error(`Error: ${error.message}`);
     },
-    [statsError, toast]
+    [toast]
   );
 
   // Show toast on error

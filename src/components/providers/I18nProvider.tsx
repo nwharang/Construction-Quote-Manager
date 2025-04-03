@@ -20,6 +20,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
 
   const changeLocale = useCallback(
     (newLocale: AppLocale) => {
+      console.log('[I18nProvider] changeLocale called with:', newLocale);
       // 1. Update Zustand store
       setStoreSettings({ locale: newLocale });
 
@@ -43,12 +44,29 @@ export function I18nProvider({ children }: I18nProviderProps) {
     [router, setStoreSettings]
   );
 
+  // Sync store locale to router locale ON INITIAL LOAD or EXTERNAL router change
   useEffect(() => {
     const routerLocale = router.locale as AppLocale | undefined;
-    if (settings && routerLocale && locales[routerLocale] && routerLocale !== settings.locale) {
+    const storeLocale = settings?.locale as AppLocale | undefined;
+    const isLoadingStore = useConfigStore.getState().isLoading; // Get loading state
+
+    // Only sync if:
+    // 1. Store is NOT loading
+    // 2. Router has a valid locale
+    // 3. It differs from the store's current locale
+    if (
+      !isLoadingStore &&
+      settings &&
+      routerLocale &&
+      locales[routerLocale] &&
+      routerLocale !== storeLocale
+    ) {
+      // Update the store to match the router's locale
+      console.log(`[I18nProvider] Syncing store locale (${storeLocale}) to router locale (${routerLocale}) after load`); // Debug log
       setStoreSettings({ locale: routerLocale });
     }
-  }, [router.locale, settings, setStoreSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.locale, settings?.locale, setStoreSettings]); // Add settings?.locale and setStoreSettings for completeness
 
   useEffect(() => {
     if (settings && typeof document !== 'undefined') {

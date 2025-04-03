@@ -304,14 +304,22 @@ export const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({ quoteId, isO
     }
     const apiInput = formatFormValuesToApiInput(data);
     try {
+      // *** Log raw form data ***
+      console.log('Raw form data:', JSON.stringify(data, null, 2));
+
+      // *** Log transformed data ***
+      console.log('Transformed apiInput for mutation:', JSON.stringify(apiInput, null, 2));
+
       if (isEditMode && quoteId) {
         await updateQuoteMutation.mutateAsync({ id: quoteId, ...apiInput });
       } else {
         await createQuoteMutation.mutateAsync(apiInput as QuoteCreateInput);
       }
     } catch (error) {
-      // Errors are handled in mutation onError callbacks
-      console.error("Submission failed:", error);
+      // Errors are typically handled by the mutation's onError callback
+      // but we can set a generic error here if needed.
+      console.error('Form submission error:', error);
+      toast.error('An unexpected error occurred during submission.'); // Set a generic error
     }
   };
 

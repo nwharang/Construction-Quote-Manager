@@ -643,32 +643,37 @@ export class QuoteService extends BaseService {
       updateData.estimatedMaterialsCost = taskData.estimatedMaterialsCost?.toString() ?? '0';
     }
 
-    // Update task
-    const [updatedTask] = await this.db
-      .update(tasks)
-      .set(updateData)
-      .where(eq(tasks.id, taskId))
-      .returning();
+    // Wrap update and recalculation in a transaction
+    const result = await this.db.transaction(async (tx) => {
+      // Update task
+      const [updatedTask] = await tx
+        .update(tasks)
+        .set(updateData)
+        .where(eq(tasks.id, taskId))
+        .returning();
 
-    if (!updatedTask) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to update task',
-      });
-    }
+      if (!updatedTask) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update task',
+        });
+      }
 
-    // Recalculate quote totals
-    await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId });
+      // Recalculate quote totals within the transaction
+      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId, tx });
+
+      return updatedTask;
+    });
 
     // Return the updated task with numeric values
     return {
-      ...updatedTask,
+      ...result, // Use the result from the transaction
       price:
-        typeof updatedTask.price === 'string' ? parseFloat(updatedTask.price) : updatedTask.price,
-      estimatedMaterialsCost: updatedTask.estimatedMaterialsCost
-        ? typeof updatedTask.estimatedMaterialsCost === 'string'
-          ? parseFloat(updatedTask.estimatedMaterialsCost)
-          : updatedTask.estimatedMaterialsCost
+        typeof result.price === 'string' ? parseFloat(result.price) : result.price,
+      estimatedMaterialsCost: result.estimatedMaterialsCost
+        ? typeof result.estimatedMaterialsCost === 'string'
+          ? parseFloat(result.estimatedMaterialsCost)
+          : result.estimatedMaterialsCost
         : null,
     };
   }
@@ -690,23 +695,28 @@ export class QuoteService extends BaseService {
     // Verify quote exists
     await this.getQuoteById({ id: task[0]!.quoteId });
 
-    // Delete the task (cascade will delete materials)
-    const result = await this.db
-      .delete(tasks)
-      .where(eq(tasks.id, taskId))
-      .returning({ deletedId: tasks.id });
+    // Wrap delete and recalculation in a transaction
+    const result = await this.db.transaction(async (tx) => {
+      // Delete the task (cascade will delete materials)
+      const deleteResult = await tx
+        .delete(tasks)
+        .where(eq(tasks.id, taskId))
+        .returning({ deletedId: tasks.id });
 
-    // Recalculate quote totals
-    await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId });
+      if (deleteResult.length === 0) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to delete task during transaction', // More specific error
+        });
+      }
 
-    if (result.length === 0) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to delete task',
-      });
-    }
+      // Recalculate quote totals within the transaction
+      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId, tx });
 
-    return { success: true, deletedId: result[0]!.deletedId };
+      return deleteResult[0]; // Return the object with deletedId
+    });
+
+    return { success: true, deletedId: result!.deletedId };
   }
 
   /**
@@ -737,39 +747,37 @@ export class QuoteService extends BaseService {
     // Verify quote exists
     await this.getQuoteById({ id: task[0]!.quoteId });
 
-    // Insert material
-    const [createdMaterial] = await this.db
-      .insert(materials)
-      .values({
-        taskId,
-        productId: materialData.productId,
-        quantity: materialData.quantity,
-        unitPrice: materialData.unitPrice.toString(),
-        notes: materialData.notes || null,
-      })
-      .returning();
+    // Wrap insert and recalculation in a transaction
+    const result = await this.db.transaction(async (tx) => {
+      // Insert material
+      const [createdMaterial] = await tx
+        .insert(materials)
+        .values({
+          taskId,
+          productId: materialData.productId,
+          quantity: materialData.quantity,
+          unitPrice: materialData.unitPrice.toString(),
+          notes: materialData.notes || null,
+        })
+        .returning();
 
-    if (!createdMaterial) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to add material to task',
-      });
-    }
+      if (!createdMaterial) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create material',
+        });
+      }
 
-    // Recalculate quote totals
-    await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId });
+      // Recalculate quote totals within the transaction
+      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId, tx });
 
-    // Return the material with numeric values
+      return createdMaterial;
+    });
+
+    // Return the created material with numeric values
     return {
-      ...createdMaterial,
-      unitPrice:
-        typeof createdMaterial.unitPrice === 'string'
-          ? parseFloat(createdMaterial.unitPrice)
-          : createdMaterial.unitPrice,
-      quantity:
-        typeof createdMaterial.quantity === 'string'
-          ? parseFloat(createdMaterial.quantity)
-          : createdMaterial.quantity,
+      ...result,
+      unitPrice: this.toNumber(result.unitPrice),
     };
   }
 

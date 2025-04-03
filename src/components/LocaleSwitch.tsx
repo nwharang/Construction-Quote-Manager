@@ -138,7 +138,7 @@ export function LocaleSwitch({
                 <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
                   {localeFlags[code]}
                 </span>
-                {flag} {name}
+                {name}
               </div>
             </DropdownItem>
           ))}
@@ -162,7 +162,7 @@ export function LocaleSwitch({
             <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
               {localeFlags[code]}
             </span>
-            {flag} {name}
+            {name}
           </div>
         </SelectItem>
       ))}

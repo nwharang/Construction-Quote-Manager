@@ -1,8 +1,12 @@
+'use client';
+
 import React, { createContext, useContext, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
-import { useConfigStore } from '~/store';
+import Cookies from 'js-cookie';
+import { useConfigStore } from '~/store/configStore';
 
 type Theme = 'light' | 'dark' | 'system';
+const themeCookieKey = 'app-theme';
 
 interface ThemeContextType {
   theme: Theme;
@@ -43,7 +47,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback(
     (newTheme: Theme) => {
+      console.log('[ThemeProvider] setTheme called with:', newTheme);
       if (isLoadingStore) {
+        console.log('[ThemeProvider] Store is loading, skipping theme set.');
         return;
       }
 
@@ -53,25 +59,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('theme', newTheme);
+        Cookies.set(themeCookieKey, newTheme, { expires: 365 });
       }
     },
     [setStoreSettings, updateDocumentClass, isLoadingStore]
   );
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedTheme = localStorage.getItem('theme');
-      if (storedTheme && ['light', 'dark', 'system'].includes(storedTheme)) {
-        updateDocumentClass(storedTheme as Theme);
-      }
+    const cookieTheme = Cookies.get(themeCookieKey) as Theme | undefined;
+    const localTheme = localStorage.getItem('theme') as Theme | undefined;
+
+    if (cookieTheme && cookieTheme !== localTheme && ['light', 'dark', 'system'].includes(cookieTheme)) {
+      console.log(`[ThemeProvider] Syncing cookie theme ('${cookieTheme}') to localStorage.`);
+      localStorage.setItem('theme', cookieTheme);
     }
-  }, [updateDocumentClass]);
+  }, []);
 
   useEffect(() => {
-    if (currentStoreTheme) {
+    if (!isLoadingStore && currentStoreTheme) {
+      console.log('[ThemeProvider] Syncing store theme to document:', currentStoreTheme);
       updateDocumentClass(currentStoreTheme as Theme);
     }
-  }, [currentStoreTheme, updateDocumentClass]);
+  }, [currentStoreTheme, isLoadingStore, updateDocumentClass]);
 
   const contextValue = useMemo(
     () => ({

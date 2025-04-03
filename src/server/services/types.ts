@@ -47,7 +47,7 @@ export interface BaseEntityFields {
   id: string;
   createdAt: Date;
   updatedAt: Date;
-  userId: string;
+  creatorId: string | null;
 }
 
 /**
@@ -83,4 +83,46 @@ export interface MaterialFields extends BaseEntityFields {
   quantity: number;
   unitPrice: number;
   notes: string | null;
+}
+
+/**
+ * Customer-specific types (Re-added)
+ */
+export interface CustomerFields extends BaseEntityFields {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  // creatorId is inherited from BaseEntityFields
+  creatorName: string | null; // Matches schema, allow null
+}
+
+/**
+ * Product Category-specific types (Re-added)
+ */
+export interface ProductCategoryFields extends BaseEntityFields {
+  name: string;
+  // creatorId is inherited from BaseEntityFields
+  creatorName: string | null; // Matches schema, allow null
+}
+
+// Need ProductFields as well for ProductService
+/**
+ * Product-specific types
+ */
+export interface ProductFields extends BaseEntityFields {
+  name: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  description: string | null;
+  unitPrice: string; // Stored as decimal/string in DB
+  unit: string | null;
+  sku: string | null;
+  manufacturer: string | null;
+  supplier: string | null;
+  location: string | null;
+  notes: string | null;
+  // creatorId is inherited from BaseEntityFields
+  creatorName: string | null; // Matches schema, allow null
 }

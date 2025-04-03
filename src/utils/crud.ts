@@ -1,3 +1,4 @@
+import type { TranslationKey } from '~/types/i18n/keys';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useToastStore } from '~/store';
 
@@ -5,7 +6,21 @@ import { useToastStore } from '~/store';
  * Standard handlers for CRUD operations to ensure consistent behavior
  * across all entity types in the application
  */
-export function useCrudHandlers<T>(entityType: string) {
+export function useCrudHandlers<T>({
+  createSuccessKey,
+  createErrorKey,
+  updateSuccessKey,
+  updateErrorKey,
+  deleteSuccessKey,
+  deleteErrorKey,
+}: {
+  createSuccessKey: TranslationKey;
+  createErrorKey: TranslationKey;
+  updateSuccessKey: TranslationKey;
+  updateErrorKey: TranslationKey;
+  deleteSuccessKey: TranslationKey;
+  deleteErrorKey: TranslationKey;
+}) {
   const { t } = useTranslation();
   const { success, error } = useToastStore();
   
@@ -13,7 +28,7 @@ export function useCrudHandlers<T>(entityType: string) {
    * Generic success handler for create operations
    */
   const handleCreateSuccess = (data: T) => {
-    success(t(`${entityType}.createSuccess`));
+    success(t(createSuccessKey));
     return data;
   };
   
@@ -21,7 +36,7 @@ export function useCrudHandlers<T>(entityType: string) {
    * Generic error handler for create operations
    */
   const handleCreateError = (err: Error) => {
-    error(t(`${entityType}.createError`, { message: err.message }));
+    error(t(createErrorKey, { message: err.message }));
     throw err;
   };
   
@@ -29,7 +44,7 @@ export function useCrudHandlers<T>(entityType: string) {
    * Generic success handler for update operations
    */
   const handleUpdateSuccess = (data: T) => {
-    success(t(`${entityType}.updateSuccess`));
+    success(t(updateSuccessKey));
     return data;
   };
   
@@ -37,7 +52,7 @@ export function useCrudHandlers<T>(entityType: string) {
    * Generic error handler for update operations
    */
   const handleUpdateError = (err: Error) => {
-    error(t(`${entityType}.updateError`, { message: err.message }));
+    error(t(updateErrorKey, { message: err.message }));
     throw err;
   };
   
@@ -45,14 +60,14 @@ export function useCrudHandlers<T>(entityType: string) {
    * Generic success handler for delete operations
    */
   const handleDeleteSuccess = () => {
-    success(t(`${entityType}.deleteSuccess`));
+    success(t(deleteSuccessKey));
   };
   
   /**
    * Generic error handler for delete operations
    */
   const handleDeleteError = (err: Error) => {
-    error(t(`${entityType}.deleteError`, { message: err.message }));
+    error(t(deleteErrorKey, { message: err.message }));
     throw err;
   };
   

@@ -1,11 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useFieldArray, Controller, type UseFormReturn } from 'react-hook-form';
 import {
   Button,
   Input,
-  NumberInput,
   RadioGroup,
   Radio, // Import cn utility
 } from '@heroui/react';
@@ -13,6 +12,10 @@ import { Plus, Trash2 as IconTrash } from 'lucide-react'; // Use consistent icon
 import { useTranslation } from '~/hooks/useTranslation';
 import type { QuoteDetailFormValues } from './QuoteDetailModal'; // Assuming types are exported from here
 import { ProductSelector } from '~/components/products/ProductSelector';
+import { useConfigStore } from '~/store/configStore'; // Import config store
+// Import the new specialized components
+import { CurrencyInput } from '~/components/ui/CurrencyInput';
+import { IntegerInput } from '~/components/ui/IntegerInput';
 
 // Helper Component for Field Errors (assuming it's defined elsewhere or here)
 function FieldInfo({ error }: { error?: { message?: string } }) {
@@ -33,18 +36,13 @@ interface MaterialListProps {
 
 // --- Main TaskList Component --- //
 export const TaskList: React.FC<TaskListProps> = ({ form, readOnly = false }) => {
-  const { t, formatCurrency } = useTranslation();
+  const { t } = useTranslation();
   const { control, watch } = form;
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'tasks',
   });
-
-  // Get currency symbol
-  const currencySymbol = formatCurrency(0)
-    .replace(/\d|\.|,/g, '')
-    .trim();
 
   const handleAddTask = () => {
     append({
@@ -128,18 +126,10 @@ export const TaskList: React.FC<TaskListProps> = ({ form, readOnly = false }) =>
                   min: { value: 0, message: t('validation.minValue', { min: 0 }) },
                 }}
                 render={({ field: { onChange, value, ...field }, fieldState: { error } }) => (
-                  <NumberInput
+                  <CurrencyInput
                     label={t('quotes.taskPriceLabel')}
-                    value={value ?? 0}
-                    onChange={onChange} // react-hook-form handles conversion
-                    min={0}
-                    step={0.01}
-                    formatOptions={{
-                      style: 'decimal',
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }}
-                    startContent={currencySymbol}
+                    value={Number(value ?? 0)}
+                    onValueChange={onChange}
                     isRequired
                     isDisabled={readOnly}
                     isInvalid={!!error}
@@ -185,21 +175,13 @@ export const TaskList: React.FC<TaskListProps> = ({ form, readOnly = false }) =>
                   min: { value: 0, message: t('validation.minValue', { min: 0 }) },
                 }}
                 render={({ field: { onChange, value, ...field }, fieldState: { error } }) => (
-                  <NumberInput
+                  <CurrencyInput
                     label={t('quotes.estimatedMaterialCostLumpSumLabel')}
                     value={value ?? 0}
-                    onChange={onChange}
-                    min={0}
-                    step={0.01}
-                    formatOptions={{
-                      style: 'decimal',
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }}
-                    startContent={currencySymbol}
+                    onValueChange={onChange}
                     isRequired
                     isDisabled={readOnly}
-                    className="mb-4 max-w-xs" // Constrain width
+                    className="mb-4 max-w-xs"
                     errorMessage={error?.message}
                     isInvalid={!!error}
                     {...field}
@@ -240,17 +222,12 @@ export const TaskList: React.FC<TaskListProps> = ({ form, readOnly = false }) =>
 
 // --- MaterialList Component (Nested) --- //
 const MaterialList: React.FC<MaterialListProps> = ({ form, taskIndex, readOnly = false }) => {
-  const { t, formatCurrency } = useTranslation();
-  const { control } = form; // Get control from the main form prop
+  const { t } = useTranslation();
+  const { control, setValue } = form; // Get control and setValue from the main form prop
   const { fields, append, remove } = useFieldArray({
     control: control, // Use control from props
     name: `tasks.${taskIndex}.materials`,
   });
-
-  // Get currency symbol for number inputs
-  const currencySymbol = formatCurrency(0)
-    .replace(/\d|\.|,/g, '')
-    .trim();
 
   const handleAddMaterial = () => {
     append({ productId: '', quantity: 1, unitPrice: 0, notes: '' });
@@ -292,26 +269,25 @@ const MaterialList: React.FC<MaterialListProps> = ({ form, taskIndex, readOnly =
                 name={`tasks.${taskIndex}.materials.${materialIndex}.productId`}
                 control={control}
                 rules={{ required: t('validation.required') }}
-                render={({ field: { onChange, value, ...field }, fieldState: { error } }) => (
-                  <>
-                    <ProductSelector
-                      label={t('quotes.materialProductIdLabel')}
-                      value={value ?? undefined}
-                      onChange={(selectedProduct) => {
-                        if (selectedProduct) {
-                          onChange(selectedProduct.id);
-                          form.setValue(
-                            `tasks.${taskIndex}.materials.${materialIndex}.unitPrice`,
-                            Number(selectedProduct.unitPrice),
-                            { shouldValidate: true }
-                          );
-                        }
-                      }}
-                      disabled={readOnly}
-                      {...field}
-                    />
-                    <FieldInfo error={error} />
-                  </>
+                render={({ field: { value, onChange }, fieldState: { error } }) => (
+                  <ProductSelector
+                    label={t('quotes.materialProductLabel')}
+                    placeholder={t('quotes.materialProductPlaceholder')}
+                    value={value}
+                    onChange={(selectedProduct) => {
+                      const productId = selectedProduct ? selectedProduct.id : '';
+                      console.log(`[MaterialList ${taskIndex}-${materialIndex}] Product selected. Extracted ID:`, productId);
+                      onChange(productId);
+
+                      const newPrice = selectedProduct ? Number(selectedProduct.unitPrice ?? 0) : 0;
+                      setValue(
+                        `tasks.${taskIndex}.materials.${materialIndex}.unitPrice`,
+                        newPrice,
+                        { shouldValidate: true }
+                      );
+                    }}
+                    disabled={readOnly}
+                  />
                 )}
               />
             </div>
@@ -326,13 +302,10 @@ const MaterialList: React.FC<MaterialListProps> = ({ form, taskIndex, readOnly =
                   min: { value: 1, message: t('validation.minValue', { min: 1 }) },
                 }}
                 render={({ field: { onChange, value, ...field }, fieldState: { error } }) => (
-                  <NumberInput
+                  <IntegerInput
                     label={t('quotes.materialQuantityLabel')}
                     value={value ?? 1}
-                    onChange={onChange}
-                    min={1}
-                    step={1}
-                    formatOptions={{ style: 'decimal', maximumFractionDigits: 0 }}
+                    onValueChange={onChange}
                     isRequired
                     isDisabled={readOnly}
                     aria-label={t('quotes.materialQuantityLabel')}
@@ -353,24 +326,23 @@ const MaterialList: React.FC<MaterialListProps> = ({ form, taskIndex, readOnly =
                   required: t('validation.required'),
                   min: { value: 0, message: t('validation.minValue', { min: 0 }) },
                 }}
-                render={({ field: { onChange, value, ...field }, fieldState: { error } }) => (
-                  <NumberInput
+                render={({ field: { value, onChange }, fieldState: { error } }) => (
+                  <CurrencyInput
                     label={t('quotes.materialUnitPriceLabel')}
-                    value={value ?? 0}
-                    onChange={onChange}
-                    min={0}
-                    step={0.01}
-                    formatOptions={{
-                      style: 'decimal',
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
+                    value={Number(value ?? 0)}
+                    onValueChange={(newValue) => {
+                      onChange(newValue);
+                      setValue(
+                        `tasks.${taskIndex}.materials.${materialIndex}.unitPrice`,
+                        newValue,
+                        { shouldValidate: true }
+                      );
                     }}
-                    startContent={currencySymbol}
                     isRequired
                     isDisabled={readOnly}
-                    aria-label={t('quotes.materialUnitPriceLabel')}
-                    errorMessage={error?.message}
                     isInvalid={!!error}
+                    errorMessage={error?.message}
+                    className="w-full"
                     {...field}
                   />
                 )}

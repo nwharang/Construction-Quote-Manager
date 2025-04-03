@@ -1,106 +1,32 @@
 import { relations } from 'drizzle-orm';
-import {
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  boolean,
-  integer,
-  decimal,
-  pgEnum,
-  primaryKey,
-  varchar,
-  index,
-  serial,
-} from 'drizzle-orm/pg-core';
+import { pgTable, text, varchar, timestamp, integer, decimal, pgEnum, uuid, uniqueIndex, boolean, primaryKey, serial, index } from 'drizzle-orm/pg-core';
 import { type AdapterAccount } from 'next-auth/adapters';
-/**
- * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
- * database instance for multiple projects.
- *
- * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
- */
 
-// Quote status enum
+// --- Enums (Copied from lib) ---
+
 export const quoteStatusEnum = pgEnum('quote_status', ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED']);
-
-export const QuoteStatus = {
-  DRAFT: 'DRAFT',
-  SENT: 'SENT',
-  ACCEPTED: 'ACCEPTED',
-  REJECTED: 'REJECTED',
-} as const;
-
+export const QuoteStatus = { DRAFT: 'DRAFT', SENT: 'SENT', ACCEPTED: 'ACCEPTED', REJECTED: 'REJECTED' } as const;
 export type QuoteStatusType = (typeof QuoteStatus)[keyof typeof QuoteStatus];
 
-// Material type enum
 export const materialTypeEnum = pgEnum('material_type', ['ITEMIZED', 'LUMPSUM']);
+export const MaterialType = { ITEMIZED: 'ITEMIZED', LUMPSUM: 'LUMPSUM' } as const;
+export type MaterialTypeType = (typeof MaterialType)[keyof typeof MaterialType];
 
-export const MaterialType = {
-  ITEMIZED: 'ITEMIZED',
-  LUMPSUM: 'LUMPSUM',
-} as const;
-
-// Product categories enum
-export const productCategoryEnum = pgEnum('product_category', [
-  'LUMBER',
-  'PLUMBING',
-  'ELECTRICAL',
-  'PAINT',
-  'HARDWARE',
-  'TOOLS',
-  'OTHER',
-]);
-
-export const ProductCategory = {
-  LUMBER: 'LUMBER',
-  PLUMBING: 'PLUMBING',
-  ELECTRICAL: 'ELECTRICAL',
-  PAINT: 'PAINT',
-  HARDWARE: 'HARDWARE',
-  TOOLS: 'TOOLS',
-  OTHER: 'OTHER',
-} as const;
-
+export const productCategoryEnum = pgEnum('product_category', ['LUMBER', 'PLUMBING', 'ELECTRICAL', 'PAINT', 'HARDWARE', 'TOOLS', 'OTHER']);
+export const ProductCategory = { LUMBER: 'LUMBER', PLUMBING: 'PLUMBING', ELECTRICAL: 'ELECTRICAL', PAINT: 'PAINT', HARDWARE: 'HARDWARE', TOOLS: 'TOOLS', OTHER: 'OTHER' } as const;
 export type ProductCategoryType = (typeof ProductCategory)[keyof typeof ProductCategory];
 
-// Transaction type enum
 export const transactionTypeEnum = pgEnum('transaction_type', ['INCOME', 'EXPENSE']);
-
-export const TransactionType = {
-  INCOME: 'INCOME',
-  EXPENSE: 'EXPENSE',
-} as const;
-
+export const TransactionType = { INCOME: 'INCOME', EXPENSE: 'EXPENSE' } as const;
 export type TransactionTypeType = (typeof TransactionType)[keyof typeof TransactionType];
 
-// Transaction category enum
-export const transactionCategoryEnum = pgEnum('transaction_category', [
-  'QUOTE_PAYMENT',
-  'MATERIALS',
-  'LABOR',
-  'SUPPLIES',
-  'EQUIPMENT',
-  'RENT',
-  'UTILITIES',
-  'OTHER',
-]);
+export const transactionCategoryEnum = pgEnum('transaction_category', ['QUOTE_PAYMENT', 'MATERIALS', 'LABOR', 'SUPPLIES', 'EQUIPMENT', 'RENT', 'UTILITIES', 'OTHER']);
+export const TransactionCategory = { QUOTE_PAYMENT: 'QUOTE_PAYMENT', MATERIALS: 'MATERIALS', LABOR: 'LABOR', SUPPLIES: 'SUPPLIES', EQUIPMENT: 'EQUIPMENT', RENT: 'RENT', UTILITIES: 'UTILITIES', OTHER: 'OTHER' } as const;
+export type TransactionCategoryType = (typeof TransactionCategory)[keyof typeof TransactionCategory];
 
-export const TransactionCategory = {
-  QUOTE_PAYMENT: 'QUOTE_PAYMENT',
-  MATERIALS: 'MATERIALS',
-  LABOR: 'LABOR',
-  SUPPLIES: 'SUPPLIES',
-  EQUIPMENT: 'EQUIPMENT',
-  RENT: 'RENT',
-  UTILITIES: 'UTILITIES',
-  OTHER: 'OTHER',
-} as const;
 
-export type TransactionCategoryType =
-  (typeof TransactionCategory)[keyof typeof TransactionCategory];
+// --- Tables (Copied & Merged from lib) ---
 
-// Users table (with authentication fields)
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 255 }).notNull(),
@@ -111,163 +37,106 @@ export const users = pgTable('users', {
   role: varchar('role', { length: 50 }).notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   emailVerified: timestamp('email_verified'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// NextAuth Sessions table
-export const sessions = pgTable(
-  'session',
-  (d) => ({
-    sessionToken: d.varchar({ length: 255 }).notNull().primaryKey(),
-    userId: d
-      .uuid('user_id')
-      .notNull()
-      .references(() => users.id),
-    expires: d.timestamp({ mode: 'date', withTimezone: true }).notNull(),
-  }),
-  (t) => [index('t_user_id_idx').on(t.userId)]
-);
-// NextAuth Accounts table
-export const accounts = pgTable(
-  'account',
-  (d) => ({
-    userId: d
-      .uuid('user_id')
-      .notNull()
-      .references(() => users.id),
-    type: d.varchar({ length: 255 }).$type<AdapterAccount['type']>().notNull(),
-    provider: d.varchar({ length: 255 }).notNull(),
-    providerAccountId: d.varchar({ length: 255 }).notNull(),
-    refresh_token: d.text(),
-    access_token: d.text(),
-    expires_at: d.integer(),
-    token_type: d.varchar({ length: 255 }),
-    scope: d.varchar({ length: 255 }),
-    id_token: d.text(),
-    session_state: d.varchar({ length: 255 }),
-  }),
-  (t) => [
-    primaryKey({ columns: [t.provider, t.providerAccountId] }),
-    index('account_user_id_idx').on(t.userId),
-  ]
-);
+export const customers = pgTable('customers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
+  creatorName: varchar('creator_name', { length: 255 }),
+  name: varchar('name', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }),
+  phone: varchar('phone', { length: 50 }),
+  address: text('address'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
-// NextAuth Verification Tokens table
+export const productCategories = pgTable('product_categories', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
+  creatorName: varchar('creator_name', { length: 255 }),
+  name: varchar('name', { length: 255 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
-export const verificationTokens = pgTable(
-  'verification_token',
-  (d) => ({
-    identifier: d.varchar({ length: 255 }).notNull(),
-    token: d.varchar({ length: 255 }).notNull(),
-    expires: d.timestamp({ mode: 'date', withTimezone: true }).notNull(),
-  }),
-  (t) => [primaryKey({ columns: [t.identifier, t.token] })]
-);
+export const products = pgTable('products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // sequentialId: serial('sequential_id').notNull(), // Decided against adding sequentialId here for now
+  creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
+  creatorName: varchar('creator_name', { length: 255 }),
+  categoryId: uuid('category_id').references(() => productCategories.id, { onDelete: 'set null' }),
+  categoryName: varchar('category_name', { length: 255 }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull().default('0'),
+  unit: varchar('unit', { length: 50 }),
+  sku: varchar('sku', { length: 100 }),
+  manufacturer: varchar('manufacturer', { length: 255 }),
+  supplier: varchar('supplier', { length: 255 }),
+  location: varchar('location', { length: 255 }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  creatorIdIdx: index('products_creator_id_idx').on(table.creatorId),
+  createdAtIdx: index('products_created_at_idx').on(table.createdAt),
+}));
 
-// Quotes table
-export const quotes = pgTable(
-  'quotes',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    sequentialId: serial('sequential_id').notNull(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    customerId: uuid('customer_id')
-      .notNull()
-      .references(() => customers.id),
-    title: text('title').notNull(),
-    status: quoteStatusEnum('status').notNull().default('DRAFT'),
-    subtotalTasks: decimal('subtotal_tasks', { precision: 10, scale: 2 }).notNull().default('0'),
-    subtotalMaterials: decimal('subtotal_materials', { precision: 10, scale: 2 })
-      .notNull()
-      .default('0'),
-    complexityCharge: decimal('complexity_charge', { precision: 10, scale: 2 })
-      .notNull()
-      .default('0'),
-    markupCharge: decimal('markup_charge', { precision: 10, scale: 2 }).notNull().default('0'),
-    markupPercentage: decimal('markup_percentage', { precision: 5, scale: 2 })
-      .notNull()
-      .default('10'),
-    grandTotal: decimal('grand_total', { precision: 10, scale: 2 }).notNull().default('0'),
-    notes: text('notes'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
-  },
-  (table) => ({
-    userIdIdx: index('quotes_user_id_idx').on(table.userId),
-    statusIdx: index('quotes_status_idx').on(table.status),
-    createdAtIdx: index('quotes_created_at_idx').on(table.createdAt),
-  })
-);
+export const quotes = pgTable('quotes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sequentialId: serial('sequential_id').notNull(),
+  creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
+  creatorName: varchar('creator_name', { length: 255 }),
+  customerId: uuid('customer_id').notNull().references(() => customers.id, { onDelete: 'restrict' }),
+  customerName: varchar('customer_name', { length: 255 }),
+  title: varchar('title', { length: 255 }).notNull(),
+  status: quoteStatusEnum('status').default('DRAFT').notNull(),
+  subtotalTasks: decimal('subtotal_tasks', { precision: 10, scale: 2 }).notNull().default('0'),
+  subtotalMaterials: decimal('subtotal_materials', { precision: 10, scale: 2 }).notNull().default('0'),
+  complexityCharge: decimal('complexity_charge', { precision: 10, scale: 2 }).notNull().default('0'),
+  markupCharge: decimal('markup_charge', { precision: 10, scale: 2 }).notNull().default('0'),
+  markupPercentage: decimal('markup_percentage', { precision: 5, scale: 2 }).default('10').notNull(),
+  grandTotal: decimal('grand_total', { precision: 10, scale: 2 }).notNull().default('0'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  creatorIdIdx: index('quotes_creator_id_idx').on(table.creatorId),
+  statusIdx: index('quotes_status_idx').on(table.status),
+  createdAtIdx: index('quotes_created_at_idx').on(table.createdAt),
+}));
 
-// Tasks table
 export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().defaultRandom(),
-  quoteId: uuid('quote_id')
-    .notNull()
-    .references(() => quotes.id, { onDelete: 'cascade' }),
+  quoteId: uuid('quote_id').notNull().references(() => quotes.id, { onDelete: 'cascade' }),
   description: text('description').notNull(),
   price: decimal('price', { precision: 10, scale: 2 }).notNull(),
-  estimatedMaterialsCost: decimal('estimated_materials_cost', { precision: 10, scale: 2 })
-    .notNull()
-    .default('0'),
-  order: integer('order').notNull().default(0),
   materialType: materialTypeEnum('material_type').notNull().default('ITEMIZED'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  estimatedMaterialsCostLumpSum: decimal('estimated_materials_cost_lump_sum', { precision: 10, scale: 2 }),
+  order: integer('order').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Products table
-export const products = pgTable(
-  'products',
-  {
-    id: text('id').primaryKey(),
-    sequentialId: serial('sequential_id').notNull(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name').notNull(),
-    description: text('description'),
-    category: productCategoryEnum('category').notNull(),
-    unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
-    unit: text('unit').notNull(),
-    sku: text('sku'),
-    manufacturer: text('manufacturer'),
-    supplier: text('supplier'),
-    location: text('location'),
-    notes: text('notes'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
-  },
-  (table) => ({
-    userIdIdx: index('products_user_id_idx').on(table.userId),
-    createdAtIdx: index('products_created_at_idx').on(table.createdAt),
-  })
-);
-
-// Update materials table to reference products
 export const materials = pgTable('materials', {
   id: uuid('id').primaryKey().defaultRandom(),
-  taskId: uuid('task_id')
-    .notNull()
-    .references(() => tasks.id, { onDelete: 'cascade' }),
-  productId: text('product_id')
-    .notNull()
-    .references(() => products.id),
-  quantity: integer('quantity').notNull().default(1),
-  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(), // Price at time of use
+  taskId: uuid('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+  productName: varchar('product_name', { length: 255 }),
+  quantity: integer('quantity').default(1).notNull(),
+  unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
   notes: text('notes'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Transactions table
 export const transactions = pgTable('transactions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  quoteId: uuid('quote_id').references(() => quotes.id),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  quoteId: uuid('quote_id').references(() => quotes.id, { onDelete: 'set null' }),
   type: transactionTypeEnum('type').notNull(),
   category: transactionCategoryEnum('category').notNull(),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
@@ -275,74 +144,21 @@ export const transactions = pgTable('transactions', {
   date: timestamp('date').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-// Quotes table
-export const quotesRelations = relations(quotes, ({ one, many }) => ({
-  user: one(users, {
-    fields: [quotes.userId],
-    references: [users.id],
-  }),
-  customer: one(customers, {
-    fields: [quotes.customerId],
-    references: [customers.id],
-  }),
-  tasks: many(tasks),
-  transactions: many(transactions),
+}, (table) => ({
+    userIdIdx: index('transactions_user_id_idx').on(table.userId),
 }));
 
-// Tasks table
-export const tasksRelations = relations(tasks, ({ one, many }) => ({
-  quote: one(quotes, {
-    fields: [tasks.quoteId],
-    references: [quotes.id],
-  }),
-  materials: many(materials),
-}));
-
-// Products relations
-export const productsRelations = relations(products, ({ one, many }) => ({
-  user: one(users, {
-    fields: [products.userId],
-    references: [users.id],
-  }),
-  materials: many(materials),
-}));
-
-// Update materials relations
-export const materialsRelations = relations(materials, ({ one }) => ({
-  task: one(tasks, {
-    fields: [materials.taskId],
-    references: [tasks.id],
-  }),
-  product: one(products, {
-    fields: [materials.productId],
-    references: [products.id],
-  }),
-}));
-
-// Settings table
 export const settings = pgTable('settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
   companyName: text('company_name').notNull().default(''),
   companyEmail: text('company_email').notNull().default(''),
   companyPhone: text('company_phone'),
   companyAddress: text('company_address'),
-  defaultComplexityCharge: decimal('default_complexity_charge', { precision: 5, scale: 2 })
-    .notNull()
-    .default('0'),
-  defaultMarkupCharge: decimal('default_markup_charge', { precision: 5, scale: 2 })
-    .notNull()
-    .default('0'),
-  defaultTaskPrice: decimal('default_task_price', { precision: 10, scale: 2 })
-    .notNull()
-    .default('0'),
-  defaultMaterialPrice: decimal('default_material_price', { precision: 10, scale: 2 })
-    .notNull()
-    .default('0'),
+  defaultComplexityCharge: decimal('default_complexity_charge', { precision: 5, scale: 2 }).notNull().default('0'),
+  defaultMarkupCharge: decimal('default_markup_charge', { precision: 5, scale: 2 }).notNull().default('0'),
+  defaultTaskPrice: decimal('default_task_price', { precision: 10, scale: 2 }).notNull().default('0'),
+  defaultMaterialPrice: decimal('default_material_price', { precision: 10, scale: 2 }).notNull().default('0'),
   emailNotifications: boolean('email_notifications').notNull().default(true),
   quoteNotifications: boolean('quote_notifications').notNull().default(true),
   taskNotifications: boolean('task_notifications').notNull().default(true),
@@ -354,9 +170,106 @@ export const settings = pgTable('settings', {
   timeFormat: text('time_format').notNull().default('12h'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('settings_user_id_idx').on(table.userId),
+}));
 
-// Settings relations
+
+// --- Auth Tables (Copied from lib) ---
+
+export const sessions = pgTable('session',
+  {
+    sessionToken: varchar('session_token', { length: 255 }).primaryKey(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    expires: timestamp('expires', { mode: 'date', withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    userIdIdx: index('session_user_id_idx').on(table.userId),
+  })
+);
+
+export const accounts = pgTable('account',
+  {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    type: varchar('type', { length: 255 }).$type<AdapterAccount['type']>().notNull(),
+    provider: varchar('provider', { length: 255 }).notNull(),
+    providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
+    refresh_token: text('refresh_token'),
+    access_token: text('access_token'),
+    expires_at: integer('expires_at'),
+    token_type: varchar('token_type', { length: 255 }),
+    scope: varchar('scope', { length: 255 }),
+    id_token: text('id_token'),
+    session_state: varchar('session_state', { length: 255 }),
+  },
+  (account) => ({
+    compoundKey: primaryKey({ columns: [account.provider, account.providerAccountId] }),
+    userIdIdx: index('account_user_id_idx').on(account.userId),
+  })
+);
+
+export const verificationTokens = pgTable('verification_token',
+  {
+    identifier: varchar('identifier', { length: 255 }).notNull(),
+    token: varchar('token', { length: 255 }).notNull(),
+    expires: timestamp('expires', { mode: 'date', withTimezone: true }).notNull(),
+  },
+  (vt) => ({
+    compoundKey: primaryKey({ columns: [vt.identifier, vt.token] }),
+  })
+);
+
+// --- Relations (Copied from server/db/schema) ---
+
+// Notes:
+// - Removed imports of tables/enums as they are now defined above.
+// - Added productCategoriesRelations based on copied table.
+
+export const quotesRelations = relations(quotes, ({ one, many }) => ({
+  user: one(users, {
+    fields: [quotes.creatorId],
+    references: [users.id],
+  }),
+  customer: one(customers, {
+    fields: [quotes.customerId],
+    references: [customers.id],
+  }),
+  tasks: many(tasks),
+  transactions: many(transactions),
+}));
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  quote: one(quotes, {
+    fields: [tasks.quoteId],
+    references: [quotes.id],
+  }),
+  materials: many(materials),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  user: one(users, {
+    fields: [products.creatorId],
+    references: [users.id],
+  }),
+  materials: many(materials),
+  // Add relation back to productCategories
+  category: one(productCategories, { 
+    fields: [products.categoryId], 
+    references: [productCategories.id] 
+  }), 
+}));
+
+export const materialsRelations = relations(materials, ({ one }) => ({
+  task: one(tasks, {
+    fields: [materials.taskId],
+    references: [tasks.id],
+  }),
+  product: one(products, {
+    fields: [materials.productId],
+    references: [products.id],
+  }),
+}));
+
 export const settingsRelations = relations(settings, ({ one }) => ({
   user: one(users, {
     fields: [settings.userId],
@@ -364,12 +277,14 @@ export const settingsRelations = relations(settings, ({ one }) => ({
   }),
 }));
 
-// Update users relations to include settings and transactions
 export const usersRelations = relations(users, ({ many, one }) => ({
   accounts: many(accounts),
-  quotes: many(quotes),
-  products: many(products),
+  sessions: many(sessions),
   settings: one(settings),
+  createdCustomers: many(customers),
+  createdQuotes: many(quotes),
+  createdProducts: many(products),
+  createdProductCategories: many(productCategories), // Added relation
   transactions: many(transactions),
 }));
 
@@ -381,38 +296,14 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
   user: one(users, { fields: [accounts.userId], references: [users.id] }),
 }));
 
-// Customer table
-export const customers = pgTable(
-  'customers',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    name: text('name').notNull(),
-    email: text('email'),
-    phone: text('phone'),
-    address: text('address'),
-    notes: text('notes'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow(),
-  },
-  (table) => ({
-    userIdIdx: index('customers_user_id_idx').on(table.userId),
-    createdAtIdx: index('customers_created_at_idx').on(table.createdAt),
-  })
-);
-
-// Customer relations
 export const customersRelations = relations(customers, ({ one, many }) => ({
-  user: one(users, {
-    fields: [customers.userId],
+  creator: one(users, {
+    fields: [customers.creatorId],
     references: [users.id],
   }),
   quotes: many(quotes),
 }));
 
-// Transaction relations
 export const transactionsRelations = relations(transactions, ({ one }) => ({
   user: one(users, {
     fields: [transactions.userId],
@@ -422,4 +313,13 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.quoteId],
     references: [quotes.id],
   }),
+}));
+
+// Added ProductCategories relations
+export const productCategoriesRelations = relations(productCategories, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [productCategories.creatorId],
+    references: [users.id],
+  }),
+  products: many(products),
 }));
