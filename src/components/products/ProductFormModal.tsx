@@ -17,7 +17,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { api } from '~/utils/api';
 // Import Drizzle schema and helper
-import { products as productsTable, productCategoryEnum } from '~/server/db/schema'; 
+// Remove unused enum import if not needed elsewhere
+// import { products as productsTable, productCategoryEnum } from '~/server/db/schema'; // Removed comment
+import { products as productsTable } from '~/server/db/schema'; 
 import { type InferSelectModel } from 'drizzle-orm';
 
 // Use InferSelectModel for the Product type
@@ -29,8 +31,8 @@ const getProductSchema = () => z.object({
   name: z.string().min(1, 'Name is required'), 
   // Match backend: optional strings
   description: z.string().optional(), 
-  // Use z.enum with the actual values from the Drizzle enum
-  category: z.enum(productCategoryEnum.enumValues).nullable(), // Use .enumValues
+  // Use categoryId (UUID string) consistent with DB/Service
+  categoryId: z.string().uuid('Invalid category ID').nullable(), 
   // Match backend: unitPrice is required, non-negative number
   unitPrice: z.number().min(0, 'Unit price must be non-negative'), 
   // Match backend: unit is required string (or nullish converted to empty)
@@ -71,8 +73,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const { t } = useTranslation();
   const productSchema = getProductSchema();
 
-  // Fetch categories using the correct tRPC query
-  const { data: categories, isLoading: isLoadingCategories } = api.product.getProductCategories.useQuery();
+  // Fetch categories using the ProductCategory router
+  const { data: categories, isLoading: isLoadingCategories } = api.productCategory.getAll.useQuery();
 
   // Initialize React Hook Form
   const {
@@ -86,11 +88,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     defaultValues: {
       name: initialData?.name ?? '',
       description: initialData?.description ?? undefined,
-      category: initialData?.category ?? null,
-      // unitPrice comes as string/Decimal from DB, convert to number for form
-      unitPrice: initialData?.unitPrice ? Number(initialData.unitPrice) : 0,
-      // unit might be null from DB, default to empty string for input
-      unit: initialData?.unit ?? '', 
+      categoryId: initialData?.categoryId ?? null,
+      unitPrice: Number(initialData?.unitPrice ?? 0),
+      unit: initialData?.unit ?? '',
       sku: initialData?.sku ?? undefined,
       manufacturer: initialData?.manufacturer ?? undefined,
       supplier: initialData?.supplier ?? undefined,
@@ -104,18 +104,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       onClose();
       return;
     }
-    // Add explicit check for category selection before submitting
-    if (!data.category) {
-       // Consider using form.setError or a toast here instead of alert
-       alert(t('validation.selectOption', { field: t('productFields.category') }));
-       return;
-    }
     // Submit data (parent page handles actual mutation)
     await onSubmit({ 
         ...data, 
         id: initialData?.id,
-        category: data.category, // Already validated to be non-null here
-        unit: data.unit ?? '', // Ensure unit is string, not nullish
+        categoryId: data.categoryId,
+        unit: data.unit ?? '',
     });
   };
 
@@ -124,8 +118,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       reset({
         name: initialData?.name ?? '',
         description: initialData?.description ?? undefined,
-        category: initialData?.category ?? null,
-        unitPrice: initialData?.unitPrice ? Number(initialData.unitPrice) : 0,
+        categoryId: initialData?.categoryId ?? null,
+        unitPrice: Number(initialData?.unitPrice ?? 0),
         unit: initialData?.unit ?? '',
         sku: initialData?.sku ?? undefined,
         manufacturer: initialData?.manufacturer ?? undefined,
@@ -196,28 +190,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         {/* Category Select */}
         <div>
-          <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700">
             {t('productFields.category')} <span className="text-danger">*</span>
           </label>
           <Controller
-            name="category"
+            name="categoryId"
             control={control}
             render={({ field }) => (
               <Select
-                id="category"
+                id="categoryId"
                 selectedKeys={field.value ? [field.value] : []}
                 onBlur={field.onBlur}
                 onSelectionChange={(keys) => field.onChange(Array.from(keys)[0] ?? null)}
                 placeholder={t('productPlaceholders.category')}
                 isDisabled={isReadOnly || isLoadingCategories || isSubmitting}
-                isInvalid={!!errors.category}
-                errorMessage={errors.category?.message} 
-                isLoading={isLoadingCategories} // Show loading state for categories
+                isInvalid={!!errors.categoryId}
+                errorMessage={errors.categoryId?.message}
+                isLoading={isLoadingCategories}
                 className="mt-1"
               >
                 {(categories ?? []).map((category) => (
-                  <SelectItem key={category} textValue={category}>
-                    {category}
+                  <SelectItem key={category.id} textValue={category.name}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </Select>

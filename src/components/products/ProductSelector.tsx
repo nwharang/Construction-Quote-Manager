@@ -8,7 +8,14 @@ import { products as productsTable } from '~/server/db/schema';
 import { type InferSelectModel } from 'drizzle-orm';
 
 // Define Product type based on Drizzle schema inference
-type Product = InferSelectModel<typeof productsTable>;
+type ProductSchemaType = InferSelectModel<typeof productsTable>;
+
+// Adjust type for component usage: unitPrice is returned as number by the service
+type Product = Omit<ProductSchemaType, 'unitPrice'> & {
+  unitPrice: number;
+  // Include nested category object if needed based on service return type
+  category: { id: string; name: string; /* ... other fields */ } | null;
+};
 
 // --- Props Interface --- //
 interface ProductSelectorProps {
@@ -46,12 +53,12 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
     }
   );
 
-  // Use the items from the fetched page data
-  const allProducts = productsPage?.items ?? [];
+  // Use the data property from the fetched page data
+  const allProducts = productsPage?.data ?? [];
 
   // Find the full selected product object based on the value (ID)
   const selectedProduct = useMemo(
-    () => allProducts.find((p: Product) => p.id === value),
+    () => allProducts.find((p) => p.id === value), // Type P should now match allProducts item type
     [allProducts, value]
   );
 
@@ -59,7 +66,7 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
   const handleSelectionChange = (keys: React.Key | Set<React.Key>) => {
     const selectedKey = keys instanceof Set ? Array.from(keys)[0] : keys;
     if (selectedKey) {
-      const product = allProducts.find((p: Product) => p.id === selectedKey);
+      const product = allProducts.find((p) => p.id === selectedKey); // Type P should now match
       onChange(product || null);
     } else {
       onChange(null);
@@ -105,7 +112,7 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
         </SelectItem>
       ) : (
         <SelectSection showDivider={allProducts.length > 0}>
-          {allProducts.map((product: Product) => (
+          {allProducts.map((product) => ( // Type Product should now match
             <SelectItem key={product.id} textValue={product.name} className="h-auto p-0">
                {/* Simple display for now - Card removed for simplicity */}
                <div className="p-2">
@@ -116,7 +123,7 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
                     {product.sku ? `SKU: ${product.sku}` : t('common.noSKU')}
                   </div>
                   <div className="text-tiny text-default-500">
-                    {formatCurrency(Number(product.unitPrice))}
+                    {formatCurrency(product.unitPrice)} // Already a number
                   </div>
                </div>
             </SelectItem>

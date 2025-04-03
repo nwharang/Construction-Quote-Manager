@@ -1,8 +1,3 @@
-import { type inferRouterOutputs } from '@trpc/server';
-import { type AppRouter } from './root';
-
-export type RouterOutputs = inferRouterOutputs<AppRouter>;
-
 export function getUrl() {
   // If the VERCEL_URL environment variable is defined, use it
   if (process.env.VERCEL_URL) {

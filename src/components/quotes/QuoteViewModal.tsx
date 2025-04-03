@@ -24,7 +24,7 @@ import {
 import { api, type RouterOutputs } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
 import type { TranslationKey } from '~/types/i18n/keys';
-import type { QuoteStatusType } from '~/server/db/schema-exports';
+import type { QuoteStatusType } from '~/server/db/schema';
 
 // Type for the fetched quote data
 type QuoteData = NonNullable<RouterOutputs['quote']['getById']>;

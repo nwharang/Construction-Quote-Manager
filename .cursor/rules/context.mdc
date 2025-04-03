@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 follow this instruction file: [CONTEXT.md](mdc:CONTEXT.md)
 if the user propose is not follow the context, notied them

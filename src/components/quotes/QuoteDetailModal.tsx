@@ -25,7 +25,7 @@ import { useTranslation } from '~/hooks/useTranslation';
 import { TaskList } from './TaskList'; // Uncomment TaskList import
 import { QuoteSummary } from './QuoteSummary';
 import { CustomerSelector } from '~/components/customers/CustomerSelector'; // Ensure CustomerSelect is imported
-import type { QuoteStatusType } from '~/server/db/schema-exports'; // Import QuoteStatusType
+import type { QuoteStatusType } from '~/server/db/schema'; // Import QuoteStatusType
 import { EntityModal } from '~/components/shared/EntityModal';
 
 // Interface for props
@@ -47,7 +47,7 @@ type QuoteUpdateInput = RouterInputs['quote']['update'];
 // Define the type for a single material in the form state
 export interface MaterialFormValues {
   id?: string; // Optional ID
-  productId: string;
+  productId: string | null; // Allow null
   quantity: number;
   unitPrice: number;
   notes?: string | null; // Allow null or undefined
@@ -77,7 +77,7 @@ export interface QuoteDetailFormValues {
 // Zod schema for a single material in the form
 const materialSchema = z.object({
   id: z.string().optional(),
-  productId: z.string().min(1, 'Product is required'), // Required selection
+  productId: z.string().uuid().nullable(), // Allow null to match API/DB possibility
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unitPrice: z.number().min(0, 'Unit price must be non-negative'),
   notes: z.string().nullable().optional(),
@@ -147,7 +147,7 @@ function mapQuoteDataToFormValues(quote: QuoteData, defaultMarkup: number): Quot
         description: task.description || '',
         price: Number(task.price ?? 0), // Ensure number
         materialType: (task.materialType?.toUpperCase() || 'LUMPSUM') as 'LUMPSUM' | 'ITEMIZED',
-        estimatedMaterialsCostLumpSum: Number(task.estimatedMaterialsCost ?? 0), // Ensure number
+        estimatedMaterialsCostLumpSum: Number(task.estimatedMaterialsCostLumpSum ?? 0),
         materials:
           task.materials?.map((mat) => ({
             id: mat.id,
