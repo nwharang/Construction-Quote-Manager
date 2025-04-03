@@ -1,33 +1,52 @@
-**Project Context Document (v8)**
+**Project Context Document (v8.3 - Further Streamlined)**
 
-**Guiding Principle:** Build the **simplest, fastest, most reliable** quoting tool imaginable for small construction contractors, ensuring **absolute consistency and correctness** at every step, with **maximal use of the standard UI component library**.
+**Guiding Principle:** Build the **fastest, most reliable** quoting tool imaginable for small construction contractors, ensuring **absolute consistency and correctness** at every step, with **maximal use of the standard UI component library**.
 
 **Objective:** Create a web app for generating quotes based on **Tasks** (Labor) + **Materials** (Lump Sum OR Itemized). Core goals are ease of use, speed, **strict consistency**, robust security, and **error-free implementation**.
 
-**Core Workflow (Quote Management - Standard Modal Flow):**
+**Core Workflow (Quote & Customer & Product Management - Direct-to-Page Flow):**
 
-- **Strict Adherence:** Quote management **MUST** follow the **Standard Workflow for Core Entities** defined below (Modal-based CRUD). Dedicated `/admin/quotes/new` and `/admin/quotes/[id]/edit` pages **ARE NOT USED** for primary creation or editing.
+- **Strict Adherence:** Quote, Customer, and Product management **MUST** follow the **Standard Workflow for Core Entities** defined below (Direct-to-Page CRUD). Modal-based workflows are **NOT USED** for primary creation, editing, or viewing of these entities.
 - **1. List & Creation:**
   - Quotes list is displayed on `/admin/quotes`.
-  - Creation **MUST** be initiated via a **standardized modal** (`CreateQuoteModal`) launched from the list page (`/admin/quotes`) using a "Create" button and `useDisclosure`.
-  - This modal collects essential header info: Title, Customer, optional Notes. Uses TanStack Form.
-  - **On success, it typically closes, returning the user to the updated list.** Optionally, logic could open `QuoteDetailModal` immediately, but **MUST NOT redirect to a dedicated page.**
+  - Customers list is displayed on `/admin/customers`.
+  - Products list is displayed on `/admin/products`.
+  - Creation **MUST** be initiated via a "Create" button that navigates to:
+    - `/admin/quotes/new` for quotes
+    - `/admin/customers/new` for customers
+    - `/admin/products/new` for products
+  - These pages use React Hook Form for managing the entire entity state.
 - **2. Detailed Configuration / Editing:**
-  - Adding/Editing full details **MUST** be done via the **standardized detail/edit modal** (`QuoteDetailModal`), launched from the list page (`/admin/quotes`) using "Edit" (or chained after `CreateQuoteModal`).
-  - This modal uses TanStack Form for managing the _entire_ quote details state.
-  - **Add Tasks:** Uses `TaskList` component with TanStack Form helpers (`description`, `Task Price`, Materials Choice [Lump Sum/Itemized]).
-  - **Review Totals:** Displays calculated totals via `QuoteSummary`.
-  - **Adjustments:** `markupCharge` (%).
-  - **Final Total:** Display `grandTotal`.
-  - **Prefetching:** Data prefetching for `QuoteDetailModal` is highly recommended.
-- **3. Save/Output:**
-  - Saving occurs via buttons within `QuoteDetailModal` using `api.quote.create` or `api.quote.update`.
-  - "View" (`QuoteViewModal` from list) and "Print" (`/admin/quotes/[id]/print`) actions remain available.
+  - Adding/Editing full details **MUST** be done via dedicated pages:
+    - **Quotes:**
+      - **Creation:** `/admin/quotes/new`
+      - **Editing:** `/admin/quotes/[id]/edit`
+      - Uses React Hook Form with `TaskList` and `QuoteSummary` components
+    - **Customers:**
+      - **Creation:** `/admin/customers/new`
+      - **Editing:** `/admin/customers/[id]/edit`
+    - **Products:**
+      - **Creation:** `/admin/products/new`
+      - **Editing:** `/admin/products/[id]/edit`
+  - **Prefetching:** Data prefetching for edit pages is highly recommended.
+- **3. Viewing:**
+  - **Quotes:**
+    - View action navigates to `/admin/quotes/[id]/view`
+    - Print action available via `/admin/quotes/[id]/print`
+  - **Customers:**
+    - View action navigates to `/admin/customers/[id]/view`
+    - Includes space for displaying customer history and interactions
+  - **Products:**
+    - View action navigates to `/admin/products/[id]/view`
+    - Displays product details in a read-only format
+- **4. Delete Confirmation:**
+  - The "Delete" action on list pages uses the `DeleteEntityDialog` modal for confirmation.
+  - This is the only modal used in the core workflow for these entities.
 
-**Standard Workflow for Core Entities (Quotes, Customers, Products):**
-Unless explicitly stated otherwise, **ALL** core entities (Quotes, Customers, Products) **MUST** follow the **List Page -> Create Modal -> Detail/Edit Modal** pattern. Dedicated `/new` or `/edit` pages for these entities **ARE NOT USED**.
-**Note:** Key modal components like `ProductFormModal` require correct implementation using TanStack Form according to this standard flow.
-Correct integration of TanStack Form with Zod validation is critical for modal functionality and requires ongoing attention, particularly for components like `ProductFormModal`.
+**Standard Workflow for Core Entities:**
+
+- **Quotes, Customers & Products:** Follow the **List Page -> New Page / Edit Page / View Page** pattern.
+- **Delete Confirmation:** Always use `DeleteEntityDialog` modal for confirmation.
 
 **Mandatory Tech Stack (Strictly Enforced - No Deviations):**
 
@@ -44,7 +63,6 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
 - **Schema Location (Strict):** All Drizzle schema definitions (tables via `pgTable`, enums via `pgEnum`, and relations via `relations`) **MUST** reside exclusively within the `src/server/db/schema.ts` file. The `/lib` directory **MUST NOT** contain schema definitions. This enforces that only server-side code imports and interacts with the database schema.
 - **Tables:** `users`, `sessions`, `accounts`, `verificationTokens`, `quotes`, `tasks`, `products`, `productCategories`, `materials`, `customers`, `settings`, `transactions`. (Implement schema exactly as previously detailed within `src/server/db/schema.ts`).
 - **Types & Keys:** Use UUID `id`s, **`NUMERIC(10, 2)` for ALL currency**, `timestamptz` for dates. Enforce `NOT NULL`, Defaults, Foreign Keys precisely.
-- **User-Friendly IDs:** **Universal UI Display Format:** `"#<sequentialId> (<short_uuid>)"` (e.g., `#123 (ae42b8...)`) for Quotes, Products, Customers. Internal logic **MUST** use full UUID (`id`). `sequentialId` is `SERIAL`.
 - **Ownership:** Link `quotes`, `customers`, `products` to `userId` via Foreign Key. **Can be used for tracking/auditing, but data access is generally open within the single company.**
 
 **Backend Logic & Validation (tRPC & Service Layer - Authoritative & Secure Core):**
@@ -54,37 +72,34 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
   - All core business logic **MUST** be encapsulated within dedicated Service classes in `/server/services/` (e.g., `QuoteService`, `CustomerService`, `ProductService`, `SettingService`).
   - Services **MUST** extend `BaseService` or similar for dependency injection (DB) and user context.
   - Services handle direct DB interactions via Drizzle ORM.
-  - **`SettingService` Specifics:** Handles fetching/creating/updating settings, including necessary data type conversions (e.g., number to string for DB storage of currency fields) before database operations and converting back (string to number/boolean) before returning data to the client router (`processSettingsForClient`, `processSettingsForDb`).
+  - **`SettingService` Specifics:** Handles fetching/creating/updating settings, including necessary data type conversions (e.g., number to string for DB storage of currency fields) before database operations and converting back (string to number/boolean) before returning data to the client router.
   - Services **MUST** perform checks for data existence and appropriate authorization (e.g., user authentication) before mutations. Strict creator ownership checks are not required for general access.
-  - Services contain reusable, testable functions (e.g., calculations).
+  - Services contain reusable, testable functions.
   - Services **MUST** handle internal errors and throw specific `TRPCError`s (`NOT_FOUND`, `FORBIDDEN`, etc.).
 - **6.2. tRPC Router Responsibilities (`/server/api/routers/`):**
   - Routers define API endpoints (`.query()`, `.mutation()`).
   - Routers **MUST** be thin; delegate ALL business logic to Services.
-  - **MANDATORY ZOD VALIDATION:** Routers use Zod schemas (`.input()`) for **rigorous** validation of _every_ procedure input _before_ calling services. Throw `BAD_REQUEST` on failure. **The `settings.update` router uses `updateSettingsInputSchema` which expects numeric types for currency/charge fields.**
+  - **MANDATORY ZOD VALIDATION:** Routers use Zod schemas (`.input()`) for **rigorous** validation of _every_ procedure input _before_ calling services.
   - Routers extract context (e.g., `ctx.session.user.id`).
   - Routers call corresponding Service methods with validated input and context.
   - Routers catch Service errors and map them to appropriate client-safe `TRPCError`s. **No business logic in routers.**
 - **Zero Trust Client:** Treat ALL client input as untrusted. Rely _solely_ on backend validation (Zod in Router, checks in Service).
-- **CALCULATIONS:** Implemented precisely per formulas in **reusable, testable Service functions**.
 - **Rounding:** Backend services **MUST** round final monetary values to 2 decimal places before storage/return.
-- **User Scoping & Ownership:** For this single-company application, filtering data based on the authenticated user (`userId` from context) is generally **not** required for read operations. All authenticated users can typically view all core data (quotes, customers, products). Authorization checks for mutations may still apply (e.g., ensuring user is authenticated, or based on potential future roles). The `creatorId` field, if present, should be set to the actual authenticated user's ID upon creation for tracking purposes.
+- **User Scoping & Ownership:** **(Simplified)** In this single-company app, all authenticated users can generally view all core data (quotes, customers, products). Mutations (create/update/delete) require user authentication (via `protectedProcedure`) but typically do not need strict creator ownership checks. The `creatorId` field serves primarily for tracking/informational purposes.
 
-**Frontend State Management (Zustand & React State):**
+**Frontend State Management (Zustand):**
 
 - **Global State (`useConfigStore` - Zustand):**
   - **Single Source of Truth:** Manages global application settings (theme, locale, default charges, company info, etc.).
   - **Hydration:** Initialized on app load by the `ConfigLoader` component, which fetches data via `api.settings.get`.
   - **Persistence:** Store updates _do not_ automatically persist to the backend. Persistence **MUST** happen explicitly via the Settings page save action.
   - **Structure:** The store structure mirrors the database schema for settings, often storing currency/charge values as **strings**, consistent with the DB.
-- **Local Component State (`useState`):**
-  - Used for managing UI state within components (e.g., modal open/close, loading indicators specific to a component action).
-  - **Settings Page:** Uses local state (`formState`) to manage user edits _before_ they are saved. This `formState` typically holds values matching the Zod input schema (e.g., **numbers** for currency/charges).
 
 **UI/UX Principles & Defined Consistency (Strictly Enforced):**
 
 - **Consistency Above All:** Uniform layout, spacing, typography, colors, interactions across the _entire_ app. Aim for intuitive, error-free experience.
 - **Responsive Design:** Consistent mobile-first implementation using Tailwind modifiers.
+- **List Pages Design:** See `LIST_PAGES_CONCEPT.md` for detailed guidelines on implementing list pages (Quotes, Customers, Products) with hybrid view system, styling principles, and implementation details.
 - **7.1. Defining Strict UI Consistency (Mandatory Rules):**
   - **1. Master Layout:** All `/admin/*` pages **MUST** use `Layout.tsx` with standard `NavBar.tsx` and `SidebarComponent.tsx`.
   - **2. Component Standardization (HeroUI Prioritization):**
@@ -95,16 +110,14 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
   - **3. Styling Uniformity (Tailwind & Theme):**
     - Use _only_ theme colors. Use Tailwind scale consistently for spacing/sizing. Use theme typography consistently. Use theme borders/shadows consistently.
   - **4. Interaction Pattern Consistency:**
-    - **Forms:** Inline validation below input. Feedback via **standardized** `@heroui/toast`. Consistent loading indicators. Submit data to tRPC backend. **TanStack Form is standard** for complex modal forms (Quotes, Products, Customers). The Settings page uses local React state (`formState`) and Zod validation on submit.
+    - **Forms:** Inline validation below input. Feedback via **standardized** `@heroui/toast`. Consistent loading indicators. Submit data to tRPC backend. **React Hook Form is standard** for complex forms (Quotes, Products, Customers, Settings).
     - **Loading States:** **MUST** use `@heroui/react` Skeleton or Spinners. tRPC query loading states (`isLoading`) should be used where applicable (e.g., initial page loads). Local states (`isUpdating`) can manage button/mutation loading.
     - **Notifications:** **MUST** use `@heroui/toast` (standard appearance via `useAppToast`) for all feedback (success, error, validation).
-    - **Standard CRUD Flow (Modal-Based):** **ALL** core entities (Quotes, Products, Customers) **MUST** strictly follow **List Page -> Create Modal -> Detail/Edit Modal** workflow. Dedicated `/new`, `/edit` pages **ARE NOT USED**. Prefetching **SHOULD** be used for detail/edit modals.
-    - **Modal Interaction:** All modals **MUST** use `@heroui/react` Modal and `useDisclosure`.
     - **Settings Management:**
       - Global settings (theme, locale) can be changed via UI elements (e.g., `ThemeToggle`, `LocaleSwitch`) which update `useConfigStore` directly for immediate UI feedback.
       - **Persistence** of ALL settings (including theme/locale changes made via toggles) **ONLY** occurs when the user explicitly clicks "Save Changes" on the `/admin/settings` page.
-      - The `/admin/settings` page handles fetching current settings, managing local edits (`formState`), validating input against Zod schema, and triggering the `api.settings.update` mutation. On successful mutation, it updates `useConfigStore` to reflect the persisted state.
-  - **5. Data Presentation Consistency:** All currency, dates, percentages, User-Friendly IDs (`#123 (abc...)`) **MUST** be formatted using the **exact same** centralized utility functions/hooks.
+      - The `/admin/settings` page handles fetching current settings, managing edits via **React Hook Form**, validating input against Zod schema, and triggering the `api.settings.update` mutation. On successful mutation, it updates `useConfigStore` to reflect the persisted state.
+  - **5. Data Presentation Consistency:** All currency, dates, percentages **MUST** be formatted using the **exact same** centralized utility functions/hooks.
   - **6. Internationalization (i18n):**
     - **Implementation Note:** This project uses a custom `useTranslation` hook and a flat, prefixed key structure (e.g., `'common.save'`) defined in `src/types/i18n/keys.ts`. It does **not** use the standard nested structure often associated with `i18next`.
     - **Type Safety:** All translation keys **MUST** be defined in the `TranslationKey` union type in `src/types/i18n/keys.ts`.
@@ -116,25 +129,23 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
 **Component Usage Standards (Linked to UI Consistency):**
 
 - **HeroUI Exclusivity & Precision:** Use `@heroui/react` components **only** (as per Rule 7.1.2).
-- **Specialized Number Inputs (Mandatory & Consistent):** 
+- **Specialized Number Inputs (Mandatory & Consistent):**
   - **Usage:** **MUST** use the custom wrapper components `CurrencyInput`, `PercentageInput`, and `IntegerInput` (located in `src/components/ui/`) for all number inputs.
   - **Encapsulation:** These components automatically apply consistent formatting, minimum/maximum values, step increments, and appearance (steppers hidden, wheel disabled) based on the input type (`currency`, `percentage`, `integer`) and global settings (`locale`, `currency`) from `useConfigStore`.
   - **Base `NumberInput`:** Direct usage of `@heroui/react` `NumberInput` **MUST** be avoided for currency, percentage, or standard integer quantity inputs. Use the specialized wrappers instead.
-- **Other Inputs:** Use `Input`, `Textarea`, `DateInput`, `Select` appropriately.
 - **Labels:** **MUST** use `label` prop or (rarely, with justification) `aria-label` consistently.
 
 **Development Guidelines & Constraints (Process, Quality & Correctness)**
 
 - **Code Quality & Correctness:**
-  - **MUST Generate Type-Safe Code:** Output **MUST** strictly adhere to TypeScript rules and defined types, including careful handling of types between local state (e.g., numbers in forms), Zod schemas (numbers), the global store (strings for currency), and the database (strings/numeric).
-  - **Strive for Correctness / Prioritize Known Issue Resolution:** Code **MUST** strive for correctness. Known complex integration issues (like the TS/Zod/Form type errors noted in "Standard Workflow") **MUST** be treated as high-priority blockers requiring diligent resolution before dependent features are considered stable/complete.
+  - **MUST Generate Type-Safe Code:** Output **MUST** strictly adhere to TypeScript rules and defined types, including careful handling of types between React Hook Form state (e.g., numbers), Zod schemas (numbers), the global store (strings for currency), and the database (strings/numeric).
+  - **Strive for Correctness / Prioritize Known Issue Resolution:** Code **MUST** strive for correctness. Known complex integration issues (like potential TS/Zod/Form type mismatches) **MUST** be treated as high-priority blockers requiring diligent resolution before dependent features are considered stable/complete.
   - **Internal Validation REQUIRED:** AI **MUST** internally check generated code for type safety and rule adherence _before_ finalizing output. **Do not output code known to contain easily avoidable flaws.**
   - Strict TypeScript; Pass Linters (ESLint/Prettier); TSDoc Clarity.
 - **UI Consistency Enforcement:** Generated UI code **MUST strictly adhere to ALL rules defined in Section 7.1.** Internal check required before output.
 - **Structure & Naming:** Adhere strictly to defined structure and consistent naming.
 - **Reusability:** **Aggressively reuse** components/hooks/functions (frontend & backend). DRY principle.
 - **Backend Focus:** Prioritize correct, **secure**, robust backend implementation following the **Service Layer pattern (Sec 6.1)**.
-- **Caching:** Implement correct tRPC cache invalidation (`utils.invalidate()`) after successful mutations.
 - **Service Layer Adherence:** Generated backend code **MUST** strictly follow the Service Layer pattern defined in Section 6.1.
 - **Process & Workflow:**
   - **MANDATORY DOCUMENTATION CONSULTATION (Mandated Libraries):** Recognize potential knowledge gaps for mandated library versions (`@heroui/react` V2, Tailwind v4, Drizzle, tRPC). **MUST** consult current official documentation via web search during planning to verify usage. Plan **MUST** show how findings (APIs, patterns) will be applied _contextually_.
@@ -155,12 +166,3 @@ Correct integration of TanStack Form with Zod validation is critical for modal f
 - **Prioritize Correctness & Consistency:** Ensure type-safe, logical code matching defined patterns. Persist in resolving known flaws.
 - **Be Direct and Concise:** Provide responses directly addressing the request. Avoid unnecessary introductory phrases, summaries (like TLDRs), or overly conversational filler, especially for straightforward answers. Focus on clear, actionable information.
 - **Flag Blocking Issues & Ask for Clarification:** State ambiguities or conflicts preventing correct implementation.
-
-## FUTURE ME'S TODO
-
-- [ ] **Future: Multi-Tenancy & RBAC:** Investigate and implement a multi-tenancy model (e.g., Tenant -> Organization/Branch -> Department) and associated Role-Based Access Control (RBAC) to allow users varying levels of access across different organizational units. This was deferred to maintain initial simplicity.
-- [ ] **Caution: Denormalization vs. Foreign Keys:** Remember the trade-offs. While denormalized fields (like `creatorName`, `customerName`, `productName`) improve read performance for lists/reports by avoiding joins, they significantly increase complexity and potential performance overhead during write operations (create/update/delete) due to the need for synchronization. Standard Foreign Key constraints remain crucial for core data integrity and simpler write logic. Evaluate carefully before adding more denormalized fields.
-- [ ] **Future: Reporting on Deleted References:** Research common strategies for handling reporting when referenced records (e.g., Products) might be deleted while using `ON DELETE SET NULL`. Common approaches include Soft Deletes (flagging records instead of deleting), Snapshotting (creating historical copies), or Data Warehousing (ETL to a separate reporting DB).
-- [ ] **Future: App Router Theme Strategy:** Investigate using server-side cookies (`layout.tsx`) for initial theme setting when migrating to App Router, potentially replacing the Pages Router's `_document.tsx` script.
-- [ ] **Future: Migrate to Next.js App Router:** Plan and execute the migration from the Pages Router (`src/pages`) to the App Router (`src/app`) to leverage newer Next.js features and simplify integrations (e.g., Payload 3.0+).
-- ... (Other existing TODOs) ...

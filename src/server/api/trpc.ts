@@ -10,10 +10,10 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import { ZodError } from 'zod';
-import { getServerAuthSession } from '~/server/auth/session';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '~/pages/api/auth/[...nextauth]';
 import { db } from '~/server/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
-
 /**
  * 1. CONTEXT
  *
@@ -38,10 +38,7 @@ interface CreateContextOptions {
  * @see https://create.t3.gg/en/usage/trpc#-serverapitrpcts
  */
 export const createInnerTRPCContext = async (opts: CreateContextOptions) => {
-  const session = await getServerAuthSession({
-    req: opts.req,
-    res: opts.res,
-  });
+  const session = await getServerSession(opts.req, opts.res, authOptions);
 
   return {
     session,

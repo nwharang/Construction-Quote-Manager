@@ -15,8 +15,9 @@ export class DashboardService extends BaseService {
 
   /**
    * Get dashboard statistics for quotes
+   * Reads are not user-scoped per CONTEXT.md
    */
-  async getDashboardStats(userId: string) {
+  async getDashboardStats(/* userId: string */) {
     try {
       // Get all stats in a single query
       const stats = await this.db
@@ -26,8 +27,7 @@ export class DashboardService extends BaseService {
           totalCustomers: sql<number>`count(distinct ${quotes.customerId})`,
           totalRevenue: sql<string>`coalesce(sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = 'ACCEPTED'), '0')`,
         })
-        .from(quotes)
-        .where(eq(quotes.userId, userId));
+        .from(quotes);
 
       // Get recent quotes with customer information
       const recentQuotes = await this.db
@@ -37,7 +37,6 @@ export class DashboardService extends BaseService {
         })
         .from(quotes)
         .leftJoin(customers, eq(quotes.customerId, customers.id))
-        .where(eq(quotes.userId, userId))
         .orderBy(desc(quotes.createdAt))
         .limit(5);
 
@@ -50,7 +49,6 @@ export class DashboardService extends BaseService {
         })
         .from(quotes)
         .leftJoin(customers, eq(quotes.customerId, customers.id))
-        .where(eq(quotes.userId, userId))
         .groupBy(customers.id, customers.name, customers.email, customers.phone)
         .orderBy(
           sql`sum(cast(${quotes.grandTotal} as numeric)) filter (where ${quotes.status} = 'ACCEPTED') desc`

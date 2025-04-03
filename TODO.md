@@ -1,0 +1,29 @@
+### FUTURE ME'S TODO:
+
+- **Quote Creation/Editing:**
+    - Implement `TaskList` component for managing tasks (labor/material items).
+    - Implement `QuoteSummary` component for displaying totals.
+    - Ensure React Hook Form manages state correctly, including array fields for tasks.
+    - Integrate with tRPC mutations for saving/updating quotes.
+    - Implement prefetching for edit pages.
+- **Customer Creation/Editing:**
+    - Create basic React Hook Form setup for customer fields.
+    - Integrate with tRPC mutations.
+    - Implement prefetching for edit pages.
+- **Product Creation/Editing:**
+    - Create basic React Hook Form setup for product fields.
+    - Integrate with tRPC mutations.
+    - Implement prefetching for edit pages.
+- **View Pages (Quote, Customer, Product):**
+    - Develop read-only display components for each entity.
+    - Quote View: Include Print link/button.
+    - Customer View: Plan for future history display.
+    - Product View: Display core details.
+- **List Pages (Quote, Customer, Product):**
+    - Update action buttons (Create, Edit, View, Delete) to use new page navigation (or `DeleteEntityDialog` for delete).
+    - Remove old modal triggers/logic.
+- **General:**
+    - Ensure consistent use of `@heroui/react` components and styling.
+    - Verify accessibility compliance.
+    - Add appropriate loading states using skeletons/spinners.
+    - Implement standardized feedback using `useAppToast`. 

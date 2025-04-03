@@ -1,7 +1,7 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { Session } from 'next-auth';
 import type * as schema from '~/server/db/schema';
-import type { QuoteStatusType } from '~/server/db/schema-exports';
+import type { QuoteStatusType } from '~/server/db/schema';
 
 /**
  * Service context interface

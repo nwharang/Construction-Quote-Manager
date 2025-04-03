@@ -9,6 +9,11 @@ import type { NextAuthOptions } from 'next-auth';
 
 // Removed getBaseUrl function
 
+// Import necessary items for AuthService
+import { db } from '~/server/db';
+import { AuthService } from '~/server/services/authService';
+import { TRPCError } from '@trpc/server'; // Import TRPCError to catch service errors
+
 // Extend the built-in session types
 declare module 'next-auth' {
   interface Session {
@@ -38,35 +43,36 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Re-add direct import of getUserFromDb
-        const { getUserFromDb } = await import('~/server/utils/get-user-from-db');
-
         if (!credentials?.email || !credentials?.password) {
           console.log('Auth: Missing credentials');
           return null;
         }
 
-        // Remove temporary client creation
-
         try {
-          // Revert to calling getUserFromDb directly
-          const user = await getUserFromDb(credentials.email, credentials.password);
+          // Instantiate AuthService (session context is null here, not needed for validation)
+          const authService = new AuthService(db, { session: null });
 
-          if (!user) {
-            console.log('Auth: getUserFromDb returned null (user not found or invalid password)');
-            return null;
-          }
+          // Call AuthService to validate credentials using the correct method name
+          const user = await authService.verifyUserCredentials(
+            credentials.email,
+            credentials.password
+          );
 
-          console.log(`Auth: User ${user.email} authorized successfully`);
+          // Service returns user object on success (already excludes password)
           return {
             id: user.id,
             email: user.email,
             name: user.name,
           };
-
         } catch (error) {
-          // Simplified error handling for direct call
-          console.error('Error during direct authorization call:', error);
+          // Catch errors from AuthService (e.g., TRPCError with code UNAUTHORIZED)
+          if (error instanceof TRPCError && error.code === 'UNAUTHORIZED') {
+            console.log(`Auth: Authorization failed via AuthService: ${error.message}`);
+          } else {
+            // Log other unexpected errors
+            console.error('Auth: Unexpected error during authorization:', error);
+          }
+          // Return null to indicate failed authorization to NextAuth
           return null;
         }
       },

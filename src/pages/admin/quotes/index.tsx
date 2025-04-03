@@ -33,7 +33,7 @@ import { Plus, Search, MoreVertical, Edit, Trash, Eye } from 'lucide-react';
 import { QuoteDetailModal } from '~/components/quotes/QuoteDetailModal';
 import { QuoteViewModal } from '~/components/quotes/QuoteViewModal';
 import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
-import type { QuoteStatusType } from '~/server/db/schema-exports';
+import type { QuoteStatusType } from '~/server/db/schema';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import { APP_NAME } from '~/config/constants';
 

@@ -24,7 +24,7 @@ export type DateParams = Pick<AllPossibleParams, 'date'>;
 
 // --- Grouped Key Types --- //
 
-import type { QuoteStatusType, ProductCategoryType } from '~/server/db/schema-exports';
+import type { QuoteStatusType } from '~/server/db/schema';
 
 // Combine all keys into a single type for use with useTranslation
 export type TranslationKey =
@@ -272,7 +272,7 @@ export type TranslationKey =
   | 'validation.selectOption'
   | 'validation.minValue' // Params: { min: number }
   | 'quotes.materialProductLabel'
-  | 'quotes.materialProductPlaceholder'
+  | 'quotes.materialProductPlaceholder';
 
 // --- Conditional Mapping Type --- //
 

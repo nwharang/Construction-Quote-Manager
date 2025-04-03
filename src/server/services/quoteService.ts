@@ -5,6 +5,7 @@ import { PgColumn } from 'drizzle-orm/pg-core';
 import { type DB } from './index';
 import { BaseService } from './baseService';
 import type { Session } from 'next-auth';
+import { type PgTransaction } from 'drizzle-orm/pg-core';
 
 /**
  * Service layer for handling quote-related business logic
@@ -132,7 +133,6 @@ export class QuoteService extends BaseService {
    */
   async createQuote({
     data,
-    userId,
   }: {
     data: {
       customerId: string;
@@ -150,10 +150,9 @@ export class QuoteService extends BaseService {
           quantity: number;
           notes?: string;
         }[];
-        estimatedMaterialsCost?: number;
+        estimatedMaterialsCostLumpSum?: number;
       }[];
     };
-    userId: string;
   }) {
     // Verify customer exists
     const customer = await this.db
@@ -171,7 +170,6 @@ export class QuoteService extends BaseService {
 
     // Set default values
     const quoteData = {
-      userId,
       customerId: data.customerId,
       title: data.title,
       status: data.status || 'DRAFT',
@@ -208,7 +206,8 @@ export class QuoteService extends BaseService {
                 | 'LUMPSUM'
                 | 'ITEMIZED'
                 | undefined,
-              estimatedMaterialsCost: taskData.estimatedMaterialsCost?.toString() ?? '0',
+              estimatedMaterialsCostLumpSum:
+                taskData.estimatedMaterialsCostLumpSum?.toString() ?? null,
             })
             .returning();
 
@@ -244,69 +243,117 @@ export class QuoteService extends BaseService {
   /**
    * Recalculate all totals for a quote based on its tasks and materials
    */
-  async recalculateQuoteTotals({ quoteId, tx = this.db }: { quoteId: string; tx?: DB }) {
-    // Fetch the quote to get markup percentage
-    const [quote] = await tx
-      .select({
-        markupPercentage: quotes.markupPercentage,
-        // complexityPercentage removed as it doesn't exist in schema
-      })
-      .from(quotes)
-      .where(eq(quotes.id, quoteId))
-      .limit(1);
+  async recalculateQuoteTotals({ quoteId, tx }: { quoteId: string; tx?: DB /* | Tx */ }) {
+    const dbOrTx = tx ?? this.db;
+
+    // Fetch all tasks and their materials for the quote
+    const quoteTasks = await dbOrTx.query.tasks.findMany({
+      where: eq(tasks.quoteId, quoteId),
+      with: {
+        materials: {}, // Fetch materials to calculate their cost
+      },
+    });
+
+    // --- Refactored Calculation Logic ---
+
+    let calculatedSubtotalTasks = 0;
+    let calculatedSubtotalMaterials = 0;
+
+    quoteTasks.forEach((task) => {
+      // Add task price (labor)
+      calculatedSubtotalTasks += this.toNumber(task.price);
+
+      // Add material cost for the task
+      calculatedSubtotalMaterials += this.calculateTaskMaterialsTotalInternal(task);
+    });
+
+    // Round the basic subtotals
+    const subtotalTasks = this.roundCurrency(calculatedSubtotalTasks);
+    const subtotalMaterials = this.roundCurrency(calculatedSubtotalMaterials);
+    const subtotalCombined = this.roundCurrency(subtotalTasks + subtotalMaterials);
+
+    // Fetch quote details needed for final calculations
+    const quote = await dbOrTx.query.quotes.findFirst({
+      where: eq(quotes.id, quoteId),
+      columns: {
+        markupPercentage: true,
+        complexityCharge: true,
+        markupCharge: true, // Fetch existing fixed markup charge
+      },
+    });
 
     if (!quote) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Quote not found for recalculation' });
+      console.error(`Recalculation failed: Quote ${quoteId} not found.`);
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `Quote ${quoteId} not found during recalculation.`,
+      });
     }
 
-    const markupPercent = this.toNumber(quote.markupPercentage) / 100;
-    // Set complexityPercent to 0 as it's not stored directly
-    const complexityPercent = 0;
+    const markupPercentageInput = this.toNumber(quote.markupPercentage) / 100; // As decimal
+    const complexityChargeValue = this.toNumber(quote.complexityCharge); // Fixed value
+    const existingMarkupChargeValue = this.toNumber(quote.markupCharge); // Fixed value
 
-    // Calculate Subtotal Tasks - Remove quantity multiplication
-    const taskTotals = await tx
-      .select({ total: sql<number>`sum(${tasks.price})`.mapWith(Number) }) // Removed * tasks.quantity
-      .from(tasks)
-      .where(eq(tasks.quoteId, quoteId));
-    const subtotalTasks = taskTotals[0]?.total ?? 0;
+    // Calculate charges based on combined subtotal
+    const calculatedComplexityCharge = this.roundCurrency(
+      subtotalCombined * (complexityChargeValue / 100)
+    ); // Assuming complexityCharge is also a percentage stored as number
 
-    // Calculate Subtotal Materials (no change here)
-    const itemizedMaterialsTotalResult = await tx
-      .select({
-        total: sql<number>`sum(${materials.unitPrice} * ${materials.quantity})`.mapWith(Number),
-      })
-      .from(materials)
-      .innerJoin(tasks, and(eq(materials.taskId, tasks.id), eq(tasks.quoteId, quoteId)))
-      .where(eq(tasks.materialType, 'ITEMIZED'));
-    const itemizedMaterialsTotal = itemizedMaterialsTotalResult[0]?.total ?? 0;
+    const markupBase = this.roundCurrency(subtotalCombined + calculatedComplexityCharge);
 
-    const lumpSumMaterialsTotalResult = await tx
-      .select({ total: sql<number>`sum(${tasks.estimatedMaterialsCost})`.mapWith(Number) })
-      .from(tasks)
-      .where(and(eq(tasks.quoteId, quoteId), eq(tasks.materialType, 'LUMPSUM')));
-    const lumpSumMaterialsTotal = lumpSumMaterialsTotalResult[0]?.total ?? 0;
+    // Use existing fixed markup if > 0, otherwise calculate based on percentage
+    const calculatedMarkupCharge =
+      existingMarkupChargeValue > 0
+        ? existingMarkupChargeValue
+        : this.roundCurrency(markupBase * markupPercentageInput);
 
-    const subtotalMaterials = itemizedMaterialsTotal + lumpSumMaterialsTotal;
-    // ... (rest of calculations: subtotalCombined, complexityCharge, markupCharge, grandTotal)
-    const subtotalCombined = subtotalTasks + subtotalMaterials;
-    const complexityCharge = subtotalCombined * complexityPercent; // Uses complexityPercent = 0
-    const markupCharge = subtotalCombined * markupPercent;
-    const grandTotal = subtotalCombined + complexityCharge + markupCharge;
+    // Calculate grand total
+    const grandTotal = this.roundCurrency(
+      subtotalCombined + calculatedComplexityCharge + calculatedMarkupCharge
+    );
 
-    // Update the quote with calculated totals (no change here)
-    await tx
+    // --- End Refactored Calculation Logic ---
+
+    // Update the quote with calculated totals (ensure conversion to string for DB)
+    await dbOrTx
       .update(quotes)
       .set({
-        subtotalTasks: subtotalTasks.toFixed(2),
-        subtotalMaterials: subtotalMaterials.toFixed(2),
-        complexityCharge: complexityCharge.toFixed(2),
-        markupCharge: markupCharge.toFixed(2),
-        grandTotal: grandTotal.toFixed(2),
+        subtotalTasks: subtotalTasks.toString(),
+        subtotalMaterials: subtotalMaterials.toString(),
+        // Only update markupCharge if it wasn't a fixed value override
+        ...(existingMarkupChargeValue <= 0 && { markupCharge: calculatedMarkupCharge.toString() }),
+        // Keep existing complexity charge value as it's likely fixed input, not calculated % for storage
+        // complexityCharge: calculatedComplexityCharge.toString(), // Usually complexity charge is fixed, not recalculated percentage stored
+        grandTotal: grandTotal.toString(),
         updatedAt: new Date(),
       })
       .where(eq(quotes.id, quoteId));
+  }
 
-    return this.getQuoteById({ id: quoteId, includeRelated: true });
+  /**
+   * Helper to calculate the materials total for a single task.
+   * Uses service's toNumber and roundCurrency methods.
+   */
+  private calculateTaskMaterialsTotalInternal(task: {
+    materialType?: 'LUMPSUM' | 'ITEMIZED'; // Use uppercase enum values from schema
+    estimatedMaterialsCostLumpSum?: string | null; // Expect string from DB
+    materials: Array<{ quantity: number; unitPrice: string }>; // Expect string from DB
+  }): number {
+    if (task.materialType === 'LUMPSUM') {
+      // Use the correct field name and convert from string
+      return this.toNumber(task.estimatedMaterialsCostLumpSum);
+    }
+
+    if (task.materialType === 'ITEMIZED' && Array.isArray(task.materials)) {
+      const total = task.materials.reduce((sum, material) => {
+        const unitPrice = this.toNumber(material.unitPrice);
+        const lineTotal = material.quantity * unitPrice;
+        return sum + lineTotal;
+      }, 0);
+      // No need to round here, will be rounded when summing up all tasks' materials
+      return total;
+    }
+    return 0;
   }
 
   /**
@@ -340,7 +387,6 @@ export class QuoteService extends BaseService {
         }[];
       }[];
     };
-    userId: string;
   }) {
     return this.db.transaction(async (tx) => {
       // 1. Fetch existing quote ... (no change here)
@@ -386,7 +432,8 @@ export class QuoteService extends BaseService {
             quoteId: id,
             description: taskData.description ?? '', // Ensure default
             price: taskData.price?.toString() ?? '0', // Ensure default
-            estimatedMaterialsCost: taskData.estimatedMaterialsCostLumpSum?.toString() ?? '0', // Ensure default
+            estimatedMaterialsCostLumpSum:
+              taskData.estimatedMaterialsCostLumpSum?.toString() ?? null, // Corrected field name
             materialType: taskData.materialType?.toUpperCase() as
               | 'LUMPSUM'
               | 'ITEMIZED'
@@ -498,7 +545,7 @@ export class QuoteService extends BaseService {
   /**
    * Delete a quote
    */
-  async deleteQuote({ id }: { id: string; userId: string }) {
+  async deleteQuote({ id }: { id: string }) {
     // Verify quote exists
     await this.getQuoteById({ id });
 
@@ -530,7 +577,7 @@ export class QuoteService extends BaseService {
       description: string;
       price: number;
       materialType: 'lumpsum' | 'itemized';
-      estimatedMaterialsCost?: number;
+      estimatedMaterialsCostLumpSum?: number;
       materials?: {
         unitPrice: number;
         productId: string;
@@ -558,7 +605,7 @@ export class QuoteService extends BaseService {
           description: taskData.description,
           price: taskData.price.toString(),
           materialType: taskData.materialType.toUpperCase() as 'LUMPSUM' | 'ITEMIZED' | undefined,
-          estimatedMaterialsCost: taskData.estimatedMaterialsCost?.toString() ?? '0',
+          estimatedMaterialsCostLumpSum: taskData.estimatedMaterialsCostLumpSum?.toString() ?? null,
           order: maxOrder + 1,
         })
         .returning();
@@ -595,8 +642,8 @@ export class QuoteService extends BaseService {
     return {
       ...result,
       price: this.toNumber(result.price),
-      estimatedMaterialsCost: result.estimatedMaterialsCost
-        ? this.toNumber(result.estimatedMaterialsCost)
+      estimatedMaterialsCostLumpSum: result.estimatedMaterialsCostLumpSum
+        ? this.toNumber(result.estimatedMaterialsCostLumpSum)
         : null,
     };
   }
@@ -613,7 +660,7 @@ export class QuoteService extends BaseService {
       description?: string;
       price?: number;
       materialType?: 'lumpsum' | 'itemized';
-      estimatedMaterialsCost?: number;
+      estimatedMaterialsCostLumpSum?: number;
     };
   }) {
     // Get task
@@ -639,8 +686,9 @@ export class QuoteService extends BaseService {
         | 'LUMPSUM'
         | 'ITEMIZED'
         | undefined;
-    if (taskData.estimatedMaterialsCost !== undefined) {
-      updateData.estimatedMaterialsCost = taskData.estimatedMaterialsCost?.toString() ?? '0';
+    if (taskData.estimatedMaterialsCostLumpSum !== undefined) {
+      updateData.estimatedMaterialsCostLumpSum =
+        taskData.estimatedMaterialsCostLumpSum?.toString() ?? null;
     }
 
     // Wrap update and recalculation in a transaction
@@ -660,7 +708,7 @@ export class QuoteService extends BaseService {
       }
 
       // Recalculate quote totals within the transaction
-      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId, tx });
+      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId });
 
       return updatedTask;
     });
@@ -668,12 +716,11 @@ export class QuoteService extends BaseService {
     // Return the updated task with numeric values
     return {
       ...result, // Use the result from the transaction
-      price:
-        typeof result.price === 'string' ? parseFloat(result.price) : result.price,
-      estimatedMaterialsCost: result.estimatedMaterialsCost
-        ? typeof result.estimatedMaterialsCost === 'string'
-          ? parseFloat(result.estimatedMaterialsCost)
-          : result.estimatedMaterialsCost
+      price: typeof result.price === 'string' ? parseFloat(result.price) : result.price,
+      estimatedMaterialsCostLumpSum: result.estimatedMaterialsCostLumpSum
+        ? typeof result.estimatedMaterialsCostLumpSum === 'string'
+          ? parseFloat(result.estimatedMaterialsCostLumpSum)
+          : result.estimatedMaterialsCostLumpSum
         : null,
     };
   }
@@ -711,7 +758,7 @@ export class QuoteService extends BaseService {
       }
 
       // Recalculate quote totals within the transaction
-      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId, tx });
+      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId });
 
       return deleteResult[0]; // Return the object with deletedId
     });
@@ -769,7 +816,7 @@ export class QuoteService extends BaseService {
       }
 
       // Recalculate quote totals within the transaction
-      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId, tx });
+      await this.recalculateQuoteTotals({ quoteId: task[0]!.quoteId });
 
       return createdMaterial;
     });
@@ -784,33 +831,40 @@ export class QuoteService extends BaseService {
   /**
    * Update the status of a quote
    */
-  async updateStatus({ id, status }: { id: string; status: QuoteStatusType; userId: string }) {
-    // Verify quote exists
-    await this.getQuoteById({ id });
-
-    // Update the quote status
-    const [updatedQuote] = await this.db
-      .update(quotes)
-      .set({
-        status,
-        updatedAt: new Date(),
-      })
-      .where(eq(quotes.id, id))
-      .returning();
-
-    if (!updatedQuote) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to update quote status',
+  async updateStatus({ id, status }: { id: string; status: QuoteStatusType }) {
+    return this.db.transaction(async (tx) => {
+      // Verify quote exists using tx
+      const quote = await tx.query.quotes.findFirst({
+        where: eq(quotes.id, id),
+        columns: { id: true },
       });
-    }
+      if (!quote) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Quote not found.' });
+      }
 
-    // Return the updated quote with numeric values
-    return this.getQuoteById({ id, includeRelated: true });
+      // Update the quote status using tx
+      const [updatedQuote] = await tx
+        .update(quotes)
+        .set({
+          status,
+          updatedAt: new Date(),
+        })
+        .where(eq(quotes.id, id))
+        .returning();
+
+      if (!updatedQuote) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update quote status',
+        });
+      }
+      // Return minimal info from transaction
+      return { updatedId: updatedQuote.id, newStatus: updatedQuote.status };
+    });
   }
 
   /**
-   * Update the charges of a quote
+   * Update the charges of a quote and recalculate totals
    */
   async updateCharges({
     id,
@@ -820,48 +874,43 @@ export class QuoteService extends BaseService {
     id: string;
     complexityCharge: number;
     markupCharge: number;
-    userId: string;
   }) {
-    // Get the quote with tasks to calculate subtotals
-    const quote = await this.getQuoteById({ id, includeRelated: true });
-
-    if (!quote) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Quote not found',
+    return this.db.transaction(async (tx) => {
+      // 1. Verify quote exists using tx
+      const quote = await tx.query.quotes.findFirst({
+        where: eq(quotes.id, id),
+        columns: { id: true },
       });
-    }
+      if (!quote) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Quote not found.' });
+      }
 
-    // Ensure we have subtotals using toNumber for consistent handling
-    const subtotalTasks = this.toNumber(quote.subtotalTasks);
-    const subtotalMaterials = this.toNumber(quote.subtotalMaterials);
-    const subtotal = subtotalTasks + subtotalMaterials;
+      // 2. Format and Update specific charges using tx
+      const formattedComplexityCharge = this.roundCurrency(complexityCharge);
+      const formattedMarkupCharge = this.roundCurrency(markupCharge);
 
-    // Calculate grand total - use Math.round to ensure 2 decimal places
-    const formattedComplexityCharge = Math.round(complexityCharge * 100) / 100;
-    const formattedMarkupCharge = Math.round(markupCharge * 100) / 100;
-    const grandTotal =
-      Math.round((subtotal + formattedComplexityCharge + formattedMarkupCharge) * 100) / 100;
+      const [updateResult] = await tx
+        .update(quotes)
+        .set({
+          complexityCharge: formattedComplexityCharge.toString(),
+          markupCharge: formattedMarkupCharge.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(quotes.id, id))
+        .returning({ id: quotes.id });
 
-    // Update the quote
-    const [updatedQuote] = await this.db
-      .update(quotes)
-      .set({
-        complexityCharge: formattedComplexityCharge.toString(),
-        markupCharge: formattedMarkupCharge.toString(),
-        grandTotal: grandTotal.toString(),
-        updatedAt: new Date(),
-      })
-      .where(eq(quotes.id, id));
+      if (!updateResult) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update quote charges',
+        });
+      }
 
-    if (!updatedQuote) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to update quote charges',
-      });
-    }
+      // 3. Recalculate totals using tx
+      await this.recalculateQuoteTotals({ quoteId: id, tx });
 
-    // Return the updated quote with numeric values
-    return this.getQuoteById({ id, includeRelated: true });
+      // 4. Return success or minimal data
+      return { updatedId: updateResult.id };
+    });
   }
 }

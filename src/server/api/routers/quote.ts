@@ -1,11 +1,10 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
-import {
-  QuoteStatus,
-  type QuoteStatusType,
-} from '~/server/db/schema';
+import { QuoteStatus, type QuoteStatusType } from '~/server/db/schema';
 import { TRPCError } from '@trpc/server';
 import { createServices } from '~/server/services';
+import { AuthService } from '~/server/services/authService';
+import { db } from '~/server/db';
 
 // Define reusable nested schemas with UUIDs
 const quoteMaterialInputSchema = z.object({
@@ -26,7 +25,7 @@ const taskInputSchema = z.object({
 });
 
 // Type inferred from the material input schema
-type MaterialInputType = z.infer<typeof quoteMaterialInputSchema>;
+// type MaterialInputType = z.infer<typeof quoteMaterialInputSchema>; // Can be removed if not used
 
 export const quoteRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -136,34 +135,34 @@ export const quoteRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         const services = createServices(ctx);
-
-        // Explicitly map input to service data structure
+        // userId is available in service context via BaseService, no need to fetch here unless explicitly needed by service method signature
+        // const authService = new AuthService(db, ctx); 
+        // const userId = authService.getUserId();
         const serviceData = {
           customerId: input.customerId,
           title: input.title,
           status: input.status,
           markupPercentage: input.markupPercentage,
-          notes: input.notes ?? undefined, // Map null to undefined
+          notes: input.notes ?? undefined,
           tasks: input.tasks?.map((task) => ({
             description: task.description,
             price: task.price,
             materialType: task.materialType,
-            estimatedMaterialsCost: task.estimatedMaterialsCost,
+            estimatedMaterialsCostLumpSum: task.estimatedMaterialsCost,
             materials: task.materials?.map((mat) => ({
-              // name/description removed
               productId: mat.productId,
               quantity: mat.quantity,
               unitPrice: mat.unitPrice,
-              notes: mat.notes ?? undefined, // Map null to undefined
+              notes: mat.notes ?? undefined,
             })),
           })),
         };
 
         const quote = await services.quote.createQuote({
           data: serviceData,
-          userId: 'system-user',
+          // FIX: Remove userId as it's not expected by the service method
+          // userId: userId, 
         });
-
         return quote;
       } catch (error) {
         console.error('Error creating quote:', error);
@@ -217,37 +216,39 @@ export const quoteRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         const services = createServices(ctx);
-
-        // Explicitly map input to service data structure
+        // userId is available in service context via BaseService
+        // const authService = new AuthService(db, ctx); 
+        // const userId = authService.getUserId();
         const serviceData = {
           customerId: input.customerId,
           title: input.title,
           status: input.status,
           markupPercentage: input.markupPercentage,
-          notes: input.notes ?? undefined, // Map null to undefined
+          notes: input.notes ?? undefined,
           tasks: input.tasks?.map((task) => ({
             id: task.id,
             description: task.description,
             price: task.price,
             materialType: task.materialType,
             estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum,
-            materials: task.materials?.map((mat) => ({
-              id: mat.id,
-              // name/description removed
-              productId: mat.productId ?? undefined, // Map null to undefined for optional DB field?
-              quantity: mat.quantity,
-              unitPrice: mat.unitPrice,
-              notes: mat.notes ?? undefined, // Map null to undefined
-            })),
+            materials: task.materials
+              ?.filter((mat) => mat.productId != null)
+              .map((mat) => ({
+                id: mat.id,
+                productId: mat.productId!,
+                quantity: mat.quantity,
+                unitPrice: mat.unitPrice,
+                notes: mat.notes ?? undefined,
+              })),
           })),
         };
 
         const quote = await services.quote.updateQuote({
           id: input.id,
           data: serviceData,
-          userId: 'system-user',
+          // FIX: Remove userId as it's not expected by the service method
+          // userId: userId, 
         });
-
         return quote;
       } catch (error) {
         console.error('Error updating quote:', error);
@@ -269,11 +270,14 @@ export const quoteRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         const services = createServices(ctx);
+         // userId is available in service context via BaseService
+        // const authService = new AuthService(db, ctx); 
+        // const userId = authService.getUserId(); 
 
-        // Keep passing userId (placeholder)
         const result = await services.quote.deleteQuote({
           id: input.id,
-          userId: 'system-user',
+           // FIX: Remove userId as it's not expected by the service method
+          // userId: userId, 
         });
 
         return result;
@@ -292,7 +296,7 @@ export const quoteRouter = createTRPCRouter({
     try {
       const services = createServices(ctx);
 
-      const stats = await services.dashboard.getDashboardStats('system-user'); // Use a consistent system user
+      const stats = await services.dashboard.getDashboardStats();
 
       return stats;
     } catch (error) {
@@ -318,12 +322,10 @@ export const quoteRouter = createTRPCRouter({
       try {
         const services = createServices(ctx);
 
-        // Keep passing userId (placeholder)
         const updatedQuote = await services.quote.updateCharges({
           id: input.id,
           complexityCharge: input.complexityCharge,
           markupCharge: input.markupCharge,
-          userId: 'system-user',
         });
 
         return updatedQuote;
@@ -354,11 +356,9 @@ export const quoteRouter = createTRPCRouter({
       try {
         const services = createServices(ctx);
 
-        // Keep passing userId (placeholder)
         const updatedQuote = await services.quote.updateStatus({
           id: input.id,
           status: input.status,
-          userId: 'system-user',
         });
 
         return updatedQuote;
@@ -398,18 +398,16 @@ export const quoteRouter = createTRPCRouter({
       try {
         const services = createServices(ctx);
 
-        // Explicitly map input to service taskData structure
         const serviceTaskData = {
           description: input.description,
           price: input.price,
           materialType: input.materialType,
-          estimatedMaterialsCost: input.estimatedMaterialsCost,
+          estimatedMaterialsCostLumpSum: input.estimatedMaterialsCost,
           materials: input.materials?.map((mat) => ({
-            // name/description removed
             productId: mat.productId,
             quantity: mat.quantity,
             unitPrice: mat.unitPrice,
-            notes: mat.notes ?? undefined, // Map null to undefined
+            notes: mat.notes ?? undefined,
           })),
         };
 
@@ -429,59 +427,4 @@ export const quoteRouter = createTRPCRouter({
         });
       }
     }),
-
-  // Need routers for Task and Material update/delete separate from quote?
-  // Assuming task updates/deletes happen via quote update for now.
-  // Let's stub placeholder routers for task/material updates/deletes
-  // if they are intended to be standalone.
-
-  // Example placeholder if updateTask was meant to be standalone:
-  /*
-  updateTask: protectedProcedure
-    .input(
-      z.object({
-        taskId: z.string().uuid(),
-        description: z.string().optional(),
-        price: z.number().optional(),
-        estimatedMaterialsCost: z.number().optional(),
-        materialType: z.enum(['lumpsum', 'itemized']).optional(),
-        // NO quantity
-      })
-    )
-    .mutation(async ({ ctx, input }) => { 
-        const services = createServices(ctx);
-        const { taskId, ...taskData } = input;
-        return services.quote.updateTask({ taskId, taskData });
-    }),
-  */
-
-  // Example placeholder if deleteTask was meant to be standalone:
-  /*
-  deleteTask: protectedProcedure
-    .input(z.object({ taskId: z.string().uuid() })) // NO userId
-    .mutation(async ({ ctx, input }) => {
-        const services = createServices(ctx);
-        return services.quote.deleteTask({ taskId: input.taskId });
-     }),
-  */
-
-  // Example placeholder if addMaterial was meant to be standalone:
-  /*
-  addMaterial: protectedProcedure
-    .input(
-      z.object({
-          taskId: z.string().uuid(),
-          productId: z.string().uuid(),
-          quantity: z.number(),
-          unitPrice: z.number(),
-          notes: z.string().optional().nullable(),
-          // NO name, NO description
-      })
-    )
-    .mutation(async ({ ctx, input }) => { 
-      const services = createServices(ctx);
-      const { taskId, ...materialData } = input;
-      return services.quote.addMaterial({ taskId, materialData });
-    }),
-  */
 });

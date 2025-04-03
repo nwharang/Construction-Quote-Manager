@@ -3,6 +3,9 @@ import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { customers } from '~/server/db/schema';
 import { eq, and, sql, or, ilike, desc } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import { CustomerService } from '../../services/customerService';
+import { AuthService } from '../../services/authService';
+import { db } from '../../db';
 
 const customerInput = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -12,205 +15,116 @@ const customerInput = z.object({
   notes: z.string().optional().nullable(),
 });
 
+// Define the input schema for the update procedure, including the id
+const updateRouterInputSchema = z.object({
+  id: z.string().uuid('Invalid customer ID format'),
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+const deleteInputSchema = z.object({ id: z.string().uuid('Invalid customer ID format') });
+
+// Define input schema for getAll
+const getAllInputSchema = z.object({
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(10),
+  search: z.string().optional(),
+});
+
+// Define input schema for getById
+const getByIdInputSchema = z.object({ id: z.string().uuid('Invalid customer ID format') });
+
 export const customerRouter = createTRPCRouter({
-  getAll: protectedProcedure
-    .input(
-      z.object({
-        page: z.number().min(1).default(1),
-        limit: z.number().min(1).max(100).default(10),
-        search: z.string().optional(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      try {
-        const { page, limit, search } = input;
-        const offset = (page - 1) * limit;
+  getAll: protectedProcedure.input(getAllInputSchema).query(async ({ ctx, input }) => {
+    try {
+      // 1. Instantiate CustomerService
+      const customerService = new CustomerService(db, ctx);
 
-        // 1. Build search condition
-        const whereClause = and(
-          eq(customers.userId, ctx.session.user.id),
-          ...(search
-            ? [
-                or(
-                  ilike(customers.name, `%${search}%`),
-                  ilike(customers.email, `%${search}%`)
-                )
-              ]
-            : [])
-        );
+      // 2. Delegate fetching to the service
+      // The service method (CustomerService.getAllCustomers) now handles pagination, search, and NO userId filtering.
+      const result = await customerService.getAllCustomers(input);
 
-        // 2. Get total count
-        const countResult = await ctx.db
-          .select({ count: sql<number>`count(*)` })
-          .from(customers)
-          .where(whereClause);
+      // 3. Return the result from the service
+      return result;
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch customers',
+        cause: error,
+      });
+    }
+  }),
 
-        const total = Number(countResult[0]?.count ?? 0);
+  getById: protectedProcedure.input(getByIdInputSchema).query(async ({ ctx, input }) => {
+    try {
+      // 1. Instantiate CustomerService
+      const customerService = new CustomerService(db, ctx);
 
-        // 3. Get customers with pagination
-        const customerList = await ctx.db
-          .select({
-            id: customers.id,
-            name: customers.name,
-            email: customers.email,
-            phone: customers.phone,
-            address: customers.address,
-            notes: customers.notes,
-            createdAt: customers.createdAt,
-            updatedAt: customers.updatedAt,
-          })
-          .from(customers)
-          .where(whereClause)
-          .orderBy(desc(customers.createdAt))
-          .limit(limit)
-          .offset(offset);
+      // 2. Delegate fetching to the service
+      // The service method (CustomerService.getCustomerById) now handles existence check and NO userId filtering.
+      const customer = await customerService.getCustomerById(input.id);
 
-        // 4. Add empty count field to maintain API compatibility
-        const customersWithCounts = customerList.map(customer => ({
-          ...customer,
-          _count: {
-            quotes: 0 // Default to 0 - will need to be updated in UI
-          }
-        }));
+      // 3. Return result from service
+      return customer;
+    } catch (error) {
+      console.error('Error fetching customer:', error);
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch customer',
+        cause: error,
+      });
+    }
+  }),
 
-        return {
-          customers: customersWithCounts,
-          total,
-          page,
-          limit,
-        };
-      } catch (error) {
-        console.error("Error fetching customers:", error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch customers',
-          cause: error,
-        });
-      }
-    }),
+  create: protectedProcedure.input(customerInput).mutation(async ({ ctx, input }) => {
+    try {
+      // 1. Instantiate services
+      const customerService = new CustomerService(db, ctx);
+      const authService = new AuthService(db, ctx);
 
-  getById: protectedProcedure
-    .input(z.object({ id: z.string().uuid('Invalid customer ID format') }))
-    .query(async ({ ctx, input }) => {
-      try {
-        // 1. Verify ownership and get customer data
-        const customer = await ctx.db
-          .select()
-          .from(customers)
-          .where(
-            and(
-              eq(customers.id, input.id),
-              eq(customers.userId, ctx.session.user.id)
-            )
-          )
-          .limit(1);
+      // 2. Get creatorId from AuthService
+      const creatorId = authService.getUserId();
 
-        if (!customer[0]) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Customer not found or does not belong to user',
-          });
-        }
+      // 3. Delegate creation to CustomerService
+      const createdCustomer = await customerService.createCustomer(
+        input // Pass validated input
+      );
 
-        return customer[0];
-      } catch (error) {
-        console.error("Error fetching customer:", error);
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch customer',
-          cause: error,
-        });
-      }
-    }),
-
-  create: protectedProcedure
-    .input(customerInput)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        // 1. Create the customer
-        const [createdCustomer] = await ctx.db
-          .insert(customers)
-          .values({
-            ...input,
-            userId: ctx.session.user.id,
-          })
-          .returning();
-
-        if (!createdCustomer) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to create customer',
-          });
-        }
-
-        return createdCustomer;
-      } catch (error) {
-        console.error("Error creating customer:", error);
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to create customer',
-          cause: error,
-        });
-      }
-    }),
+      // 4. Return result
+      return createdCustomer;
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to create customer',
+        cause: error,
+      });
+    }
+  }),
 
   update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string().uuid('Invalid customer ID format'),
-        ...customerInput.shape,
-      })
-    )
+    .input(updateRouterInputSchema) // Use the schema with id
     .mutation(async ({ ctx, input }) => {
       try {
-        const { id, ...data } = input;
+        const { id, ...data } = input; // Separate id from the rest of the data
 
-        // 1. Verify customer exists and belongs to user
-        const existingCustomer = await ctx.db
-          .select()
-          .from(customers)
-          .where(
-            and(
-              eq(customers.id, id),
-              eq(customers.userId, ctx.session.user.id)
-            )
-          )
-          .limit(1);
+        // 1. Instantiate CustomerService
+        const customerService = new CustomerService(db, ctx);
 
-        if (!existingCustomer[0]) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Customer not found or does not belong to user',
-          });
-        }
+        // 2. Delegate update to the service
+        const updatedCustomer = await customerService.updateCustomer(id, data);
 
-        // 2. Update the customer
-        const [updatedCustomer] = await ctx.db
-          .update(customers)
-          .set({
-            ...data,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(customers.id, id),
-              eq(customers.userId, ctx.session.user.id)
-            )
-          )
-          .returning();
-
-        if (!updatedCustomer) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to update customer',
-          });
-        }
-
+        // 3. Return result
         return updatedCustomer;
       } catch (error) {
-        console.error("Error updating customer:", error);
+        console.error('Error updating customer:', error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -220,48 +134,24 @@ export const customerRouter = createTRPCRouter({
       }
     }),
 
-  delete: protectedProcedure
-    .input(z.object({ id: z.string().uuid('Invalid customer ID format') }))
-    .mutation(async ({ ctx, input }) => {
-      try {
-        // 1. Verify customer exists and belongs to user
-        const existingCustomer = await ctx.db
-          .select()
-          .from(customers)
-          .where(
-            and(
-              eq(customers.id, input.id),
-              eq(customers.userId, ctx.session.user.id)
-            )
-          )
-          .limit(1);
+  delete: protectedProcedure.input(deleteInputSchema).mutation(async ({ ctx, input }) => {
+    try {
+      // 1. Instantiate CustomerService
+      const customerService = new CustomerService(db, ctx);
 
-        if (!existingCustomer[0]) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Customer not found or does not belong to user',
-          });
-        }
+      // 2. Delegate deletion to the service
+      const result = await customerService.deleteCustomer(input.id);
 
-        // 2. Delete the customer
-        await ctx.db
-          .delete(customers)
-          .where(
-            and(
-              eq(customers.id, input.id),
-              eq(customers.userId, ctx.session.user.id)
-            )
-          );
-
-        return { success: true };
-      } catch (error) {
-        console.error("Error deleting customer:", error);
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to delete customer',
-          cause: error,
-        });
-      }
-    }),
-}); 
+      // 3. Return result from service
+      return result;
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to delete customer',
+        cause: error,
+      });
+    }
+  }),
+});

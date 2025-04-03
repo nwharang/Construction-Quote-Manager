@@ -163,54 +163,36 @@ const ProductsPage: NextPageWithLayout = () => {
 
   // === START: Define Submit Handlers ===
   const handleCreateSubmit = useCallback(async (data: ProductSubmitData) => {
-    if (!data.category) {
-      toast.error(t('validation.selectOption', { field: t('productFields.category') }));
-      return;
-    }
     try {
         await createProduct({
             name: data.name,
             description: data.description ?? undefined,
-            sku: data.sku ?? undefined,
             unitPrice: data.unitPrice,
-            unit: data.unit ?? undefined, // Ensure unit is passed
-            manufacturer: data.manufacturer ?? undefined,
-            supplier: data.supplier ?? undefined,
+            unit: data.unit ?? undefined,
             location: data.location ?? undefined,
             notes: data.notes ?? undefined,
-            category: data.category as ProductCategoryType,
+            categoryId: data.categoryId,
         });
     } catch (error) {
         console.error("Create product failed:", error);
-        // Error toast is handled by mutation onError
     }
   }, [createProduct, t, toast]);
 
   const handleUpdateSubmit = useCallback(async (data: ProductSubmitData) => {
     if (selectedProduct) {
-      if (!data.category) {
-        toast.error(t('validation.selectOption', { field: t('productFields.category') }));
-        return;
-      }
       try {
           await updateProduct({
             id: selectedProduct.id,
-            data: {
-              name: data.name,
-              description: data.description ?? undefined,
-              sku: data.sku ?? undefined,
-              unitPrice: data.unitPrice,
-              unit: data.unit ?? undefined, // Ensure unit is passed
-              manufacturer: data.manufacturer ?? undefined,
-              supplier: data.supplier ?? undefined,
-              location: data.location ?? undefined,
-              notes: data.notes ?? undefined,
-              category: data.category as ProductCategoryType,
-            },
+            name: data.name,
+            description: data.description ?? undefined,
+            unitPrice: data.unitPrice,
+            unit: data.unit ?? undefined,
+            location: data.location ?? undefined,
+            notes: data.notes ?? undefined,
+            categoryId: data.categoryId,
           });
       } catch (error) {
           console.error("Update product failed:", error);
-          // Error toast is handled by mutation onError
       }
     }
   }, [updateProduct, selectedProduct, t, toast]);
