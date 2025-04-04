@@ -1,4 +1,4 @@
-**Project Context Document (v8.3 - Further Streamlined)**
+**Project Context Document (v8r Streamlined)**
 
 **Guiding Principle:** Build the **fastest, most reliable** quoting tool imaginable for small construction contractors, ensuring **absolute consistency and correctness** at every step, with **maximal use of the standard UI component library**.
 
@@ -21,7 +21,6 @@
     - **Quotes:**
       - **Creation:** `/admin/quotes/new`
       - **Editing:** `/admin/quotes/[id]/edit`
-      - Uses React Hook Form with `TaskList` and `QuoteSummary` components
     - **Customers:**
       - **Creation:** `/admin/customers/new`
       - **Editing:** `/admin/customers/[id]/edit`
@@ -99,7 +98,7 @@
 
 - **Consistency Above All:** Uniform layout, spacing, typography, colors, interactions across the _entire_ app. Aim for intuitive, error-free experience.
 - **Responsive Design:** Consistent mobile-first implementation using Tailwind modifiers.
-- **List Pages Design:** See `LIST_PAGES_CONCEPT.md` for detailed guidelines on implementing list pages (Quotes, Customers, Products) with hybrid view system, styling principles, and implementation details.
+- **List Pages Design:** See @LIST_PAGES_CONCEPT.md for detailed guidelines on implementing list pages (Quotes, Customers, Products) with hybrid view system, styling principles, and implementation details.
 - **7.1. Defining Strict UI Consistency (Mandatory Rules):**
   - **1. Master Layout:** All `/admin/*` pages **MUST** use `Layout.tsx` with standard `NavBar.tsx` and `SidebarComponent.tsx`.
   - **2. Component Standardization (HeroUI Prioritization):**

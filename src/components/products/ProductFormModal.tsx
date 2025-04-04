@@ -3,15 +3,9 @@
 import React, { useEffect } from 'react';
 import { EntityModal } from '~/components/shared/EntityModal';
 // Remove RouterOutputs import if no longer needed after type change
-// import type { RouterOutputs } from '~/utils/api'; 
+// import type { RouterOutputs } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
-import {
-  Input,
-  Textarea,
-  Select,
-  SelectItem,
-  NumberInput,
-} from '@heroui/react';
+import { Input, Textarea, Select, SelectItem, NumberInput } from '@heroui/react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,31 +13,32 @@ import { api } from '~/utils/api';
 // Import Drizzle schema and helper
 // Remove unused enum import if not needed elsewhere
 // import { products as productsTable, productCategoryEnum } from '~/server/db/schema'; // Removed comment
-import { products as productsTable } from '~/server/db/schema'; 
+import { products as productsTable } from '~/server/db/schema';
 import { type InferSelectModel } from 'drizzle-orm';
 
 // Use InferSelectModel for the Product type
 type Product = InferSelectModel<typeof productsTable>;
 
 // Define Zod Schema for Product Form Validation - Align with backend productInput
-const getProductSchema = () => z.object({
-  // Match backend: name is required
-  name: z.string().min(1, 'Name is required'), 
-  // Match backend: optional strings
-  description: z.string().optional(), 
-  // Use categoryId (UUID string) consistent with DB/Service
-  categoryId: z.string().uuid('Invalid category ID').nullable(), 
-  // Match backend: unitPrice is required, non-negative number
-  unitPrice: z.number().min(0, 'Unit price must be non-negative'), 
-  // Match backend: unit is required string (or nullish converted to empty)
-  unit: z.string().min(1, 'Unit is required').nullish(), 
-  // Match backend: optional strings
-  sku: z.string().optional(), 
-  manufacturer: z.string().optional(),
-  supplier: z.string().optional(), 
-  location: z.string().optional(), 
-  notes: z.string().optional(), 
-});
+const getProductSchema = () =>
+  z.object({
+    // Match backend: name is required
+    name: z.string().min(1, 'Name is required'),
+    // Match backend: optional strings
+    description: z.string().optional(),
+    // Use categoryId (UUID string) consistent with DB/Service
+    categoryId: z.string().uuid('Invalid category ID').nullable(),
+    // Match backend: unitPrice is required, non-negative number
+    unitPrice: z.number().min(0, 'Unit price must be non-negative'),
+    // Match backend: unit is required string (or nullish converted to empty)
+    unit: z.string().min(1, 'Unit is required').nullish(),
+    // Match backend: optional strings
+    sku: z.string().optional(),
+    manufacturer: z.string().optional(),
+    supplier: z.string().optional(),
+    location: z.string().optional(),
+    notes: z.string().optional(),
+  });
 
 // Define the type based on the schema for use in the form
 export type ProductFormData = z.infer<ReturnType<typeof getProductSchema>>;
@@ -74,7 +69,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const productSchema = getProductSchema();
 
   // Fetch categories using the ProductCategory router
-  const { data: categories, isLoading: isLoadingCategories } = api.productCategory.getAll.useQuery();
+  const { data: categories, isLoading: isLoadingCategories } =
+    api.productCategory.getAll.useQuery();
 
   // Initialize React Hook Form
   const {
@@ -105,11 +101,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       return;
     }
     // Submit data (parent page handles actual mutation)
-    await onSubmit({ 
-        ...data, 
-        id: initialData?.id,
-        categoryId: data.categoryId,
-        unit: data.unit ?? '',
+    await onSubmit({
+      ...data,
+      id: initialData?.id,
+      categoryId: data.categoryId,
+      unit: data.unit ?? '',
     });
   };
 
@@ -153,7 +149,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     >
       <form
         onSubmit={handleSubmit(onSubmitRHF)}
-        className="grid grid-cols-1 gap-y-6 gap-x-6 md:grid-cols-2"
+        className="grid grid-cols-1 gap-x-6 gap-y-6 md:grid-cols-2"
       >
         {/* Name Input */}
         <div className="md:col-span-2">
@@ -162,10 +158,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </label>
           <Input
             id="name"
-            {...register('name')} 
+            {...register('name')}
             placeholder={t('productPlaceholders.name')}
             isDisabled={isReadOnly || isSubmitting}
-            isInvalid={!!errors.name} 
+            isInvalid={!!errors.name}
             errorMessage={errors.name?.message} // Display Zod error message
             className="mt-1"
           />
@@ -178,10 +174,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </label>
           <Textarea
             id="description"
-            {...register('description')} 
+            {...register('description')}
             placeholder={t('productPlaceholders.description')}
             isDisabled={isReadOnly || isSubmitting}
-            isInvalid={!!errors.description} 
+            isInvalid={!!errors.description}
             errorMessage={errors.description?.message}
             minRows={3}
             className="mt-1"
@@ -232,14 +228,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 id="unitPrice"
                 value={field.value ?? 0} // Default to 0 if null/undefined
                 onBlur={field.onBlur}
-                onValueChange={field.onChange} 
+                onValueChange={field.onChange}
                 placeholder="0.00"
                 isDisabled={isReadOnly || isSubmitting}
-                isInvalid={!!errors.unitPrice} 
+                isInvalid={!!errors.unitPrice}
                 errorMessage={errors.unitPrice?.message}
                 min={0} // Ensure non-negative
                 step={0.01} // Allow cents
-                formatOptions={{ style: 'decimal', minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                formatOptions={{
+                  style: 'decimal',
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }}
                 className="mt-1"
               />
             )}
@@ -342,7 +342,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             className="mt-1"
           />
         </div>
-
       </form>
     </EntityModal>
   );

@@ -23,6 +23,7 @@ interface NavigationProps {
 
 /**
  * Top navigation bar component with user dropdown and theme toggle
+ * Fully responsive with mobile-optimized menu button
  */
 export function Navigation({ onMenuClick }: NavigationProps) {
   const { t } = useTranslation();
@@ -53,16 +54,31 @@ export function Navigation({ onMenuClick }: NavigationProps) {
   }
 
   return (
-    <Navbar maxWidth="full" position="sticky">
+    <Navbar 
+      maxWidth="full" 
+      position="sticky" 
+      className="border-b border-divider h-16 z-20"
+    >
       {/* Mobile menu button */}
       <NavbarContent className="md:hidden" justify="start">
-        <Button isIconOnly variant="light" onClick={onMenuClick} aria-label={t('common.openMenu')}>
+        <Button 
+          isIconOnly 
+          variant="light" 
+          onClick={onMenuClick} 
+          aria-label={t('common.openMenu')}
+          className="text-default-600"
+        >
           <Menu size={24} />
         </Button>
       </NavbarContent>
 
+      {/* Title for mobile (optional) */}
+      <NavbarContent className="md:hidden" justify="center">
+        <span className="text-foreground font-semibold">TTXD</span>
+      </NavbarContent>
+
       {/* Right side items */}
-      <NavbarContent justify="end">
+      <NavbarContent justify="end" className="gap-2">
         <NavbarItem>
           <LocaleSwitch />
         </NavbarItem>

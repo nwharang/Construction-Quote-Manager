@@ -35,30 +35,31 @@ import {
   Search,
   LayoutGrid,
   LayoutList,
-  Mail,
-  Phone,
-  Calendar,
+  Tag,
+  Package,
+  CircleDollarSign,
   MoreVertical,
   Eye,
   Edit,
   Trash,
+  FileText,
   MapPin,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUIStore } from '~/store/uiStore';
 
 // Use inferred type from the API output for the list items
-type CustomerListItem = RouterOutputs['customer']['getAll']['customers'][number];
+type ProductListItem = RouterOutputs['product']['getAll']['data'][number];
 
-export function CustomersList() {
-  const { t, formatDate } = useTranslation();
+export function ProductsList() {
+  const { t, formatDate, formatCurrency } = useTranslation();
   const toast = useAppToast();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [customerToDelete, setCustomerToDelete] = useState<CustomerListItem | null>(null);
+  const [productToDelete, setProductToDelete] = useState<ProductListItem | null>(null);
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
-  const [viewType, setViewType] = useState<'card' | 'table'>('card'); // Default to card view as per LIST_PAGES_CONCEPT.md
+  const [viewType, setViewType] = useState<'card' | 'table'>('card'); // Default to card view
 
   // Use UI settings from the store
   const { tableSettings, buttonSettings } = useUIStore();
@@ -68,72 +69,72 @@ export function CustomersList() {
   // API Utils for invalidation
   const utils = api.useUtils();
 
-  // Get customers data with search and pagination
-  const { data: customersData, isLoading } = api.customer.getAll.useQuery({
+  // Get products data with search and pagination
+  const { data: productsData, isLoading } = api.product.getAll.useQuery({
     page,
-    limit: pageSize,
-    search: search,
+    pageSize,
+    filter: search,
   });
 
   // --- Delete Mutation ---
-  const { mutate: deleteCustomer, isPending: isDeleting } = api.customer.delete.useMutation({
+  const { mutate: deleteProduct, isPending: isDeleting } = api.product.delete.useMutation({
     onSuccess: () => {
-      utils.customer.getAll.invalidate(); // Invalidate list query
-      toast.success(t('customers.deleteSuccess'));
+      utils.product.getAll.invalidate(); // Invalidate list query
+      toast.success(t('products.deleteSuccess'));
       onDeleteClose();
-      setCustomerToDelete(null);
+      setProductToDelete(null);
     },
     onError: (error) => {
-      toast.error(t('customers.deleteError', { message: error.message }));
+      toast.error(t('products.deleteError', { message: error.message }));
       onDeleteClose();
-      setCustomerToDelete(null);
+      setProductToDelete(null);
     },
   });
 
   // --- Action Handlers ---
-  const handleCreateCustomer = useCallback(() => {
-    router.push('/admin/customers/new');
+  const handleCreateProduct = useCallback(() => {
+    router.push('/admin/products/new');
   }, [router]);
 
   const handleView = useCallback(
-    (customer: CustomerListItem) => {
-      router.push(`/admin/customers/${customer.id}/view`);
+    (product: ProductListItem) => {
+      router.push(`/admin/products/${product.id}/view`);
     },
     [router]
   );
 
   const handleEdit = useCallback(
-    (customer: CustomerListItem) => {
-      router.push(`/admin/customers/${customer.id}/edit`);
+    (product: ProductListItem) => {
+      router.push(`/admin/products/${product.id}/edit`);
     },
     [router]
   );
 
   const handleDeleteRequest = useCallback(
-    (customer: CustomerListItem) => {
-      setCustomerToDelete(customer);
+    (product: ProductListItem) => {
+      setProductToDelete(product);
       onDeleteOpen();
     },
     [onDeleteOpen]
   );
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (customerToDelete) {
+    if (productToDelete) {
       try {
-        await deleteCustomer({ id: customerToDelete.id });
+        await deleteProduct({ id: productToDelete.id });
       } catch (error) {
         // Error handled by onError mutation handler
-        console.error('Delete customer failed:', error);
+        console.error('Delete product failed:', error);
       }
     }
-  }, [deleteCustomer, customerToDelete]);
+  }, [deleteProduct, productToDelete]);
 
   // Column definitions
   const columns = useMemo(
     () => [
-      { uid: 'name', name: t('customers.list.name') },
-      { uid: 'email', name: t('customers.list.email'), hideOnMobile: true },
-      { uid: 'phone', name: t('customers.list.phone'), hideOnMobile: true },
+      { uid: 'name', name: t('products.list.name') },
+      { uid: 'category', name: t('products.list.category'), hideOnMobile: true },
+      { uid: 'unitPrice', name: t('products.list.price'), hideOnMobile: false },
       { uid: 'createdAt', name: t('customers.list.created'), hideOnMobile: true },
       { uid: 'actions', name: t('common.actions') },
     ],
@@ -152,31 +153,25 @@ export function CustomersList() {
 
   // Render cell content
   const renderCell = useCallback(
-    (customer: CustomerListItem, columnKey: React.Key) => {
+    (product: ProductListItem, columnKey: React.Key) => {
       switch (columnKey) {
         case 'name':
           return (
             <div className="flex flex-col">
-              <p className="text-foreground font-medium">{customer.name}</p>
-              {customer.address && (
+              <p className="text-foreground font-medium">{product.name}</p>
+              {product.description && (
                 <p className="text-default-500 max-w-[200px] truncate text-xs">
-                  {customer.address}
+                  {product.description}
                 </p>
               )}
             </div>
           );
-        case 'email':
-          return customer.email ? (
-            <Tooltip content={customer.email}>
-              <span className="inline-block max-w-[150px] truncate">{customer.email}</span>
-            </Tooltip>
-          ) : (
-            '-'
-          );
-        case 'phone':
-          return customer.phone || '-';
+        case 'category':
+          return product.categoryName || '-';
+        case 'unitPrice':
+          return formatCurrency(Number(product.unitPrice));
         case 'createdAt':
-          return customer.createdAt ? formatDate(customer.createdAt, 'short') : '-';
+          return product.createdAt ? formatDate(product.createdAt, 'short') : '-';
         case 'actions':
           return (
             <div className="flex justify-end">
@@ -186,18 +181,18 @@ export function CustomersList() {
                     <MoreVertical size={16} />
                   </Button>
                 </DropdownTrigger>
-                <DropdownMenu aria-label="Customer actions">
+                <DropdownMenu aria-label="Product actions">
                   <DropdownItem
                     key="view"
                     startContent={<Eye size={16} />}
-                    onPress={() => handleView(customer)}
+                    onPress={() => handleView(product)}
                   >
                     {t('common.view')}
                   </DropdownItem>
                   <DropdownItem
                     key="edit"
                     startContent={<Edit size={16} />}
-                    onPress={() => handleEdit(customer)}
+                    onPress={() => handleEdit(product)}
                   >
                     {t('common.edit')}
                   </DropdownItem>
@@ -206,7 +201,7 @@ export function CustomersList() {
                     startContent={<Trash size={16} />}
                     className="text-danger"
                     color="danger"
-                    onPress={() => handleDeleteRequest(customer)}
+                    onPress={() => handleDeleteRequest(product)}
                   >
                     {t('common.delete')}
                   </DropdownItem>
@@ -215,22 +210,22 @@ export function CustomersList() {
             </div>
           );
         default:
-          return String(customer[columnKey as keyof CustomerListItem] || '-');
+          return String(product[columnKey as keyof ProductListItem] || '-');
       }
     },
-    [handleView, handleEdit, handleDeleteRequest, t, formatDate]
+    [handleView, handleEdit, handleDeleteRequest, t, formatDate, formatCurrency]
   );
 
-  // Render the card view for a customer
-  const renderCustomerCard = useCallback(
-    (customer: CustomerListItem) => (
+  // Render the card view for a product
+  const renderProductCard = useCallback(
+    (product: ProductListItem) => (
       <Card
-        key={customer.id}
+        key={product.id}
         shadow="sm"
         radius="lg"
         isHoverable
         isPressable
-        onPress={() => handleView(customer)}
+        onPress={() => handleView(product)}
         classNames={{
           base: 'overflow-hidden',
           body: 'p-0',
@@ -238,9 +233,9 @@ export function CustomersList() {
       >
         {/* Card Header */}
         <CardHeader className="flex flex-col items-start p-4 pb-3">
-          <h3 className="text-lg font-semibold">{customer.name}</h3>
+          <h3 className="text-lg font-semibold">{product.name}</h3>
           <p className="text-default-400 mt-1 text-[11px]">
-            {customer.createdAt ? formatDate(customer.createdAt, 'short') : '-'}
+            {product.createdAt ? formatDate(product.createdAt, 'short') : '-'}
           </p>
         </CardHeader>
 
@@ -248,44 +243,51 @@ export function CustomersList() {
 
         <CardBody className="p-4">
           <div className="flex flex-col gap-4">
-            {/* Always show address field */}
+            {/* Category field */}
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <MapPin size={14} className="text-primary" />
+                <Tag size={14} className="text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-default-400 text-xs">{t('customers.contact')}</p>
-                <p className="text-sm">{customer.address || '-'}</p>
+                <p className="text-default-400 text-xs">{t('productFields.category')}</p>
+                <p className="text-sm">{product.categoryName || '-'}</p>
               </div>
             </div>
 
-            {/* Always show email field */}
+            {/* Price field */}
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <Mail size={14} className="text-primary" />
+                <CircleDollarSign size={14} className="text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-default-400 text-xs">{t('customers.list.email')}</p>
-                {customer.email ? (
-                  <Tooltip content={customer.email}>
-                    <p className="truncate text-sm">{customer.email}</p>
-                  </Tooltip>
-                ) : (
-                  <p className="text-default-400 text-sm">-</p>
-                )}
+                <p className="text-default-400 text-xs">{t('productFields.unitPrice')}</p>
+                <p className="text-sm font-medium">{formatCurrency(Number(product.unitPrice))}</p>
               </div>
             </div>
 
-            {/* Always show phone field */}
+            {/* Unit/SKU field */}
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <Phone size={14} className="text-primary" />
+                <Package size={14} className="text-primary" />
               </div>
               <div className="flex-1">
-                <p className="text-default-400 text-xs">{t('customers.list.phone')}</p>
-                <p className="text-sm">{customer.phone || '-'}</p>
+                <p className="text-default-400 text-xs">{t('productFields.unit')}</p>
+                <p className="text-sm">{product.unit || '-'}</p>
               </div>
             </div>
+
+            {/* Location field */}
+            {product.location && (
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full">
+                  <MapPin size={14} className="text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-default-400 text-xs">{t('productFields.location')}</p>
+                  <p className="text-sm">{product.location}</p>
+                </div>
+              </div>
+            )}
           </div>
         </CardBody>
 
@@ -298,7 +300,7 @@ export function CustomersList() {
             color="primary"
             variant="flat"
             startContent={<Eye size={16} />}
-            onPress={() => handleView(customer)}
+            onPress={() => handleView(product)}
             className="flex-1"
           >
             {t('common.view')}
@@ -308,7 +310,7 @@ export function CustomersList() {
             color="default"
             variant="flat"
             startContent={<Edit size={16} />}
-            onPress={() => handleEdit(customer)}
+            onPress={() => handleEdit(product)}
             className="flex-1"
           >
             {t('common.edit')}
@@ -318,7 +320,7 @@ export function CustomersList() {
             color="danger"
             variant="flat"
             startContent={<Trash size={16} />}
-            onPress={() => handleDeleteRequest(customer)}
+            onPress={() => handleDeleteRequest(product)}
             className="flex-1"
           >
             {t('common.delete')}
@@ -326,20 +328,20 @@ export function CustomersList() {
         </div>
       </Card>
     ),
-    [handleView, handleEdit, handleDeleteRequest, t, formatDate]
+    [handleView, handleEdit, handleDeleteRequest, t, formatDate, formatCurrency]
   );
 
   // Render empty state
   const renderEmptyState = useCallback(
     () => (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-default-500 mb-4 text-lg">{t('common.noResults')}</p>
-        <Button color="primary" startContent={<Plus size={16} />} onPress={handleCreateCustomer}>
+        <p className="text-default-500 mb-4 text-lg">{t('products.noProductsFound')}</p>
+        <Button color="primary" startContent={<Plus size={16} />} onPress={handleCreateProduct}>
           {t('common.new')}
         </Button>
       </div>
     ),
-    [t, handleCreateCustomer]
+    [t, handleCreateProduct]
   );
 
   // Render loading state
@@ -387,11 +389,10 @@ export function CustomersList() {
 
           {/* Search Input */}
           <Input
-            placeholder={t('customers.list.searchPlaceholder')}
+            placeholder={t('products.searchPlaceholder')}
             value={search}
             onValueChange={setSearch}
             startContent={<Search size={16} className="text-default-300" />}
-            size={buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'}
             className="w-full flex-1 sm:w-auto sm:max-w-md"
           />
         </div>
@@ -401,7 +402,7 @@ export function CustomersList() {
           <Button
             color="primary"
             startContent={<Plus size={16} />}
-            onPress={handleCreateCustomer}
+            onPress={handleCreateProduct}
             size={buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'}
             className="w-fit sm:w-auto"
           >
@@ -414,18 +415,18 @@ export function CustomersList() {
       <CardBody>
         {isLoading ? (
           renderLoadingState()
-        ) : (customersData?.customers?.length ?? 0) === 0 ? (
+        ) : (productsData?.data?.length ?? 0) === 0 ? (
           renderEmptyState()
         ) : viewType === 'card' ? (
           // Card View
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {customersData?.customers.map(renderCustomerCard)}
+            {productsData?.data.map(renderProductCard)}
           </div>
         ) : (
           // Table View - responsive with horizontal scroll on small screens
           <div className="-mx-4 overflow-x-auto sm:mx-0">
             <Table
-              aria-label="Customers table"
+              aria-label="Products table"
               isStriped={tableSettings.stripedRows}
               isHeaderSticky
               classNames={{
@@ -438,10 +439,7 @@ export function CustomersList() {
                   <TableColumn key={column.uid}>{column.name}</TableColumn>
                 ))}
               </TableHeader>
-              <TableBody
-                items={customersData?.customers ?? []}
-                emptyContent={t('common.noResults')}
-              >
+              <TableBody items={productsData?.data ?? []} emptyContent={t('common.noResults')}>
                 {(item) => (
                   <TableRow key={item.id} className="hover:bg-default-50">
                     {visibleColumns.map((column) => (
@@ -455,11 +453,11 @@ export function CustomersList() {
         )}
 
         {/* Pagination */}
-        {(customersData?.total ?? 0) > pageSize && (
+        {(productsData?.totalCount ?? 0) > pageSize && (
           <div className="mt-6 flex justify-center">
             <Pagination
               page={page}
-              total={Math.ceil((customersData?.total ?? 0) / pageSize)}
+              total={Math.ceil((productsData?.totalCount ?? 0) / pageSize)}
               onChange={setPage}
               size={
                 buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'
@@ -479,8 +477,8 @@ export function CustomersList() {
         onClose={onDeleteClose}
         onConfirm={handleDeleteConfirm}
         isLoading={isDeleting}
-        entityName={t('customers.entityName')}
-        entityLabel={customerToDelete?.name ?? ''}
+        entityName={t('products.entityName')}
+        entityLabel={productToDelete?.name ?? ''}
       />
     </Card>
   );
