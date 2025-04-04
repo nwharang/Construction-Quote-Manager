@@ -3,6 +3,7 @@ import { Card, CardHeader, CardBody, Chip, Button } from '@heroui/react';
 import { FileText, Plus } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useRouter } from 'next/router';
+import { routes } from '~/config/routes';
 import type { RouterOutputs } from '~/utils/api';
 
 type Quote = RouterOutputs['quote']['getAll']['items'][number];
@@ -16,7 +17,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ quotes }) => {
   const { formatCurrency } = useTranslation();
 
   const goToNewQuote = () => {
-    router.push('/admin/quotes/new');
+    router.push(routes.admin.quotes.new);
   };
 
   // Render the status chip for a quote
@@ -53,7 +54,7 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ quotes }) => {
               <div
                 key={quote.id}
                 className="hover:bg-muted/10 flex cursor-pointer items-center justify-between rounded-md px-3 py-2 transition-colors"
-                onClick={() => router.push(`/admin/quotes/${quote.id}`)}
+                onClick={() => router.push(routes.admin.quotes.detail(quote.id))}
               >
                 <div className="flex items-center space-x-4">
                   <div className="flex-shrink-0">

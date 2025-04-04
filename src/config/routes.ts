@@ -18,13 +18,19 @@ export const routes = {
        * @param id Quote ID
        * @returns Quote detail URL
        */
-      detail: (id: string) => `/admin/quotes/${id}`,
+      detail: (id: string) => `/admin/quotes/${id}/view`,
       /**
        * Generate a route to edit a specific quote
        * @param id Quote ID
        * @returns Quote edit URL
        */
       edit: (id: string) => `/admin/quotes/${id}/edit`,
+      /**
+       * Generate a route to print a specific quote
+       * @param id Quote ID
+       * @returns Quote print URL
+       */
+      print: (id: string) => `/admin/quotes/${id}/print`,
     },
     products: {
       list: '/admin/products',

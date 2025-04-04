@@ -6,6 +6,7 @@ import { FileText, ArrowRight, CheckCircle2, Users } from 'lucide-react';
 import { api } from '~/utils/api';
 import type { RouterOutputs } from '~/utils/api';
 import { useTrpcErrorHandling } from '~/hooks/useTrpcWithErrorHandling';
+import { routes } from '~/config/routes';
 
 type Quote = RouterOutputs['quote']['getAll']['items'][number];
 
@@ -163,7 +164,7 @@ export default function Home() {
                       <Button
                         isIconOnly
                         variant="light"
-                        onPress={() => router.push(`/admin/quotes/${quote.id}`)}
+                        onPress={() => router.push(routes.admin.quotes.detail(quote.id))}
                       >
                         <ArrowRight size={20} />
                       </Button>

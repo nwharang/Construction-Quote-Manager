@@ -78,7 +78,6 @@ const SignUp: NextPage = () => {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        role: formData.role,
       });
     } catch {
       setError(t('auth.signUp.errorUnexpected'));

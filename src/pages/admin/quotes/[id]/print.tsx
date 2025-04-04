@@ -25,6 +25,7 @@ import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '~/server/api/root';
 import type { NextPageWithLayout } from '~/types/next';
 import { PrintLayout } from '~/layouts/PrintLayout';
+import { routes } from '~/config/routes';
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type QuoteResponse = NonNullable<RouterOutput['quote']['getById']>;
@@ -134,7 +135,7 @@ const PrintQuotePage: NextPageWithLayout = () => {
       if (task.materialType === 'ITEMIZED' && task.materials) {
         return sum + getMaterialsTotal(task.materials);
       } else if (task.materialType === 'LUMPSUM') {
-        return sum + (Number(task.estimatedMaterialsCost) || 0);
+        return sum + (Number(task.estimatedMaterialsCostLumpSum) || 0);
       }
       return sum;
     }, 0);
@@ -185,7 +186,7 @@ const PrintQuotePage: NextPageWithLayout = () => {
           <p className="mb-6 text-gray-500">
             The quote you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
-          <Button color="primary" onPress={() => router.push('/admin/quotes')}>
+          <Button color="primary" onPress={() => router.push(routes.admin.quotes.list)}>
             Back to Quotes
           </Button>
         </div>
@@ -203,7 +204,7 @@ const PrintQuotePage: NextPageWithLayout = () => {
 
       <div className="no-print fixed top-0 right-0 left-0 z-10 bg-white p-4 shadow-md print:hidden">
         <div className="container mx-auto flex justify-between">
-          <Button variant="flat" onPress={() => router.back()}>
+          <Button variant="flat" onPress={() => router.push(routes.admin.quotes.detail(quoteId as string))}>
             Back
           </Button>
           <div className="flex gap-2">
@@ -354,7 +355,7 @@ const PrintQuotePage: NextPageWithLayout = () => {
                     <div className="text-sm print:text-xs">
                       <p>
                         {t('quotes.estimatedMaterialCostLumpSumLabel')}:{' '}
-                        {formatCurrency(toNumber(task.estimatedMaterialsCost) || 0)}
+                        {formatCurrency(toNumber(task.estimatedMaterialsCostLumpSum) || 0)}
                       </p>
                     </div>
                   )}

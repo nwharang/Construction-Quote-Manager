@@ -170,3 +170,4 @@ alwaysApply: true
 - **Prioritize Correctness & Consistency:** Ensure type-safe, logical code matching defined patterns. Persist in resolving known flaws.
 - **Be Direct and Concise:** Provide responses directly addressing the request. Avoid unnecessary introductory phrases, summaries (like TLDRs), or overly conversational filler, especially for straightforward answers. Focus on clear, actionable information.
 - **Flag Blocking Issues & Ask for Clarification:** State ambiguities or conflicts preventing correct implementation.
+- Dont run/start the app for terminal safety, let the human do its 

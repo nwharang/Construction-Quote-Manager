@@ -20,17 +20,12 @@ import { ExternalLink, FileText } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { api } from '~/utils/api';
 import { getStatusColor } from '~/utils/statusColors';
+import { routes } from '~/config/routes';
 import type { QuoteStatusType } from '~/server/db/schema';
+import type { RouterOutputs } from '~/utils/api';
 
-// Define a Quote interface for the component
-interface Quote {
-  id: string;
-  sequentialId: number;
-  title: string;
-  createdAt: string;
-  status: QuoteStatusType;
-  grandTotal: number;
-}
+// Use the actual type from the API response
+type QuoteItem = RouterOutputs['quote']['getAll']['items'][number];
 
 interface CustomerQuotesProps {
   customerId: string;
@@ -38,11 +33,11 @@ interface CustomerQuotesProps {
 
 export const CustomerQuotes: React.FC<CustomerQuotesProps> = ({ customerId }) => {
   const router = useRouter();
-  const { t, formatCurrency, formatDate } = useTranslation();
+  const { t, formatDate, formatCurrency } = useTranslation();
 
-  // Fetch quotes for this customer
+  // Fetch quotes for the customer
   const { data: quotesData, isLoading } = api.quote.getAll.useQuery(
-    { 
+    {
       customerId,
       limit: 10,
       page: 1
@@ -53,8 +48,9 @@ export const CustomerQuotes: React.FC<CustomerQuotesProps> = ({ customerId }) =>
     }
   );
 
+  // Navigate to the quote detail page
   const navigateToQuote = (quoteId: string) => {
-    router.push(`/admin/quotes/${quoteId}`);
+    router.push(routes.admin.quotes.detail(quoteId));
   };
 
   return (
@@ -65,7 +61,7 @@ export const CustomerQuotes: React.FC<CustomerQuotesProps> = ({ customerId }) =>
           color="primary"
           variant="light"
           startContent={<FileText size={16} />}
-          onPress={() => router.push(`/admin/quotes/new?customerId=${customerId}`)}
+          onPress={() => router.push(`${routes.admin.quotes.new}?customerId=${customerId}`)}
         >
           Create Quote
         </Button>
@@ -122,7 +118,7 @@ export const CustomerQuotes: React.FC<CustomerQuotesProps> = ({ customerId }) =>
             <Button
               color="primary"
               startContent={<FileText size={16} />}
-              onPress={() => router.push(`/admin/quotes/new?customerId=${customerId}`)}
+              onPress={() => router.push(`${routes.admin.quotes.new}?customerId=${customerId}`)}
             >
               Create First Quote
             </Button>

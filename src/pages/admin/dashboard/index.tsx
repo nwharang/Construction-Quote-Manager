@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   AlertCircle,
   DollarSign,
+  ArrowRight,
+  Plus,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody, Chip, Spinner, Button, Alert } from '@heroui/react';
 import { api } from '~/utils/api';
@@ -19,6 +21,7 @@ import { useCallback, useEffect } from 'react';
 import type { TRPCClientErrorLike } from '@trpc/client';
 import type { AppRouter } from '~/server/api/root';
 import { withMainLayout } from '~/utils/withAuth';
+import { routes } from '~/config/routes';
 
 // Types
 interface StatCardProps {
@@ -102,12 +105,33 @@ const DashboardPage: NextPage = () => {
   const stats = statsData || {
     totalCustomers: 0,
     totalQuotes: 0,
-    totalProducts: 0,
+    acceptedQuotes: 0,
     totalRevenue: 0,
+    recentQuotes: [],
+    topCustomers: [],
+    // Add missing properties for the UI that don't exist in the API response type
     customerGrowth: 0,
     quoteGrowth: 0,
+    totalProducts: 0,
     productGrowth: 0,
     revenueGrowth: 0,
+  };
+
+  // Type guard to check if the stats object has the growth properties
+  const hasGrowthStats = (obj: typeof stats): obj is typeof stats & {
+    customerGrowth: number;
+    quoteGrowth: number;
+    totalProducts: number;
+    productGrowth: number;
+    revenueGrowth: number;
+  } => {
+    return (
+      'customerGrowth' in obj &&
+      'quoteGrowth' in obj &&
+      'totalProducts' in obj &&
+      'productGrowth' in obj &&
+      'revenueGrowth' in obj
+    );
   };
 
   // Safely extract quotes from the response
@@ -144,21 +168,21 @@ const DashboardPage: NextPage = () => {
       title: 'Create Quote',
       description: 'Start a new quote for a customer',
       icon: <FileText className="text-primary h-5 w-5" />,
-      action: () => router.push('/admin/quotes/new'),
+      action: () => router.push(routes.admin.quotes.new),
       actionLabel: 'Create',
     },
     {
       title: 'Add Customer',
       description: 'Add a new customer to the system',
       icon: <Users className="text-primary h-5 w-5" />,
-      action: () => router.push('/admin/customers/new'),
+      action: () => router.push(routes.admin.customers.new),
       actionLabel: 'Add',
     },
     {
       title: 'Add Product',
       description: 'Add a new product to your catalog',
       icon: <Package className="text-primary h-5 w-5" />,
-      action: () => router.push('/admin/products/new'),
+      action: () => router.push(routes.admin.products.new),
       actionLabel: 'Add',
     },
   ];
@@ -280,7 +304,7 @@ const DashboardPage: NextPage = () => {
                 title="Total Customers"
                 value={stats.totalCustomers}
                 icon={<Users className="text-muted-foreground h-4 w-4" />}
-                change={stats.customerGrowth}
+                change={hasGrowthStats(stats) ? stats.customerGrowth : undefined}
                 loading={isStatsLoading}
                 error={!!statsError}
               />
@@ -288,15 +312,15 @@ const DashboardPage: NextPage = () => {
                 title="Total Quotes"
                 value={stats.totalQuotes}
                 icon={<FileText className="text-muted-foreground h-4 w-4" />}
-                change={stats.quoteGrowth}
+                change={hasGrowthStats(stats) ? stats.quoteGrowth : undefined}
                 loading={isStatsLoading}
                 error={!!statsError}
               />
               <StatCard
                 title="Total Products"
-                value={stats.totalProducts}
+                value={hasGrowthStats(stats) ? stats.totalProducts : 0}
                 icon={<Package className="text-muted-foreground h-4 w-4" />}
-                change={stats.productGrowth}
+                change={hasGrowthStats(stats) ? stats.productGrowth : undefined}
                 loading={isStatsLoading}
                 error={!!statsError}
               />
@@ -304,7 +328,7 @@ const DashboardPage: NextPage = () => {
                 title="Total Revenue"
                 value={formatCurrency(stats.totalRevenue)}
                 icon={<DollarSign className="text-muted-foreground h-4 w-4" />}
-                change={stats.revenueGrowth}
+                change={hasGrowthStats(stats) ? stats.revenueGrowth : undefined}
                 loading={isStatsLoading}
                 error={!!statsError}
               />
@@ -330,12 +354,13 @@ const DashboardPage: NextPage = () => {
               <div className="flex justify-between">
                 <h3 className="text-lg font-medium">Latest Quotes</h3>
                 <Button
-                  size="sm"
-                  variant="flat"
+                  variant="light"
                   color="primary"
-                  onPress={() => router.push('/admin/quotes')}
+                  endContent={<ArrowRight className="h-4 w-4" />}
+                  size="sm"
+                  onPress={() => router.push(routes.admin.quotes.list)}
                 >
-                  View All
+                  View all quotes
                 </Button>
               </div>
             </CardHeader>
@@ -349,11 +374,12 @@ const DashboardPage: NextPage = () => {
                   <FileText className="text-primary h-8 w-8 opacity-50" />
                   <p className="text-muted-foreground">No quotes yet</p>
                   <Button
-                    size="sm"
                     color="primary"
-                    onPress={() => router.push('/admin/quotes/new')}
+                    startContent={<Plus className="h-4 w-4" />}
+                    onPress={() => router.push(routes.admin.quotes.new)}
+                    size="sm"
                   >
-                    Create Your First Quote
+                    New Quote
                   </Button>
                 </div>
               ) : (
@@ -386,7 +412,7 @@ const DashboardPage: NextPage = () => {
                         <tr
                           key={quote.id}
                           className="hover:bg-default-100 cursor-pointer"
-                          onClick={() => router.push(`/admin/quotes/${quote.id}`)}
+                          onClick={() => router.push(routes.admin.quotes.detail(quote.id))}
                         >
                           <td className="px-4 py-3 text-sm whitespace-nowrap">
                             #{quote.sequentialId}
