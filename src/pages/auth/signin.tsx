@@ -3,7 +3,6 @@ import { type NextPage } from 'next';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { api } from '~/utils/api';
 import { routes } from '~/config/routes';
 import { Card, CardBody, CardHeader, Input, Button, Link, CardFooter } from '@heroui/react';
 import { withAuthLayout } from '~/utils/withAuth';
@@ -18,28 +17,6 @@ const SignIn: NextPage = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // tRPC mutation for login
-  const { mutate: login } = api.auth.login.useMutation({
-    onSuccess: async () => {
-      const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError(t('auth.signIn.errorInvalidCredentials'));
-        setIsLoading(false);
-      } else {
-        await router.push(routes.admin.dashboard);
-      }
-    },
-    onError: (error) => {
-      setError(error.message || t('auth.signIn.errorUnexpected'));
-      setIsLoading(false);
-    },
-  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -61,11 +38,19 @@ const SignIn: NextPage = () => {
     setIsLoading(true);
 
     try {
-      login({
+      const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
+        redirect: false,
       });
-    } catch {
+
+      if (result?.error) {
+        setError(t('auth.signIn.errorInvalidCredentials'));
+        setIsLoading(false);
+      } else {
+        await router.push(routes.admin.dashboard);
+      }
+    } catch (error) {
       setError(t('auth.signIn.errorUnexpected'));
       setIsLoading(false);
     }
