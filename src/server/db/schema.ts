@@ -71,8 +71,8 @@ export const users = pgTable('users', {
   username: text('username').unique(),
   hashedPassword: text('hashed_password'),
   image: text('image'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
   emailVerified: timestamp('email_verified'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

@@ -1,2 +1,157 @@
 @import 'tailwindcss';
 @config "../../tailwind.config.js";
+
+/* Prevent content jumps during scrolling */
+html {
+  overflow-y: scroll;
+}
+
+/* Optimize scrolling performance */
+body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
+  touch-action: manipulation; /* Disable double-tap to zoom */
+  -webkit-tap-highlight-color: rgba(0,0,0,0); /* Remove tap highlight on iOS */
+}
+
+/* Force hardware acceleration for smoother rendering */
+.select-container, 
+.dropdown-content,
+.product-selector {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Ensure dropdowns appear above other content */
+.select-popover {
+  z-index: 9999 !important;
+}
+
+/* Fix stacking context for dropdown containers */
+.select-wrapper {
+  isolation: isolate;
+  position: relative;
+}
+
+/* Improved radio buttons for mobile */
+[role="radio"] {
+  padding: 12px !important;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(var(--color-gray-300), 0.8);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+[role="radio"][data-selected=true] {
+  background-color: rgba(var(--color-primary-500), 0.1);
+  border-color: rgb(var(--color-primary-500));
+}
+
+[role="radio"][data-selected=true]::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: rgb(var(--color-primary-500));
+}
+
+/* Dark mode support */
+.dark [role="radio"] {
+  border-color: rgba(var(--color-gray-600), 0.8);
+}
+
+.dark [role="radio"][data-selected=true] {
+  background-color: rgba(var(--color-primary-400), 0.2);
+  border-color: rgb(var(--color-primary-400));
+}
+
+.dark [role="radio"][data-selected=true]::after {
+  background-color: rgb(var(--color-primary-400));
+}
+
+/* Extra small screen optimization (iPhone 5 size) */
+@media (max-width: 320px) {
+  .flex-col-xxs {
+    flex-direction: column !important;
+  }
+  
+  .w-full-xxs {
+    width: 100% !important;
+  }
+  
+  .mt-4-xxs {
+    margin-top: 1rem !important;
+  }
+  
+  /* Condense font sizes on tiny screens */
+  h5, .text-base {
+    font-size: 0.875rem !important;
+  }
+  
+  /* Stack adjacent inputs on tiny screens */
+  .flex-row > div {
+    width: 100% !important;
+    margin-top: 0.5rem;
+  }
+  
+  .flex-row > div:first-child {
+    margin-top: 0;
+  }
+}
+
+/* Mobile specific enhancements */
+@media (max-width: 768px) {
+  /* Make buttons and inputs more touch-friendly */
+  button, 
+  [role="button"],
+  input,
+  select,
+  .select-trigger {
+    min-height: 44px; /* Apple's recommended minimum size */
+    font-size: 16px !important; /* Prevent iOS zoom on focus */
+  }
+  
+  /* Increase spacing between interactive elements */
+  .form-field {
+    margin-bottom: 20px;
+  }
+
+  /* Add more padding to selectable items */
+  [role="option"],
+  .select-item {
+    padding: 12px !important;
+  }
+  
+  /* Make radio buttons even more tappable on mobile */
+  [role="radio"] {
+    padding: 16px !important;
+    display: block;
+    width: 100%;
+  }
+
+  /* Fix iOS quirks */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+
+  /* Ensure there's extra space at bottom for scrolling past fixed elements */
+  .content-with-fixed-bottom {
+    padding-bottom: 70px;
+  }
+}
+
+/* Feedback for interactive elements */
+@media (hover: hover) {
+  /* Only apply hover effects on devices that support hover */
+  button:hover, [role="button"]:hover {
+    opacity: 0.9;
+  }
+}

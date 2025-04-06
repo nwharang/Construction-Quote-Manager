@@ -1,7 +1,7 @@
 import type { TranslationKey } from '~/types/i18n/keys';
 
 const viTranslations: Partial<Record<TranslationKey, string>> = {
-  appName: 'Công cụ Báo giá VIP PRO',
+  appName: 'Quote Tool Deluxe',
   'auth.login': 'Đăng nhập',
   'auth.signIn.emailLabel': 'Email',
   'auth.signIn.errorInvalidCredentials': 'Email hoặc mật khẩu không hợp lệ.',
@@ -85,7 +85,7 @@ const viTranslations: Partial<Record<TranslationKey, string>> = {
   'customers.updateSuccess': 'Đã cập nhật khách hàng thành công',
   'errors.requiredFieldsMissing': 'Vui lòng điền đầy đủ các trường bắt buộc.',
   'footer.allRightsReserved': 'Bản quyền đã được đăng ký.',
-  'footer.copyright': '© {year} Công cụ Báo giá VIP PRO.',
+  'footer.copyright': '© {{year}} Công cụ Báo giá VIP PRO.',
   'nav.customers': 'Khách hàng',
   'nav.dashboard': 'Bảng điều khiển',
   'nav.products': 'Sản phẩm',
@@ -255,6 +255,10 @@ const viTranslations: Partial<Record<TranslationKey, string>> = {
   'validation.minValue': 'Giá trị phải ít nhất là {min}.',
   'validation.required': 'Trường này là bắt buộc.',
   'validation.selectOption': 'Vui lòng chọn một tùy chọn.',
+  'common.moveUp': 'Di chuyển lên',
+  'common.moveDown': 'Di chuyển xuống',
+  'quotes.confirmDeleteMaterial': 'Bạn có chắc chắn muốn xóa vật liệu này?',
+  'quotes.confirmDeleteTask': 'Bạn có chắc chắn muốn xóa nhiệm vụ này?',
 };
 
 export default viTranslations;

@@ -293,16 +293,16 @@ export default function SettingsPage() {
         </title>
       </Head>
 
-      <div className="mx-auto max-w-4xl p-4 md:p-6">
+      <div className="mx-auto max-w-4xl md:p-6">
         <h1 className="mb-6 text-2xl font-semibold">{t('settings.title')}</h1>
 
-        <Tabs aria-label="Settings Tabs" variant="underlined" classNames={{ panel: 'p-4 mt-4' }}>
+        <Tabs aria-label="Settings Tabs" variant="solid" classNames={{ panel: 'py-4 mt-4' }}>
           <Tab
             key="general"
             title={
               <div className="flex items-center space-x-2">
                 <SettingsIcon className="mr-2 h-4 w-4" />
-                <span>{t('settings.general')}</span>
+                <span className="hidden sm:block">{t('settings.general')}</span>
               </div>
             }
           >
@@ -422,7 +422,7 @@ export default function SettingsPage() {
             title={
               <div className="flex items-center space-x-2">
                 <Palette className="mr-2 h-4 w-4" />
-                <span>{t('settings.appearance')}</span>
+                <span className="hidden sm:block">{t('settings.appearance')}</span>
               </div>
             }
           >
@@ -581,7 +581,7 @@ export default function SettingsPage() {
             title={
               <div className="flex items-center space-x-2">
                 <Bell className="mr-2 h-4 w-4" />
-                <span>{t('settings.notifications')}</span>
+                <span className="hidden sm:block">{t('settings.notifications')}</span>
               </div>
             }
           >

@@ -40,6 +40,8 @@ export type TranslationKey =
   | 'auth.signIn.submitButton'
   | 'auth.signIn.subtitle'
   | 'auth.signIn.title'
+  | 'auth.signIn.errorUserNotFound'
+  | 'auth.signIn.errorIncorrectPassword'
   | 'auth.signUp.confirmPasswordLabel'
   | 'auth.signUp.emailLabel'
   | 'auth.signUp.errorPasswordsDoNotMatch'
@@ -233,6 +235,19 @@ export type TranslationKey =
   | 'quotes.validation.titleRequired' // Params: { field: string }
   | 'quotes.validation.customerRequired' // Params: { field: string }
   | 'quotes.viewModalTitle'
+  | 'quotes.materials.title'
+  | 'quotes.materials.selectProduct'
+  | 'quotes.materials.quantity'
+  | 'quotes.materials.unitPrice'
+  | 'quotes.materials.noItems'
+  | 'quotes.materials.addNew'
+  | 'quotes.tasks.description'
+  | 'quotes.tasks.descriptionPlaceholder'
+  | 'quotes.tasks.price'
+  | 'quotes.tasks.addNew'
+  | 'quotes.validation.titleRequired' // Params: { field: string }
+  | 'quotes.validation.customerRequired' // Params: { field: string }
+  | 'quotes.viewModalTitle'
   | 'settings.appearance'
   | 'settings.changeTheme'
   | 'settings.changeThemeTitle' // Params: { theme: string }
@@ -281,7 +296,11 @@ export type TranslationKey =
   | 'validation.selectOption'
   | 'validation.minValue' // Params: { min: number }
   | 'quotes.materialProductLabel'
-  | 'quotes.materialProductPlaceholder';
+  | 'quotes.materialProductPlaceholder'
+  | 'common.moveUp'
+  | 'common.moveDown'
+  | 'quotes.confirmDeleteMaterial'
+  | 'quotes.confirmDeleteTask';
 
 // --- Conditional Mapping Type --- //
 

@@ -5,15 +5,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { api } from '~/utils/api';
 import { routes } from '~/config/routes';
-import { Card, CardBody, CardHeader, Input, Button, Link, CardFooter } from '@heroui/react';
+import { Card, CardBody, CardHeader, Input, Button, Link, CardFooter, Alert } from '@heroui/react';
 import { withAuthLayout } from '~/utils/withAuth';
 import { useTranslation } from '~/hooks/useTranslation';
+import { AlertTriangle } from 'lucide-react';
+import { useI18n } from '~/hooks/useI18n';
 
 type UserRole = 'contractor' | 'subcontractor' | 'supplier' | 'other';
 
 const SignUp: NextPage = () => {
   const { t } = useTranslation();
   const router = useRouter();
+  const { currentLocale } = useI18n();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,7 +26,7 @@ const SignUp: NextPage = () => {
     acceptTerms: false,
     receiveUpdates: false,
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // tRPC mutation for registration
@@ -38,8 +41,11 @@ const SignUp: NextPage = () => {
       if (result?.error) {
         setError(t('auth.signUp.errorSignInFailed'));
         setIsLoading(false);
-      } else {
+      } else if (result?.ok) {
         await router.push(routes.admin.dashboard);
+      } else {
+        setError(t('auth.signUp.errorSignInFailed'));
+        setIsLoading(false);
       }
     },
     onError: (error) => {
@@ -54,11 +60,12 @@ const SignUp: NextPage = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
 
     if (formData.password !== formData.confirmPassword) {
       setError(t('auth.signUp.errorPasswordsDoNotMatch'));
@@ -79,10 +86,17 @@ const SignUp: NextPage = () => {
         email: formData.email,
         password: formData.password,
       });
-    } catch {
+    } catch (err) {
+      console.error("Sign up form error:", err);
       setError(t('auth.signUp.errorUnexpected'));
       setIsLoading(false);
     }
+  };
+
+  // Handle navigation to sign in page with locale preservation
+  const handleSignInClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    router.push(routes.auth.signIn, routes.auth.signIn, { locale: currentLocale });
   };
 
   return (
@@ -92,8 +106,12 @@ const SignUp: NextPage = () => {
         <p className="text-sm text-gray-500">{t('auth.signUp.subtitle')}</p>
       </CardHeader>
       <CardBody>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="text-sm text-red-500">{error}</div>}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4">
+              {error}
+            </Alert>
+          )}
           <Input
             label={t('auth.signUp.nameLabel')}
             type="text"
@@ -101,6 +119,7 @@ const SignUp: NextPage = () => {
             value={formData.name}
             onChange={handleChange}
             isRequired
+            disabled={isLoading}
           />
           <Input
             label={t('auth.signUp.emailLabel')}
@@ -109,6 +128,7 @@ const SignUp: NextPage = () => {
             value={formData.email}
             onChange={handleChange}
             isRequired
+            disabled={isLoading}
           />
           <Input
             label={t('auth.signUp.passwordLabel')}
@@ -118,6 +138,7 @@ const SignUp: NextPage = () => {
             onChange={handleChange}
             isRequired
             description={t('auth.signUp.passwordHint', { min: 8 })}
+            disabled={isLoading}
           />
           <Input
             label={t('auth.signUp.confirmPasswordLabel')}
@@ -126,6 +147,7 @@ const SignUp: NextPage = () => {
             value={formData.confirmPassword}
             onChange={handleChange}
             isRequired
+            disabled={isLoading}
           />
 
           <Button type="submit" color="primary" className="w-full" isLoading={isLoading}>
@@ -137,9 +159,9 @@ const SignUp: NextPage = () => {
         <div className="relative z-10">
           <p className="text-sm opacity-80">
             {t('auth.signUp.signInPrompt')}{' '}
-            <Link href={routes.auth.signIn} className="text-sm underline hover:opacity-100">
+            <a href="#" onClick={handleSignInClick} className="text-sm underline hover:opacity-100">
               {t('auth.signUp.signInLink')}
-            </Link>
+            </a>
           </p>
         </div>
       </CardFooter>

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { routes } from '~/config/routes';
 import { APP_NAME } from '~/config/constants';
 import { QuoteForm } from '~/components/quotes/QuoteForm';
+import type { QuoteFormValues } from '~/components/quotes/QuoteForm';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import type { NextPageWithLayout } from '~/types/next';
 
@@ -40,11 +41,46 @@ function EditQuotePageContent() {
     },
   });
 
-  const handleSubmit = (formData: any) => {
+  const handleSubmit = (formData: QuoteFormValues) => {
     if (id) {
+      const { customerId, tasks: formTasks, ...restOfFormData } = formData; // Destructure tasks too
+
+      // Transform tasks: convert materialType to lowercase and filter materials
+      const transformedTasks = formTasks?.map(task => {
+        // Filter materials to only include those with a valid productId
+        const filteredMaterials = task.materials?.filter(
+          (material): material is Omit<typeof material, 'productId'> & { productId: string } => 
+            typeof material.productId === 'string' && material.productId.length > 0
+        ).map(material => ({ // Ensure only expected fields are sent
+          productId: material.productId,
+          quantity: material.quantity,
+          unitPrice: material.unitPrice,
+          notes: material.notes,
+          // Retain material ID if present for updates
+          id: material.id,
+        }));
+  
+        return {
+          // Retain task ID if present for updates
+          id: task.id,
+          description: task.description,
+          price: task.price,
+          materialType: task.materialType.toLowerCase() as 'lumpsum' | 'itemized', // Convert and assert type
+          estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum,
+          materials: filteredMaterials, // Use the filtered and cleaned materials
+        };
+      });
+
+      const dataToSend = {
+        ...restOfFormData,
+        customerId: customerId === null ? undefined : customerId, // Convert null to undefined
+        markupPercentage: (formData.markupPercentage || 0) / 100, // Convert to decimal
+        tasks: transformedTasks, // Use the transformed tasks array
+        // Status is intentionally NOT included here
+      };
       updateQuote({
         id,
-        ...formData,
+        ...dataToSend, // Use the transformed data
       });
     }
   };
@@ -126,12 +162,10 @@ function EditQuotePageContent() {
               initialValues={{
                 title: quote.title,
                 customerId: quote.customerId,
-                status: quote.status,
                 markupPercentage: quote.markupPercentage,
                 notes: quote.notes || '',
-                // Provide empty arrays for now - these will be implemented in the future
+                // Provide empty array for tasks
                 tasks: [],
-                materials: [],
               }}
               onSubmit={handleSubmit}
               isSubmitting={isSaving}

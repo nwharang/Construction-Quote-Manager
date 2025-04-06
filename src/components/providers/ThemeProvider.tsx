@@ -48,15 +48,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = useCallback(
     (newTheme: Theme) => {
       console.log('[ThemeProvider] setTheme called with:', newTheme);
+      
+      // Skip if store is loading
       if (isLoadingStore) {
         console.log('[ThemeProvider] Store is loading, skipping theme set.');
         return;
       }
 
+      // 1. Update the store
       setStoreSettings({ theme: newTheme });
 
+      // 2. Update document class for immediate visual change
       updateDocumentClass(newTheme);
 
+      // 3. Always persist to localStorage and cookies for all users
       if (typeof window !== 'undefined') {
         localStorage.setItem('theme', newTheme);
         Cookies.set(themeCookieKey, newTheme, { expires: 365 });

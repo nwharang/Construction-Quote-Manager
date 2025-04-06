@@ -8,7 +8,7 @@ import { api } from '~/utils/api';
 import Link from 'next/link';
 import { routes } from '~/config/routes';
 import { APP_NAME } from '~/config/constants';
-import { QuoteForm } from '~/components/quotes/QuoteForm';
+import { QuoteForm, type QuoteFormValues } from '~/components/quotes/QuoteForm';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import type { NextPageWithLayout } from '~/types/next';
 import React from 'react';
@@ -30,8 +30,37 @@ function NewQuotePageContent() {
     },
   });
 
-  const handleSubmit = (formData: any) => {
-    createQuote(formData);
+  const handleSubmit = (formData: QuoteFormValues) => {
+    const { tasks: formTasks, ...restOfFormData } = formData; // Destructure tasks
+
+    // Transform tasks: convert materialType to lowercase and filter materials
+    const transformedTasks = formTasks?.map(task => {
+      // Filter materials to only include those with a valid productId
+      const filteredMaterials = task.materials?.filter(
+        (material): material is Omit<typeof material, 'productId'> & { productId: string } => 
+          typeof material.productId === 'string' && material.productId.length > 0
+      ).map(material => ({ // Ensure only expected fields are sent
+        productId: material.productId,
+        quantity: material.quantity,
+        unitPrice: material.unitPrice,
+        notes: material.notes,
+      }));
+
+      return {
+        ...task,
+        materialType: task.materialType.toLowerCase() as 'lumpsum' | 'itemized',
+        materials: filteredMaterials, // Use the filtered and cleaned materials
+        // Remove fields not expected by API (like client-side id)
+        id: undefined,
+      };
+    });
+
+    const dataToSend = {
+      ...restOfFormData,
+      markupPercentage: (formData.markupPercentage || 0) / 100, // Convert to decimal
+      tasks: transformedTasks, // Use transformed tasks
+    };
+    createQuote(dataToSend);
   };
 
   return (

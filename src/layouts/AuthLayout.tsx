@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useTranslation } from '~/hooks/useTranslation';
 import { LocaleSwitch } from '~/components/LocaleSwitch';
+import { ThemeToggle } from '~/components/ThemeToggle';
+import { APP_NAME } from '~/config/constants';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -15,31 +17,43 @@ interface AuthLayoutProps {
  */
 export function AuthLayout({ children, title }: AuthLayoutProps) {
   const { t } = useTranslation();
-  const pageTitle = title || t('auth.login');
+  // Use client-side mounting to avoid hydration issues
+  const [isMounted, setIsMounted] = useState(false);
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const pageTitle = title ? `${title} | ${APP_NAME}` : APP_NAME;
+  
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
+    <>
       <Head>
-        <title>{`${pageTitle} | Construction Pro`}</title>
+        <title>{pageTitle}</title>
+        <meta name="description" content="Quoting tool for construction contractors" />
       </Head>
-
-      <header className="flex items-center justify-between p-4">
-        <Link href="/" className="text-primary text-2xl font-bold">
-          Construction Pro
-        </Link>
-        <LocaleSwitch />
-      </header>
-
-      <main className="flex flex-grow items-center justify-center p-4">
-        <div className="w-full max-w-md">{children}</div>
-      </main>
-
-      <footer className="py-4 text-center text-sm text-gray-500">
-        <p>
-          &copy; {new Date().getFullYear()} Construction Pro. {t('footer.allRightsReserved')}
-        </p>
-      </footer>
-    </div>
+      <div className="flex min-h-screen flex-col">
+        <div className="absolute right-4 top-4 flex items-center gap-2">
+          {/* Only render client-side components after client-side hydration */}
+          {isMounted && (
+            <>
+              <LocaleSwitch />
+              <ThemeToggle />
+            </>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center p-8">
+          <div className="w-full max-w-md">
+            <div className="mb-6 text-center">
+              <Link href="/" className="text-2xl font-bold">
+                {APP_NAME}
+              </Link>
+            </div>
+            {children}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 

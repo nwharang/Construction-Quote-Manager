@@ -5,7 +5,11 @@ import { Spinner } from '@heroui/react';
 import { routes } from '~/config/routes';
 import { AuthLayout, MainLayout } from '~/layouts';
 import type { NextPageWithLayout } from '~/types/next';
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
+import React from 'react';
+import Head from 'next/head';
+import { APP_NAME } from '~/config/constants';
+import { ThemeToggle } from '~/components/ThemeToggle';
 
 /**
  * Higher-order component that adds authentication protection to a page
@@ -36,16 +40,67 @@ export function withMainLayout<P extends object>(
       return <Component {...props} />;
     }
 
-    // This return is required for TypeScript but will never render
-    // due to the redirect in the useEffect
-    return null;
+    // Fallback loading state while redirecting
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  };
+
+  AuthenticatedComponent.getLayout = (page: ReactNode) => <MainLayout>{page}</MainLayout>;
+  AuthenticatedComponent.requireAuth = true;
+  AuthenticatedComponent.displayName = `withMainLayout(${Component.displayName || Component.name || 'Component'})`;
+
+  return AuthenticatedComponent;
+}
+
+/**
+ * Higher-order component for pages accessible only by unauthenticated users.
+ * Redirects authenticated users to the dashboard.
+ */
+export function withoutAuth<P extends object>(
+  Component: ComponentType<P>,
+  title?: string
+): NextPageWithLayout<P> {
+  const PublicComponent: NextPageWithLayout<P> = (props) => {
+    const { status } = useSession();
+    const router = useRouter();
+
+    if (status === 'loading') {
+      return (
+        <div className="flex h-screen items-center justify-center">
+          <Spinner />
+        </div>
+      );
+    }
+
+    if (status === 'authenticated') {
+      router.replace('/admin/dashboard'); // Or your default authenticated route
+      return (
+        <div className="flex h-screen items-center justify-center">
+          <Spinner />
+        </div>
+      );
+    }
+
+    if (status === 'unauthenticated') {
+      return <Component {...props} />;
+    }
+
+    // Fallback loading state (should ideally not be reached often)
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Spinner />
+      </div>
+    );
   };
 
   // Set layout and authentication requirements
-  AuthenticatedComponent.getLayout = (page) => <MainLayout>{page}</MainLayout>;
-  AuthenticatedComponent.requireAuth = true;
+  PublicComponent.getLayout = (page) => <AuthLayout title={title}>{page}</AuthLayout>;
+  PublicComponent.requireAuth = false;
 
-  return AuthenticatedComponent;
+  return PublicComponent;
 }
 
 /**
@@ -58,13 +113,13 @@ export function withAuthLayout<P extends object>(
   Component: ComponentType<P>,
   title?: string
 ): NextPageWithLayout<P> {
-  const PublicComponent: NextPageWithLayout<P> = (props) => {
+  const AuthLayoutWrapper: NextPageWithLayout<P> = (props) => {
     const { status } = useSession();
     const router = useRouter();
 
     useEffect(() => {
       if (status === 'authenticated') {
-        router.push(routes.admin.dashboard);
+        router.replace(routes.admin.dashboard);
       }
     }, [status, router]);
 
@@ -80,14 +135,18 @@ export function withAuthLayout<P extends object>(
       return <Component {...props} />;
     }
 
-    // This return is required for TypeScript but will never render
-    // due to the redirect in the useEffect
-    return null;
+    // Fallback loading state while redirecting authenticated users
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
   };
 
-  // Set layout and authentication requirements
-  PublicComponent.getLayout = (page) => <AuthLayout title={title}>{page}</AuthLayout>;
-  PublicComponent.requireAuth = false;
+  // Use the main AuthLayout component directly
+  AuthLayoutWrapper.getLayout = (page: ReactNode) => <AuthLayout title={title}>{page}</AuthLayout>;
+  AuthLayoutWrapper.requireAuth = false; // This page does *not* require auth
+  AuthLayoutWrapper.displayName = `withAuthLayout(${Component.displayName || Component.name || 'Component'})`;
 
-  return PublicComponent;
+  return AuthLayoutWrapper;
 }

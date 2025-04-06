@@ -91,6 +91,24 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    // Add the signIn callback to handle custom errors
+    async signIn({ user, credentials }) {
+      // The user object here might contain the error code if authorize failed
+      // However, the standard way is to catch the *thrown* error from authorize
+      // This callback runs *after* authorize. If authorize throws, this won't run.
+      // If authorize returns null (which it does on error), this callback might still run.
+      // The standard approach relies on authorize *throwing*.
+
+      // Let's adjust the authorize function to always THROW specific errors.
+      // Then, the error will propagate to the client's signIn call directly.
+
+      // Based on recent checks, the authorize function now throws NOT_FOUND or UNAUTHORIZED.
+      // These should directly translate to an error in the client-side signIn result.
+      // So, an explicit signIn callback might not be needed just to pass the error.
+      // However, if we wanted to transform the error message here, we could.
+      // For now, let's rely on the direct error propagation.
+      return true; // Allow sign in if authorize didn't throw
+    },
   },
   session: {
     strategy: 'jwt',

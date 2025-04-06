@@ -1,6 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   Button,
   Card,
@@ -10,232 +14,322 @@ import {
   Textarea,
   Spinner,
   Divider,
-  NumberInput,
+  SelectItem,
 } from '@heroui/react';
-import { PlusCircle, Trash, X } from 'lucide-react';
+import { PlusCircle, ArrowLeft, Save, LayoutList, Edit } from 'lucide-react';
 import { api } from '~/utils/api';
-import { type QuoteStatusType } from '~/server/db/schema';
+import { type QuoteStatusType, QuoteStatus } from '~/server/db/schema';
 import { QuoteStatusSettings } from './QuoteStatusBadge';
+import { CustomerSelector } from '../customers/CustomerSelector';
+import { useTranslation } from '~/hooks/useTranslation';
+import { PercentageInput } from '../ui/PercentageInput';
+import { QuoteSummary } from './QuoteSummary';
+import { TaskMasterList } from './TaskMasterList';
+import type { TaskItem } from './TaskMasterList';
+import { TaskDetailView } from './TaskDetailView';
+import { useAppToast } from '~/components/providers/ToastProvider';
 
-// Form field types
-interface QuoteFormValues {
-  title: string;
-  customerId: string;
-  status: QuoteStatusType;
-  markupPercentage: number;
-  notes: string;
-  // For future implementation
-  tasks: Array<{
-    id?: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-  }>;
-  materials: Array<{
-    id?: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-  }>;
-}
+// --- Zod Schema Definition ---
+const materialSchema = z.object({
+  id: z.string().uuid().optional(),
+  productId: z.string().uuid().nullable(),
+  productName: z.string().optional(),
+  quantity: z.number().min(1, 'Quantity must be at least 1'),
+  unitPrice: z.number().min(0, 'Price must be non-negative'),
+  notes: z.string().nullable(),
+});
 
+const taskSchema = z.object({
+  id: z.string().uuid().optional(),
+  description: z.string().min(1, 'Task description is required'),
+  price: z.number().min(0, 'Price must be non-negative'),
+  materialType: z.enum(['ITEMIZED', 'LUMPSUM']).default('ITEMIZED'),
+  estimatedMaterialsCostLumpSum: z.number().min(0).nullable(),
+  materials: z.array(materialSchema).optional(),
+  // order: z.number().optional(), // Order might be handled separately or implicitly
+});
+
+export type MaterialFormValues = z.infer<typeof materialSchema>;
+export type TaskFormValues = z.infer<typeof taskSchema>;
+
+const quoteFormSchema = z.object({
+  id: z.string().uuid().optional(), // For edit mode
+  title: z.string().min(1, 'Quote title is required'),
+  customerId: z.string().uuid('Customer is required'),
+  markupPercentage: z.number().min(0, 'Markup must be non-negative').default(0),
+  notes: z.string().nullable(),
+  tasks: z.array(taskSchema).default([]),
+});
+
+export type QuoteFormValues = z.infer<typeof quoteFormSchema>;
+
+
+// --- Prop Types ---
 interface QuoteFormProps {
-  initialValues?: Partial<QuoteFormValues> & { id?: string };
-  onSubmit: (values: QuoteFormValues) => void;
+  initialValues?: Partial<QuoteFormValues>; // Make tasks optional here for creation
+  onSubmit: SubmitHandler<QuoteFormValues>;
   isSubmitting: boolean;
+  quoteId?: string; // Pass quoteId explicitly if needed, though it's in initialValues for edit
 }
 
-export function QuoteForm({ initialValues, onSubmit, isSubmitting }: QuoteFormProps) {
-  const [formValues, setFormValues] = useState<QuoteFormValues>({
-    title: initialValues?.title || '',
-    customerId: initialValues?.customerId || '',
-    status: initialValues?.status || 'DRAFT',
-    markupPercentage: initialValues?.markupPercentage || 0,
-    notes: initialValues?.notes || '',
-    tasks: initialValues?.tasks || [],
-    materials: initialValues?.materials || [],
+export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: QuoteFormProps) {
+  const { t } = useTranslation();
+  const { success: showSuccessToast, error: showErrorToast } = useAppToast();
+
+  // --- RHF Setup ---
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isValid, isDirty },
+    reset,
+  } = useForm<QuoteFormValues>({
+    resolver: zodResolver(quoteFormSchema),
+    defaultValues: initialValues ? initialValues : {
+      title: '',
+      customerId: '',
+      markupPercentage: 0,
+      notes: '',
+      tasks: [],
+    },
+    mode: 'onChange', // Validate on change for better UX
   });
 
-  const [errors, setErrors] = useState<Partial<Record<keyof QuoteFormValues, string>>>({});
+  const { fields: taskFields, append: appendTask, remove: removeTask, move: moveTask } = useFieldArray({
+    control,
+    name: 'tasks',
+  });
 
-  // Fetch customers for dropdown
-  const { data: customers, isLoading: isLoadingCustomers } = api.customer.getAll.useQuery(
-    { limit: 100 },
-    {
-      refetchOnWindowFocus: false,
-    }
-  );
+  // --- State for Master-Detail View ---
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null);
 
-  // Form validation
-  const validateForm = (): boolean => {
-    const newErrors: Partial<Record<keyof QuoteFormValues, string>> = {};
-    
-    if (!formValues.title.trim()) {
-      newErrors.title = 'Title is required';
-    }
-    
-    if (!formValues.customerId) {
-      newErrors.customerId = 'Customer is required';
-    }
-    
-    if (formValues.markupPercentage < 0 || formValues.markupPercentage > 100) {
-      newErrors.markupPercentage = 'Markup must be between 0 and 100';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleSelectTask = (index: number) => {
+    setSelectedTaskIndex(index);
   };
 
-  // Event handlers
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormValues((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const handleAddTask = () => {
+    const newTask: TaskFormValues = {
+      description: '',
+      price: 0,
+      materialType: 'ITEMIZED',
+      estimatedMaterialsCostLumpSum: null,
+      materials: [],
+      // Generate a temporary client-side ID if needed for keys, but RHF handles array indices
+    };
+    appendTask(newTask);
+    // Automatically select the new task for editing
+    setSelectedTaskIndex(taskFields.length); // New task will be at the end
   };
 
-  const handleNumberChange = (name: string, value: number) => {
-    setFormValues((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const handleGoBackToList = () => {
+    setSelectedTaskIndex(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (validateForm()) {
-      onSubmit(formValues);
+  const handleSaveAndCloseTask = () => {
+     // Potentially add validation check here before closing
+     setSelectedTaskIndex(null);
+  };
+
+   const handleDeleteTask = (index: number) => {
+    // Add confirmation dialog logic here if needed
+    if (confirm('Are you sure you want to delete this task?')) { // Placeholder confirm
+        removeTask(index);
+        // If the deleted task was selected, go back to the list
+        if (selectedTaskIndex === index) {
+            setSelectedTaskIndex(null);
+        } else if (selectedTaskIndex !== null && index < selectedTaskIndex) {
+             // Adjust selected index if an earlier task was removed
+            setSelectedTaskIndex(selectedTaskIndex - 1);
+        }
+        showSuccessToast('Task deleted'); // Call the destructured function
     }
   };
+
+  // Watch tasks array for summary calculation
+  const watchedTasks = watch('tasks');
+  const watchedMarkup = watch('markupPercentage');
+
+  // Reset form if initialValues change (e.g., navigating between new/edit)
+  useEffect(() => {
+    if (initialValues) {
+       // Deep compare or use a version/timestamp if needed for complex scenarios
+       // For simplicity, resetting based on quoteId presence change
+      reset({
+        title: '',
+        customerId: '',
+        markupPercentage: 0,
+        notes: '',
+        tasks: [],
+        ...initialValues
+      });
+      setSelectedTaskIndex(null); // Reset selection on form reset
+    }
+  }, [initialValues, reset]);
+
+  // Map taskFields from RHF to TaskItem array expected by TaskMasterList
+  const watchedTasksData = watch('tasks'); // Watch the whole tasks array for rendering the list
+  const mappedTaskItems: TaskItem[] = taskFields.map((field, index) => {
+     const taskData = watchedTasksData[index];
+     return {
+        // Include all fields from TaskFormValues:
+        description: taskData?.description || '',
+        price: taskData?.price ?? 0,
+        materialType: taskData?.materialType || 'ITEMIZED', // Default if somehow missing
+        estimatedMaterialsCostLumpSum: taskData?.estimatedMaterialsCostLumpSum ?? null,
+        materials: taskData?.materials || [], // Include materials array
+        // Plus the ID from useFieldArray:
+        id: field.id, // RHF's stable ID
+        // 'order' was incorrectly added before, it's not part of TaskItem
+     };
+  }); // No need for 'as TaskItem' assertion now
+
+  // --- Render Logic ---
+  const isDetailViewVisible = selectedTaskIndex !== null;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium mb-1">
-            Quote Title
-          </label>
-          <Input
-            id="title"
-            name="title"
-            value={formValues.title}
-            onChange={handleChange}
-            placeholder="Enter quote title"
-            className={errors.title ? "border-red-500" : ""}
-          />
-          {errors.title && <p className="mt-1 text-sm text-red-500">{errors.title}</p>}
-        </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* --- Top Quote Details --- */}
+      <Card>
+        <CardBody className="p-6 space-y-6">
+          <h2 className="text-xl font-semibold mb-4">{t('quotes.detailsSectionTitle')}</h2>
+          {/* Title */}
+          <div>
+            <Input
+              label={t('quotes.fields.title')}
+              placeholder={t('quotes.placeholders.title')}
+              {...register('title')}
+              disabled={isSubmitting}
+              errorMessage={errors.title?.message}
+              isInvalid={!!errors.title}
+            />
+          </div>
 
-        <div>
-          <label htmlFor="customerId" className="block text-sm font-medium mb-1">
-            Customer
-          </label>
-          {isLoadingCustomers ? (
-            <Spinner size="sm" />
-          ) : (
-            <select
-              id="customerId"
+          {/* Customer Selector */}
+          <div>
+             <Controller
               name="customerId"
-              value={formValues.customerId}
-              onChange={handleChange}
-              className={`w-full rounded-md border bg-white px-3 py-2 text-sm ${errors.customerId ? "border-red-500" : "border-gray-300"}`}
-            >
-              <option value="">Select a customer</option>
-              {customers?.customers?.map(customer => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {errors.customerId && <p className="mt-1 text-sm text-red-500">{errors.customerId}</p>}
-        </div>
+              control={control}
+              render={({ field }) => (
+                <CustomerSelector
+                  label={t('quotes.fields.customer')}
+                  placeholder={t('quotes.placeholders.selectCustomer')}
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isSubmitting}
+                  errorMessage={errors.customerId?.message}
+                  isInvalid={!!errors.customerId}
+                />
+              )}
+            />
+          </div>
 
-        <div>
-          <label htmlFor="status" className="block text-sm font-medium mb-1">
-            Status
-          </label>
-          <select
-            id="status"
-            name="status"
-            value={formValues.status}
-            onChange={handleChange}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-          >
-            {Object.entries(QuoteStatusSettings).map(([status, settings]) => (
-              <option key={status} value={status}>
-                {settings.label}
-              </option>
-            ))}
-          </select>
-        </div>
+          {/* Markup Percentage */}
+           <div>
+             <Controller
+                name="markupPercentage"
+                control={control}
+                render={({ field: { onChange, value, ...fieldProps } }) => (
+                    <PercentageInput
+                        label={t('quoteSummary.markupInputLabel')}
+                        value={value ?? 0}
+                        onChange={(e) => {
+                             const targetValue = typeof e === 'object' && e !== null && 'target' in e ? e.target.value : e;
+                             const numValue = typeof targetValue === 'number' ? targetValue : parseFloat(targetValue || '0');
+                             onChange(isNaN(numValue) ? 0 : numValue);
+                        }}
+                        disabled={isSubmitting}
+                        errorMessage={errors.markupPercentage?.message}
+                        isInvalid={!!errors.markupPercentage}
+                        min={0}
+                        {...fieldProps}
+                    />
+                )}
+            />
+          </div>
 
-        <div>
-          <label htmlFor="markupPercentage" className="block text-sm font-medium mb-1">
-            Markup Percentage (%)
-          </label>
-          <NumberInput
-            id="markupPercentage"
-            value={formValues.markupPercentage}
-            onChange={(value) => handleNumberChange('markupPercentage', Number(value))}
-            min={0}
-            max={100}
-            className={errors.markupPercentage ? "border-red-500" : ""}
-          />
-          {errors.markupPercentage && <p className="mt-1 text-sm text-red-500">{errors.markupPercentage}</p>}
-        </div>
+          {/* Notes */}
+          <div>
+            <Textarea
+              label={t('quotes.notesLabel')}
+              placeholder={t('quotes.placeholders.notes')}
+              {...register('notes')}
+              disabled={isSubmitting}
+              errorMessage={errors.notes?.message}
+              isInvalid={!!errors.notes}
+              minRows={3}
+            />
+          </div>
+        </CardBody>
+      </Card>
 
-        <div>
-          <label htmlFor="notes" className="block text-sm font-medium mb-1">
-            Notes
-          </label>
-          <Textarea
-            id="notes"
-            name="notes"
-            value={formValues.notes}
-            onChange={handleChange}
-            placeholder="Additional notes or comments"
-            rows={4}
-          />
-        </div>
+      {/* --- Tasks & Materials Section (Master/Detail) --- */}
+      <Card>
+         <CardBody className="p-6">
+             <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">{t('quotes.tasksSectionTitle')}</h2>
+                 {isDetailViewVisible && (
+                    <Button
+                        variant="light"
+                        color="secondary"
+                        size="sm"
+                        startContent={<ArrowLeft size={16} />}
+                        onClick={handleGoBackToList}
+                        aria-label={t('common.back')}
+                    >
+                       {t('common.back')}
+                    </Button>
+                 )}
+             </div>
 
-        {/* Task and Material sections can be implemented in the future */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Tasks & Labor</label>
-          <Card>
-            <CardBody>
-              <div className="text-center p-4 text-gray-500">
-                Task management will be implemented in a future update
-              </div>
-            </CardBody>
-          </Card>
-        </div>
+             {/* Conditional Rendering for Master-Detail */}
+             {isDetailViewVisible && selectedTaskIndex !== null ? (
+                // --- Task Detail View ---
+                <TaskDetailView
+                    control={control}
+                    register={register}
+                    setValue={setValue}
+                    watch={watch}
+                    taskIndex={selectedTaskIndex}
+                    errors={errors}
+                    removeTask={() => handleDeleteTask(selectedTaskIndex)} // Pass the specific index to delete
+                />
+             ) : (
+                 // --- Task Master List ---
+                 <TaskMasterList
+                    tasks={mappedTaskItems} // Pass the mapped items
+                    onAddTask={handleAddTask}
+                    onSelectTask={handleSelectTask}
+                    onDeleteTask={handleDeleteTask}
+                    // onMoveTask={moveTask} // Add move later if needed - Requires dnd-kit setup
+                 />
+             )}
+         </CardBody>
+      </Card>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Materials</label>
-          <Card>
-            <CardBody>
-              <div className="text-center p-4 text-gray-500">
-                Material management will be implemented in a future update
-              </div>
-            </CardBody>
-          </Card>
-        </div>
+
+      {/* --- Quote Summary --- */}
+      <QuoteSummary tasks={watchedTasks} markupPercentage={watchedMarkup ?? 0} />
+
+      {/* --- Form Actions --- */}
+      <div className="mt-8 flex justify-end space-x-4">
+        {/* <Button variant="bordered" onPress={() => reset()} disabled={isSubmitting || !isDirty}>Reset</Button> */}
+        <Button
+          type="submit"
+          color="primary"
+          isLoading={isSubmitting}
+          isDisabled={!isValid || !isDirty} // Only enable if valid and changed
+          className="min-w-[120px]"
+        >
+          {t('common.save')} {/* Use translation key */}
+        </Button>
       </div>
-
-      <Divider />
-
-      <Button
-        type="submit"
-        color="primary"
-        isDisabled={isSubmitting}
-        className="mt-4"
-        isLoading={isSubmitting}
-      >
-        {initialValues?.id ? 'Update Quote' : 'Create Quote'}
-      </Button>
     </form>
   );
-} 
+}
+
+// Helper to convert form data before sending to API if needed
+// (e.g., converting numbers to strings if backend expects decimals as strings)
+// Not strictly needed if Zod schema matches API schema and service layer handles conversion
+// export const transformFormDataForApi = (data: QuoteFormValues): ApiQuoteInput => { ... }

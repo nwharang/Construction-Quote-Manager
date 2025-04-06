@@ -4,18 +4,30 @@ import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { routes } from '~/config/routes';
-import { Card, CardBody, CardHeader, Input, Button, Link, CardFooter } from '@heroui/react';
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Input,
+  Button,
+  Link,
+  CardFooter,
+  Alert,
+} from '@heroui/react';
 import { withAuthLayout } from '~/utils/withAuth';
 import { useTranslation } from '~/hooks/useTranslation';
+import { AlertTriangle } from 'lucide-react';
+import { useI18n } from '~/hooks/useI18n';
 
 const SignIn: NextPage = () => {
   const { t } = useTranslation();
   const router = useRouter();
+  const { currentLocale } = useI18n();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,11 +36,12 @@ const SignIn: NextPage = () => {
       ...prev,
       [name]: value,
     }));
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
 
     if (!formData.email || !formData.password) {
       setError(t('auth.signIn.errorRequiredFields'));
@@ -45,15 +58,34 @@ const SignIn: NextPage = () => {
       });
 
       if (result?.error) {
-        setError(t('auth.signIn.errorInvalidCredentials'));
+        if (result.error === 'CredentialsSignin') {
+          const urlError = router.query.error;
+          if (urlError === 'CredentialsSignin') {
+            setError(t('auth.signIn.errorInvalidCredentials'));
+          } else {
+            setError(t('auth.signIn.errorInvalidCredentials'));
+          }
+        } else {
+          setError(t('auth.signIn.errorUnexpected'));
+        }
         setIsLoading(false);
+      } else if (result?.ok) {
+        await router.push(routes.admin.dashboard, routes.admin.dashboard, { locale: currentLocale });
       } else {
-        await router.push(routes.admin.dashboard);
+        setError(t('auth.signIn.errorUnexpected'));
+        setIsLoading(false);
       }
     } catch (error) {
+      console.error("Sign in failed:", error);
       setError(t('auth.signIn.errorUnexpected'));
       setIsLoading(false);
     }
+  };
+
+  // Handle navigation to sign up page with locale preservation
+  const handleSignUpClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    router.push(routes.auth.signUp, routes.auth.signUp, { locale: currentLocale });
   };
 
   return (
@@ -63,8 +95,12 @@ const SignIn: NextPage = () => {
         <p className="text-sm text-gray-500">{t('auth.signIn.subtitle')}</p>
       </CardHeader>
       <CardBody>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="text-sm text-red-500">{error}</div>}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4">
+              {error}
+            </Alert>
+          )}
           <Input
             label={t('auth.signIn.emailLabel')}
             type="email"
@@ -72,6 +108,7 @@ const SignIn: NextPage = () => {
             value={formData.email}
             onChange={handleChange}
             isRequired
+            disabled={isLoading}
           />
           <Input
             label={t('auth.signIn.passwordLabel')}
@@ -80,6 +117,7 @@ const SignIn: NextPage = () => {
             value={formData.password}
             onChange={handleChange}
             isRequired
+            disabled={isLoading}
           />
           <Button type="submit" color="primary" className="w-full" isLoading={isLoading}>
             {t('auth.signIn.submitButton')}
@@ -90,9 +128,9 @@ const SignIn: NextPage = () => {
         <div className="relative z-10">
           <p className="text-sm opacity-80">
             {t('auth.signIn.signUpPrompt')}{' '}
-            <Link href={routes.auth.signUp} className="text-sm underline hover:opacity-100">
+            <a href="#" onClick={handleSignUpClick} className="text-sm underline hover:opacity-100">
               {t('auth.signIn.signUpLink')}
-            </Link>
+            </a>
           </p>
         </div>
       </CardFooter>

@@ -130,7 +130,22 @@ export function LocaleSwitch({
           aria-label={t('settings.language')}
           selectionMode="single"
           selectedKeys={effectiveLocale ? [effectiveLocale] : []}
-          onSelectionChange={(keys) => handleLocaleChange(Array.from(keys)[0] as string)}
+          onSelectionChange={(keys) => {
+            // Cast properly and handle with more robustness
+            const selectedKeys = keys as Set<string>;
+            if (selectedKeys && selectedKeys.size > 0) {
+              const selectedLocaleArray = Array.from(selectedKeys);
+              if (selectedLocaleArray.length > 0) {
+                const selectedLocale = selectedLocaleArray[0];
+                if (selectedLocale) {
+                  // Prevent the event from continuing to bubble up
+                  setTimeout(() => {
+                    handleLocaleChange(selectedLocale);
+                  }, 0);
+                }
+              }
+            }
+          }}
         >
           {Object.entries(locales).map(([code, { name, flag }]) => (
             <DropdownItem key={code} textValue={name}>
@@ -152,7 +167,22 @@ export function LocaleSwitch({
     <Select
       label={label || t('settings.language')}
       selectedKeys={effectiveLocale ? [effectiveLocale] : []}
-      onSelectionChange={(keys) => handleLocaleChange(Array.from(keys)[0] as string)}
+      onSelectionChange={(keys) => {
+        // Cast properly and handle with more robustness
+        const selectedKeys = keys as Set<string>;
+        if (selectedKeys && selectedKeys.size > 0) {
+          const selectedLocaleArray = Array.from(selectedKeys);
+          if (selectedLocaleArray.length > 0) {
+            const selectedLocale = selectedLocaleArray[0];
+            if (selectedLocale) {
+              // Prevent the event from continuing to bubble up
+              setTimeout(() => {
+                handleLocaleChange(selectedLocale);
+              }, 0);
+            }
+          }
+        }
+      }}
       className={className}
       aria-label={label || t('settings.selectLanguage')}
     >

@@ -77,8 +77,8 @@ export class AuthService extends BaseService {
 
     if (!potentialUser) {
       throw new TRPCError({
-        code: 'UNAUTHORIZED', // Use UNAUTHORIZED for credential issues
-        message: 'Invalid email or password.', // Generic message
+        code: 'NOT_FOUND', // Changed from UNAUTHORIZED
+        message: 'User with this email does not exist.', // More specific internal message
       });
     }
 
@@ -94,8 +94,8 @@ export class AuthService extends BaseService {
 
     if (!passwordsMatch) {
       throw new TRPCError({
-        code: 'UNAUTHORIZED',
-        message: 'Invalid email or password.',
+        code: 'UNAUTHORIZED', // Keep UNAUTHORIZED for incorrect password
+        message: 'Incorrect password provided.', // More specific internal message
       });
     }
 

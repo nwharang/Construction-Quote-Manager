@@ -50,7 +50,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   // Use Tailwind's responsive utility for transform
   const sidebarClasses = cn(
-    "fixed md:sticky top-0 left-0 z-40 h-screen w-[280px] bg-background flex flex-col shadow-lg md:shadow-none",
+    "fixed md:sticky top-0 left-0 z-40 min-h-screen w-[280px] bg-background flex flex-col shadow-lg md:shadow-none",
     "transition-transform duration-300 ease-in-out",
     isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
   );
@@ -80,7 +80,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Navigation Items */}
       <Listbox
         aria-label="Navigation menu"
-        className="flex-1 overflow-y-auto py-4"
+        className="sticky flex-1 overflow-y-auto py-4"
         itemClasses={{
           base: 'px-4 py-3 rounded-none my-1',
           title: 'text-medium',

@@ -7,6 +7,8 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'auth.signIn.errorInvalidCredentials': 'Invalid email or password.',
   'auth.signIn.errorRequiredFields': 'Please fill in both email and password.',
   'auth.signIn.errorUnexpected': 'An unexpected error occurred. Please try again.',
+  'auth.signIn.errorUserNotFound': 'No account found with that email address.',
+  'auth.signIn.errorIncorrectPassword': 'The password you entered is incorrect.',
   'auth.signIn.passwordLabel': 'Password',
   'auth.signIn.signUpLink': 'Sign up',
   'auth.signIn.signUpPrompt': "Don't have an account?",
@@ -64,6 +66,8 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'common.update': 'Update',
   'common.user': 'User',
   'common.view': 'View',
+  'common.moveUp': 'Move Up',
+  'common.moveDown': 'Move Down',
   'customers.contact': 'Contact Info',
   'customers.createError': 'Error creating customer: {message}',
   'customers.createSuccess': 'Customer created successfully',
@@ -85,13 +89,13 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'customers.updateSuccess': 'Customer updated successfully',
   'errors.requiredFieldsMissing': 'Please fill in all required fields.',
   'footer.allRightsReserved': 'All Rights Reserved.',
-  'footer.copyright': '© {year} Quote Tool Deluxe.', // Params: { year: number }
+  'footer.copyright': '© {{year}} Quote Tool Deluxe.', // Params: { year: number }
   'nav.customers': 'Customers',
   'nav.dashboard': 'Dashboard',
   'nav.products': 'Products',
   'nav.quotes': 'Quotes',
   'print.document': 'Print Document',
-  'print.generatedOn': 'Generated on: {date}', // Params: { date: string }
+  'print.generatedOn': 'Generated on: {{date}}', // Params: { date: string }
   'print.printNow': 'Print Now',
   'productFields.category': 'Category',
   'productFields.description': 'Description',
@@ -136,7 +140,7 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'products.updateSuccess': 'Product updated successfully',
   'products.viewModalTitle': 'View Product Details',
   'quoteSummary.grandTotal': 'Grand Total',
-  'quoteSummary.markup': 'Markup ({percent}%)', // Param: { percent: number } - Assume percent is passed if needed
+  'quoteSummary.markup': 'Markup ({{percent}}%)', // Param: { percent: number } - Assume percent is passed if needed
   'quoteSummary.markupCalculated': 'Markup',
   'quoteSummary.markupInputLabel': 'Markup %',
   'quoteSummary.subtotalCombined': 'Subtotal (Tasks + Materials)',
@@ -147,13 +151,13 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'quotes.addMaterialButton': 'Add Material',
   'quotes.addTaskButton': 'Add Task',
   'quotes.createButton': 'New Quote',
-  'quotes.createError': 'Error creating quote: {message}',
+  'quotes.createError': 'Error creating quote: {{message}}',
   'quotes.createModalTitle': 'Create New Quote',
   'quotes.createSuccess': 'Quote created successfully',
   'quotes.createdDateLabel': 'Created Date',
   'quotes.customerLabel': 'Customer',
   'quotes.date': 'Date',
-  'quotes.deleteError': 'Error deleting quote: {message}', // Params: { message: string }
+  'quotes.deleteError': 'Error deleting quote: {{message}}', // Params: { message: string }
   'quotes.deleteSuccess': 'Quote deleted successfully',
   'quotes.detailsSectionTitle': 'Quote Details',
   'quotes.editModalTitle': 'Edit Quote',
@@ -193,7 +197,7 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'quotes.placeholders.notes': 'Enter any internal notes about this quote...',
   'quotes.placeholders.selectCustomer': 'Select a customer...',
   'quotes.placeholders.title': 'Enter quote title...',
-  'quotes.print.title': 'Quote #{id}', // Params: { id: string }
+  'quotes.print.title': 'Quote #{{id}}', // Params: { id: string }
   'quotes.status.accepted': 'Accepted',
   'quotes.status.draft': 'Draft',
   'quotes.status.rejected': 'Rejected',
@@ -208,9 +212,11 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'quotes.validation.customerRequired': 'Customer is required.', // Params: { field: string } - Field implied
   'quotes.validation.titleRequired': 'Title is required.', // Params: { field: string } - Field implied
   'quotes.viewModalTitle': 'View Quote Details',
+  'quotes.confirmDeleteMaterial': 'Are you sure you want to delete this material?',
+  'quotes.confirmDeleteTask': 'Are you sure you want to delete this task?',
   'settings.appearance': 'Appearance',
   'settings.changeTheme': 'Change Theme',
-  'settings.changeThemeTitle': 'Change to {theme} theme', // Params: { theme: string }
+  'settings.changeThemeTitle': 'Change to {{theme}} theme', // Params: { theme: string }
   'settings.companyAddress': 'Company Address',
   'settings.companyEmail': 'Company Email',
   'settings.companyInfo': 'Company Information',
@@ -255,6 +261,16 @@ const enTranslations: Partial<Record<TranslationKey, string>> = {
   'validation.minValue': 'Value must be at least {min}.', // Params: { min: number }
   'validation.required': 'This field is required.',
   'validation.selectOption': 'Please select an option.',
+  'quotes.materials.title': 'Materials',
+  'quotes.materials.selectProduct': 'Select product',
+  'quotes.materials.quantity': 'Quantity',
+  'quotes.materials.unitPrice': 'Unit Price',
+  'quotes.materials.noItems': 'No materials added yet',
+  'quotes.materials.addNew': 'Add New Material',
+  'quotes.tasks.description': 'Task Description',
+  'quotes.tasks.descriptionPlaceholder': 'Enter task description',
+  'quotes.tasks.price': 'Labor Price',
+  'quotes.tasks.addNew': 'Add New Task',
 };
 
 export default enTranslations;
