@@ -104,7 +104,7 @@ export const quoteRouter = createTRPCRouter({
         title: z.string().min(1, 'Title is required'),
         customerId: z.string().uuid('Valid customer ID is required'),
         notes: z.string().optional().nullable(),
-        markupPercentage: z.number().min(0).default(10),
+        markupPercentage: z.number().min(0).max(1).default(0),
         status: z
           .enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
           .optional(),
@@ -114,7 +114,11 @@ export const quoteRouter = createTRPCRouter({
               description: z.string().min(1, 'Task description is required'),
               price: z.number().min(0, 'Price must be a positive number'),
               materialType: z.enum(['lumpsum', 'itemized']),
-              estimatedMaterialsCost: z.number().min(0).optional(),
+              estimatedMaterialsCostLumpSum: z
+                .number()
+                .min(0, 'Estimated cost must be non-negative')
+                .optional()
+                .nullable(),
               materials: z
                 .array(
                   z.object({
@@ -136,7 +140,7 @@ export const quoteRouter = createTRPCRouter({
       try {
         const services = createServices(ctx);
         // userId is available in service context via BaseService, no need to fetch here unless explicitly needed by service method signature
-        // const authService = new AuthService(db, ctx); 
+        // const authService = new AuthService(db, ctx);
         // const userId = authService.getUserId();
         const serviceData = {
           customerId: input.customerId,
@@ -148,7 +152,7 @@ export const quoteRouter = createTRPCRouter({
             description: task.description,
             price: task.price,
             materialType: task.materialType,
-            estimatedMaterialsCostLumpSum: task.estimatedMaterialsCost,
+            estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum ?? undefined,
             materials: task.materials?.map((mat) => ({
               productId: mat.productId,
               quantity: mat.quantity,
@@ -161,7 +165,7 @@ export const quoteRouter = createTRPCRouter({
         const quote = await services.quote.createQuote({
           data: serviceData,
           // FIX: Remove userId as it's not expected by the service method
-          // userId: userId, 
+          // userId: userId,
         });
         return quote;
       } catch (error) {
@@ -178,48 +182,50 @@ export const quoteRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string().uuid('Invalid quote ID format'),
-        title: z.string().min(1, 'Title is required').optional(),
-        customerId: z.string().uuid('Valid customer ID is required').optional(),
+        id: z.string().uuid('Quote ID must be a valid UUID'),
+        title: z.string().min(1, 'Title is required'),
         notes: z.string().optional().nullable(),
         status: z
           .enum([QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED])
           .optional(),
-        markupPercentage: z.number().min(0).optional(),
+        customerId: z.string().uuid('Valid customer ID is required'),
+        markupPercentage: z.number().min(0).default(10),
         tasks: z
           .array(
             z.object({
-              id: z.string().uuid().optional(),
-              description: z.string().min(1, 'Task description is required').optional(),
-              price: z.number().min(0, 'Price must be a positive number').optional(),
-              quantity: z.number().min(1, 'Quantity must be at least 1').optional(),
-              materialType: z.enum(['lumpsum', 'itemized']).optional(),
-              estimatedMaterialsCostLumpSum: z.number().min(0).optional().nullable(),
+              id: z.string().optional(),
+              description: z.string().min(1, 'Task description is required'),
+              price: z.number().min(0, 'Price must be a positive number'),
+              materialType: z.enum(['lumpsum', 'itemized']),
+              estimatedMaterialsCostLumpSum: z
+                .number()
+                .min(0, 'Estimated cost must be non-negative')
+                .optional()
+                .nullable(),
               materials: z
                 .array(
                   z.object({
-                    id: z.string().uuid().optional(),
-                    name: z.string().min(1, 'Material name is required').optional(),
-                    description: z.string().optional().nullable(),
-                    quantity: z.number().min(1, 'Quantity must be at least 1').optional(),
-                    unitPrice: z.number().min(0, 'Unit price must be a positive number').optional(),
-                    productId: z.string().uuid().optional().nullable(),
+                    id: z.string().optional(),
+                    productId: z.string().uuid('Product ID must be a valid UUID'),
+                    quantity: z.number().min(1, 'Quantity must be at least 1'),
+                    unitPrice: z.number().min(0, 'Unit price must be a positive number'),
                     notes: z.string().optional().nullable(),
                   })
                 )
-                .optional(),
+                .optional()
+                .default([]),
             })
           )
-          .optional(),
+          .optional()
+          .default([]),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
         const services = createServices(ctx);
-        // userId is available in service context via BaseService
-        // const authService = new AuthService(db, ctx); 
-        // const userId = authService.getUserId();
+
         const serviceData = {
+          id: input.id,
           customerId: input.customerId,
           title: input.title,
           status: input.status,
@@ -230,16 +236,14 @@ export const quoteRouter = createTRPCRouter({
             description: task.description,
             price: task.price,
             materialType: task.materialType,
-            estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum,
-            materials: task.materials
-              ?.filter((mat) => mat.productId != null)
-              .map((mat) => ({
-                id: mat.id,
-                productId: mat.productId!,
-                quantity: mat.quantity,
-                unitPrice: mat.unitPrice,
-                notes: mat.notes ?? undefined,
-              })),
+            estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum ?? undefined,
+            materials: task.materials?.map((mat) => ({
+              id: mat.id,
+              productId: mat.productId,
+              quantity: mat.quantity,
+              unitPrice: mat.unitPrice,
+              notes: mat.notes ?? undefined,
+            })),
           })),
         };
 
@@ -247,7 +251,7 @@ export const quoteRouter = createTRPCRouter({
           id: input.id,
           data: serviceData,
           // FIX: Remove userId as it's not expected by the service method
-          // userId: userId, 
+          // userId: userId,
         });
         return quote;
       } catch (error) {
@@ -270,14 +274,14 @@ export const quoteRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         const services = createServices(ctx);
-         // userId is available in service context via BaseService
-        // const authService = new AuthService(db, ctx); 
-        // const userId = authService.getUserId(); 
+        // userId is available in service context via BaseService
+        // const authService = new AuthService(db, ctx);
+        // const userId = authService.getUserId();
 
         const result = await services.quote.deleteQuote({
           id: input.id,
-           // FIX: Remove userId as it's not expected by the service method
-          // userId: userId, 
+          // FIX: Remove userId as it's not expected by the service method
+          // userId: userId,
         });
 
         return result;
@@ -380,7 +384,11 @@ export const quoteRouter = createTRPCRouter({
         description: z.string().min(1, 'Description is required'),
         price: z.number().min(0, 'Price must be a non-negative number'),
         materialType: z.enum(['lumpsum', 'itemized']),
-        estimatedMaterialsCost: z.number().min(0, 'Estimated cost must be non-negative').optional(),
+        estimatedMaterialsCostLumpSum: z
+          .number()
+          .min(0, 'Estimated cost must be non-negative')
+          .optional()
+          .nullable(),
         materials: z
           .array(
             z.object({
@@ -402,7 +410,7 @@ export const quoteRouter = createTRPCRouter({
           description: input.description,
           price: input.price,
           materialType: input.materialType,
-          estimatedMaterialsCostLumpSum: input.estimatedMaterialsCost,
+          estimatedMaterialsCostLumpSum: input.estimatedMaterialsCostLumpSum ?? undefined,
           materials: input.materials?.map((mat) => ({
             productId: mat.productId,
             quantity: mat.quantity,

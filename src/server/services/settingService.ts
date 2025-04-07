@@ -4,28 +4,12 @@ import { BaseService } from './baseService';
 import { eq } from 'drizzle-orm';
 import { settings } from '../db/schema';
 import { TRPCError, type inferRouterInputs } from '@trpc/server';
-import {
-  DEFAULT_LOCALE,
-  DEFAULT_CURRENCY,
-  DEFAULT_CURRENCY_SYMBOL,
-  DEFAULT_MARKUP_PERCENTAGE,
-  DEFAULT_COMPLEXITY_CHARGE,
-  DEFAULT_TASK_PRICE,
-  DEFAULT_MATERIAL_PRICE,
-} from '~/config/constants';
+import { DEFAULT_LOCALE } from '~/i18n/locales';
 import { type AppRouter } from '~/server/api/root'; // Adjust path if needed
 
 // --- Types moved from settingsMethods.ts ---
 export type SelectSetting = typeof settings.$inferSelect;
-export type ClientSettingsData = Omit<
-  SelectSetting,
-  'defaultComplexityCharge' | 'defaultMarkupCharge' | 'defaultTaskPrice' | 'defaultMaterialPrice'
-> & {
-  defaultComplexityCharge: number;
-  defaultMarkupCharge: number;
-  defaultTaskPrice: number;
-  defaultMaterialPrice: number;
-};
+export type ClientSettingsData = Omit<SelectSetting, never>;
 type InsertSetting = typeof settings.$inferInsert;
 type UpdateSettingsInputType = inferRouterInputs<AppRouter>['settings']['update'];
 // --- End moved types ---
@@ -56,7 +40,7 @@ export class SettingsService extends BaseService {
     });
 
     if (existingSettings) {
-      return this.processSettingsForClient(existingSettings);
+      return existingSettings;
     }
 
     console.log(`No settings found for user ${userId}, creating defaults.`);
@@ -90,25 +74,6 @@ export class SettingsService extends BaseService {
         emailNotifications: data.emailNotifications,
         quoteNotifications: data.quoteNotifications,
         taskNotifications: data.taskNotifications,
-        theme: data.theme,
-        locale: data.locale,
-        currency: data.currency,
-        currencySymbol: data.currencySymbol,
-        dateFormat: data.dateFormat,
-        timeFormat: data.timeFormat,
-        // Convert numeric fields to strings
-        ...(data.defaultComplexityCharge !== undefined && {
-          defaultComplexityCharge: String(data.defaultComplexityCharge),
-        }),
-        ...(data.defaultMarkupCharge !== undefined && {
-          defaultMarkupCharge: String(data.defaultMarkupCharge),
-        }),
-        ...(data.defaultTaskPrice !== undefined && {
-          defaultTaskPrice: String(data.defaultTaskPrice),
-        }),
-        ...(data.defaultMaterialPrice !== undefined && {
-          defaultMaterialPrice: String(data.defaultMaterialPrice),
-        }),
       };
 
     // Remove undefined properties
@@ -149,7 +114,7 @@ export class SettingsService extends BaseService {
         });
       }
 
-      return this.processSettingsForClient(updatedSetting);
+      return updatedSetting;
     } catch (error) {
       console.error(`Error updating settings for user ${userId}:`, error);
       if (error instanceof TRPCError) throw error;
@@ -176,17 +141,13 @@ export class SettingsService extends BaseService {
       companyEmail: '',
       companyPhone: null,
       companyAddress: null,
-      defaultComplexityCharge: String(DEFAULT_COMPLEXITY_CHARGE ?? 0),
-      defaultMarkupCharge: String(DEFAULT_MARKUP_PERCENTAGE ?? 0),
-      defaultTaskPrice: String(DEFAULT_TASK_PRICE ?? 0),
-      defaultMaterialPrice: String(DEFAULT_MATERIAL_PRICE ?? 0),
       emailNotifications: true,
       quoteNotifications: true,
       taskNotifications: true,
       theme: 'system',
       locale: DEFAULT_LOCALE,
-      currency: DEFAULT_CURRENCY,
-      currencySymbol: DEFAULT_CURRENCY_SYMBOL,
+      currency: 'USD',
+      currencySymbol: '$',
       dateFormat: 'MM/DD/YYYY',
       timeFormat: '12h',
     };
@@ -196,7 +157,7 @@ export class SettingsService extends BaseService {
       if (!newSettings) {
         throw new Error('Failed to retrieve settings immediately after creation.');
       }
-      return this.processSettingsForClient(newSettings);
+      return newSettings;
     } catch (error) {
       console.error(`Error creating default settings for user ${userId}:`, error);
       throw new TRPCError({
@@ -205,27 +166,5 @@ export class SettingsService extends BaseService {
         cause: error,
       });
     }
-  }
-
-  /**
-   * Helper function to convert DB string numeric values to actual numbers for client consumption.
-   * @private
-   */
-  private processSettingsForClient(settingsData: SelectSetting): ClientSettingsData {
-    const parseDecimal = (value: string | null | undefined): number => {
-      if (value === null || value === undefined) return 0;
-      const parsed = parseFloat(value);
-      return isNaN(parsed) ? 0 : parsed;
-    };
-
-    return {
-      ...settingsData,
-      defaultComplexityCharge: parseDecimal(settingsData.defaultComplexityCharge),
-      defaultMarkupCharge: parseDecimal(settingsData.defaultMarkupCharge),
-      defaultTaskPrice: parseDecimal(settingsData.defaultTaskPrice),
-      defaultMaterialPrice: parseDecimal(settingsData.defaultMaterialPrice),
-      theme: settingsData.theme ?? 'system',
-      locale: settingsData.locale ?? DEFAULT_LOCALE,
-    };
   }
 }

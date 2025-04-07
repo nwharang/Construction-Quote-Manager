@@ -174,6 +174,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({
     <div className={`flex items-end gap-2 ${className}`}>
       <Select
         id="customerId"
+        label={label}
+        aria-label={label}
         placeholder={placeholder}
         selectedKeys={value ? [value] : []}
         onSelectionChange={handleSelectionChange}

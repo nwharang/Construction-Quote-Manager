@@ -89,15 +89,15 @@ const SignIn: NextPage = () => {
   };
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md" data-testid="signin-form">
       <CardHeader className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold">{t('auth.signIn.title')}</h2>
+        <h2 className="text-2xl font-bold" data-testid="signin-title">{t('auth.signIn.title')}</h2>
         <p className="text-sm text-gray-500">{t('auth.signIn.subtitle')}</p>
       </CardHeader>
       <CardBody>
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4">
+            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4" data-testid="signin-error">
               {error}
             </Alert>
           )}
@@ -109,6 +109,7 @@ const SignIn: NextPage = () => {
             onChange={handleChange}
             isRequired
             disabled={isLoading}
+            data-testid="email-input"
           />
           <Input
             label={t('auth.signIn.passwordLabel')}
@@ -118,8 +119,15 @@ const SignIn: NextPage = () => {
             onChange={handleChange}
             isRequired
             disabled={isLoading}
+            data-testid="password-input"
           />
-          <Button type="submit" color="primary" className="w-full" isLoading={isLoading}>
+          <Button 
+            type="submit" 
+            color="primary" 
+            className="w-full" 
+            isLoading={isLoading}
+            data-testid="signin-button"
+          >
             {t('auth.signIn.submitButton')}
           </Button>
         </form>
@@ -128,7 +136,12 @@ const SignIn: NextPage = () => {
         <div className="relative z-10">
           <p className="text-sm opacity-80">
             {t('auth.signIn.signUpPrompt')}{' '}
-            <a href="#" onClick={handleSignUpClick} className="text-sm underline hover:opacity-100">
+            <a 
+              href="#" 
+              onClick={handleSignUpClick} 
+              className="text-sm underline hover:opacity-100"
+              data-testid="signup-link"
+            >
               {t('auth.signIn.signUpLink')}
             </a>
           </p>

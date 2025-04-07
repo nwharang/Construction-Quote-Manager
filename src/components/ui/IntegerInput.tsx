@@ -3,6 +3,7 @@
 import React from 'react';
 import { type NumberInputProps } from '@heroui/react';
 import { ConfiguredNumberInput } from './ConfiguredNumberInput';
+import { useConfigStore } from '~/store';
 
 // Omit the numberType prop and calculated props
 type IntegerInputProps = Omit<
@@ -16,6 +17,5 @@ type IntegerInputProps = Omit<
 
 export const IntegerInput: React.FC<IntegerInputProps> = (props) => {
   // Default min to 1 for integer inputs unless overridden
-  const { min = 1, ...rest } = props;
-  return <ConfiguredNumberInput numberType="integer" min={min} {...rest} />;
-}; 
+  return <ConfiguredNumberInput {...props} />;
+};

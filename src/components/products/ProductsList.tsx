@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUIStore } from '~/store/uiStore';
+import { ListToolbar } from '~/components/shared/ListToolbar';
 
 // Use inferred type from the API output for the list items
 type ProductListItem = RouterOutputs['product']['getAll']['data'][number];
@@ -167,7 +168,7 @@ export function ProductsList() {
             </div>
           );
         case 'category':
-          return product.categoryName || '-';
+          return product.category?.name || '-';
         case 'unitPrice':
           return formatCurrency(Number(product.unitPrice));
         case 'createdAt':
@@ -224,76 +225,76 @@ export function ProductsList() {
         shadow="sm"
         radius="lg"
         isHoverable
-        isPressable
-        onPress={() => handleView(product)}
-        classNames={{
-          base: 'overflow-hidden',
-          body: 'p-0',
-        }}
+        className="overflow-hidden"
+        as="div" // Force it to render as a div instead of a button
       >
         {/* Card Header */}
-        <CardHeader className="flex flex-col items-start p-4 pb-3">
-          <h3 className="text-lg font-semibold">{product.name}</h3>
-          <p className="text-default-400 mt-1 text-[11px]">
-            {product.createdAt ? formatDate(product.createdAt, 'short') : '-'}
-          </p>
-        </CardHeader>
+        <div 
+          className="flex flex-col cursor-pointer" 
+          onClick={() => handleView(product)}
+        >
+          <CardHeader className="flex flex-col items-start p-4 pb-3">
+            <h3 className="text-lg font-semibold">{product.name}</h3>
+            <p className="text-default-400 mt-1 text-[11px]">
+              {product.createdAt ? formatDate(product.createdAt, 'short') : '-'}
+            </p>
+          </CardHeader>
 
-        <Divider className="opacity-50" />
+          <Divider className="opacity-50" />
 
-        <CardBody className="p-4">
-          <div className="flex flex-col gap-4">
-            {/* Category field */}
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <Tag size={14} className="text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-default-400 text-xs">{t('productFields.category')}</p>
-                <p className="text-sm">{product.categoryName || '-'}</p>
-              </div>
-            </div>
-
-            {/* Price field */}
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <CircleDollarSign size={14} className="text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-default-400 text-xs">{t('productFields.unitPrice')}</p>
-                <p className="text-sm font-medium">{formatCurrency(Number(product.unitPrice))}</p>
-              </div>
-            </div>
-
-            {/* Unit/SKU field */}
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <Package size={14} className="text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-default-400 text-xs">{t('productFields.unit')}</p>
-                <p className="text-sm">{product.unit || '-'}</p>
-              </div>
-            </div>
-
-            {/* Location field */}
-            {product.location && (
+          <CardBody className="p-4">
+            <div className="flex flex-col gap-4">
+              {/* Category field */}
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                  <MapPin size={14} className="text-primary" />
+                  <Tag size={14} className="text-primary" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-default-400 text-xs">{t('productFields.location')}</p>
-                  <p className="text-sm">{product.location}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-default-400 text-xs">{t('productFields.category')}</p>
+                  <p className="text-sm">{product.category?.name || '-'}</p>
                 </div>
               </div>
-            )}
-          </div>
-        </CardBody>
+
+              {/* Price field */}
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full">
+                  <CircleDollarSign size={14} className="text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-default-400 text-xs">{t('productFields.unitPrice')}</p>
+                  <p className="text-sm font-medium">{formatCurrency(Number(product.unitPrice))}</p>
+                </div>
+              </div>
+
+              {/* Unit/SKU field */}
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full">
+                  <Package size={14} className="text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-default-400 text-xs">{t('productFields.unit')}</p>
+                  <p className="text-sm">{product.unit || '-'}</p>
+                </div>
+              </div>
+
+              {/* Location field */}
+              {product.location && (
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full">
+                    <MapPin size={14} className="text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-default-400 text-xs">{t('productFields.location')}</p>
+                    <p className="text-sm">{product.location}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </div>
 
         <div
           className="border-default-100 flex gap-2 border-t p-3"
-          onClick={(e) => e.stopPropagation()}
         >
           <Button
             size="sm"
@@ -355,131 +356,86 @@ export function ProductsList() {
   );
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-col gap-y-4 sm:flex-row">
-        {/* First row: View toggle and search */}
-        <div className="flex w-full flex-row items-start gap-3 sm:items-center">
-          {/* View Toggle */}
-          <Tabs
-            selectedKey={viewType}
-            onSelectionChange={(key) => setViewType(key as 'card' | 'table')}
-            aria-label="View Options"
-            size="sm"
-            className="sm:w-auto"
-          >
-            <Tab
-              key="card"
-              title={
-                <div className="flex items-center gap-2">
-                  <LayoutGrid size={16} />
-                  <span className="hidden sm:inline">{t('common.cardView')}</span>
-                </div>
-              }
-            />
-            <Tab
-              key="table"
-              title={
-                <div className="flex items-center gap-2">
-                  <LayoutList size={16} />
-                  <span className="hidden sm:inline">{t('common.tableView')}</span>
-                </div>
-              }
-            />
-          </Tabs>
-
-          {/* Search Input */}
-          <Input
-            placeholder={t('products.searchPlaceholder')}
-            value={search}
-            onValueChange={setSearch}
-            startContent={<Search size={16} className="text-default-300" />}
-            className="w-full flex-1 sm:w-auto sm:max-w-md"
-          />
-        </div>
-
-        {/* Second row: New button */}
-        <div className="flex w-full justify-end">
-          <Button
-            color="primary"
-            startContent={<Plus size={16} />}
-            onPress={handleCreateProduct}
-            size={buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'}
-            className="w-fit sm:w-auto"
-          >
-            <span className="hidden sm:inline">{t('common.new')}</span>
-            <span className="sm:hidden">New</span>
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardBody>
-        {isLoading ? (
-          renderLoadingState()
-        ) : (productsData?.data?.length ?? 0) === 0 ? (
-          renderEmptyState()
-        ) : viewType === 'card' ? (
-          // Card View
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {productsData?.data.map(renderProductCard)}
-          </div>
-        ) : (
-          // Table View - responsive with horizontal scroll on small screens
-          <div className="-mx-4 overflow-x-auto sm:mx-0">
-            <Table
-              aria-label="Products table"
-              isStriped={tableSettings.stripedRows}
-              isHeaderSticky
-              classNames={{
-                wrapper: 'max-h-[calc(100vh-350px)] min-w-[600px]',
-                th: 'bg-default-100/80 backdrop-blur-md',
-              }}
-            >
-              <TableHeader>
-                {visibleColumns.map((column) => (
-                  <TableColumn key={column.uid}>{column.name}</TableColumn>
-                ))}
-              </TableHeader>
-              <TableBody items={productsData?.data ?? []} emptyContent={t('common.noResults')}>
-                {(item) => (
-                  <TableRow key={item.id} className="hover:bg-default-50">
-                    {visibleColumns.map((column) => (
-                      <TableCell key={column.uid}>{renderCell(item, column.uid)}</TableCell>
-                    ))}
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {(productsData?.totalCount ?? 0) > pageSize && (
-          <div className="mt-6 flex justify-center">
-            <Pagination
-              page={page}
-              total={Math.ceil((productsData?.totalCount ?? 0) / pageSize)}
-              onChange={setPage}
-              size={
-                buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'
-              }
-              showControls
-              classNames={{
-                item: 'w-8 h-8',
-              }}
-            />
-          </div>
-        )}
-      </CardBody>
-
-      {/* Delete Confirmation Dialog */}
-      <DeleteEntityDialog
-        isOpen={isDeleteOpen}
-        onClose={onDeleteClose}
-        onConfirm={handleDeleteConfirm}
-        isLoading={isDeleting}
-        entityName={t('products.entityName')}
-        entityLabel={productToDelete?.name ?? ''}
+    <div className="space-y-4">
+      <ListToolbar
+        viewType={viewType}
+        onViewTypeChange={(type) => setViewType(type)}
+        searchValue={search}
+        onSearchChange={setSearch}
+        onCreateClick={handleCreateProduct}
+        createButtonLabel={t('common.create')}
+        searchPlaceholder={t('products.searchPlaceholder')}
       />
-    </Card>
+      
+      <Card className="w-full">
+        <CardBody className="px-2 sm:px-4">
+          {isLoading ? (
+            renderLoadingState()
+          ) : (productsData?.data?.length ?? 0) === 0 ? (
+            renderEmptyState()
+          ) : viewType === 'card' ? (
+            // Card View - Reduce to single column on smallest screens
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {productsData?.data.map(renderProductCard)}
+            </div>
+          ) : (
+            // Table View - responsive with horizontal scroll on small screens
+            <div className="-mx-2 sm:-mx-4 overflow-x-auto">
+              <Table
+                aria-label="Products table"
+                isStriped={tableSettings.stripedRows}
+                isHeaderSticky
+                classNames={{
+                  wrapper: 'max-h-[calc(100vh-350px)] min-w-[600px]',
+                  th: 'bg-default-100/80 backdrop-blur-md text-xs sm:text-sm',
+                  td: 'text-xs sm:text-sm py-2 sm:py-4',
+                }}
+              >
+                <TableHeader>
+                  {visibleColumns.map((column) => (
+                    <TableColumn key={column.uid}>{column.name}</TableColumn>
+                  ))}
+                </TableHeader>
+                <TableBody items={productsData?.data ?? []} emptyContent={t('common.noResults')}>
+                  {(item) => (
+                    <TableRow key={item.id} className="hover:bg-default-50">
+                      {visibleColumns.map((column) => (
+                        <TableCell key={column.uid}>{renderCell(item, column.uid)}</TableCell>
+                      ))}
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {(productsData?.totalCount ?? 0) > pageSize && (
+            <div className="mt-4 sm:mt-6 flex justify-center">
+              <Pagination
+                page={page}
+                total={Math.ceil((productsData?.totalCount ?? 0) / pageSize)}
+                onChange={setPage}
+                size="sm"
+                showControls
+                classNames={{
+                  item: 'w-8 h-8',
+                }}
+              />
+            </div>
+          )}
+        </CardBody>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteEntityDialog
+          isOpen={isDeleteOpen}
+          onClose={onDeleteClose}
+          onConfirm={handleDeleteConfirm}
+          isLoading={isDeleting}
+          entityName={t('products.entityName')}
+          entityLabel={productToDelete?.name ?? ''}
+        />
+      </Card>
+    </div>
   );
 }

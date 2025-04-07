@@ -13,14 +13,7 @@ import type {
   UseFormWatch,
   FieldErrors,
 } from 'react-hook-form';
-import {
-  Button,
-  Input,
-  RadioGroup,
-  Radio,
-  Textarea,
-  Divider,
-} from '@heroui/react';
+import { Button, Input, RadioGroup, Radio, Textarea, Divider } from '@heroui/react';
 import { Trash, PlusCircle } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { CurrencyInput } from '~/components/ui/CurrencyInput';
@@ -37,6 +30,7 @@ interface TaskDetailViewProps {
   taskIndex: number;
   errors: FieldErrors<QuoteFormValues>;
   removeTask: () => void;
+  getValues?: UseFormWatch<QuoteFormValues>;
 }
 
 export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
@@ -47,6 +41,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   taskIndex,
   errors,
   removeTask,
+  getValues,
 }) => {
   const { t } = useTranslation();
 
@@ -54,7 +49,11 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const materialType = watch(`tasks.${taskIndex}.materialType`);
 
   // Nested Field Array for Materials
-  const { fields: materialFields, append: appendMaterial, remove: removeMaterial } = useFieldArray({
+  const {
+    fields: materialFields,
+    append: appendMaterial,
+    remove: removeMaterial,
+  } = useFieldArray({
     control,
     name: `tasks.${taskIndex}.materials`,
   });
@@ -63,10 +62,16 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
 
   const handleProductSelection = (materialIndex: number, product: Product | null) => {
     if (product) {
-      setValue(`tasks.${taskIndex}.materials.${materialIndex}.productId`, product.id, { shouldValidate: true });
+      setValue(`tasks.${taskIndex}.materials.${materialIndex}.productId`, product.id, {
+        shouldValidate: true,
+      });
       // Product price is a string, parse it to number for the form field
       const unitPrice = parseFloat(product.price); // Directly parse the string price
-      setValue(`tasks.${taskIndex}.materials.${materialIndex}.unitPrice`, isNaN(unitPrice) ? 0 : unitPrice, { shouldValidate: true }); 
+      setValue(
+        `tasks.${taskIndex}.materials.${materialIndex}.unitPrice`,
+        isNaN(unitPrice) ? 0 : unitPrice,
+        { shouldValidate: true }
+      );
     } else {
       setValue(`tasks.${taskIndex}.materials.${materialIndex}.productId`, null);
       setValue(`tasks.${taskIndex}.materials.${materialIndex}.unitPrice`, 0);
@@ -85,7 +90,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+    <div className="space-y-6">
       {/* Task Description */}
       <Input
         label={t('quotes.taskDescriptionLabel')}
@@ -94,7 +99,6 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
         errorMessage={taskErrors?.description?.message}
         isInvalid={!!taskErrors?.description}
         isRequired
-        classNames={{ input: 'py-3 text-base' }}
       />
 
       {/* Task Price (Labor) */}
@@ -105,14 +109,15 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
           <CurrencyInput
             label={t('quotes.taskPriceLabel')}
             value={value ?? 0}
-            onChange={(e) => {
-                const targetValue = typeof e === 'object' && e !== null && 'target' in e ? e.target.value : e;
-                const numValue = typeof targetValue === 'number' ? targetValue : parseFloat(targetValue || '0');
-                onChange(isNaN(numValue) ? 0 : numValue);
+            onValueChange={(val) => {
+              // Handle value directly if it's a number
+              if (typeof val === 'number') {
+                onChange(val);
+                return;
+              }
             }}
             errorMessage={taskErrors?.price?.message}
             isInvalid={!!taskErrors?.price}
-            min={0}
             isRequired
             {...fieldProps}
           />
@@ -132,19 +137,18 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
             errorMessage={taskErrors?.materialType?.message}
             isInvalid={!!taskErrors?.materialType}
             isRequired
-            className="mt-1"
           >
-            <Radio 
-                value="ITEMIZED" 
-                className="h-12 text-base block data-[selected=true]:text-primary dark:text-foreground"
+            <Radio
+              value="ITEMIZED"
+              className="data-[selected=true]:text-primary dark:text-foreground"
             >
-                {t('quotes.materialTypeItemized')}
+              {t('quotes.materialTypeItemized')}
             </Radio>
-            <Radio 
-                value="LUMPSUM" 
-                className="h-12 text-base block data-[selected=true]:text-primary dark:text-foreground"
+            <Radio
+              value="LUMPSUM"
+              className="data-[selected=true]:text-primary dark:text-foreground"
             >
-                {t('quotes.materialTypeLumpSum')}
+              {t('quotes.materialTypeLumpSum')}
             </Radio>
           </RadioGroup>
         )}
@@ -160,14 +164,15 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
             <CurrencyInput
               label={t('quotes.estimatedMaterialCostLumpSumLabel')}
               value={value ?? 0} // Ensure value is not null/undefined
-              onChange={(e) => {
-                  const targetValue = typeof e === 'object' && e !== null && 'target' in e ? e.target.value : e;
-                  const numValue = typeof targetValue === 'number' ? targetValue : parseFloat(targetValue || '0');
-                  onChange(isNaN(numValue) ? null : numValue); // Allow null for optional field
+              onValueChange={(val) => {
+                // Handle value directly if it's a number
+                if (typeof val === 'number') {
+                  onChange(val);
+                  return;
+                }
               }}
               errorMessage={taskErrors?.estimatedMaterialsCostLumpSum?.message}
               isInvalid={!!taskErrors?.estimatedMaterialsCostLumpSum}
-              min={0}
               // Not strictly required if it can be null
               {...fieldProps}
             />
@@ -175,143 +180,133 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
         />
       ) : (
         // Itemized Materials List
-        <div className="space-y-6 border-t border-gray-200 pt-6 dark:border-gray-700">
-          <h4 className="text-md font-semibold">
-            {t('quotes.materialsSectionTitle')} {/* Add this key */}
-          </h4>
+        <div className="space-y-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <h4 className="text-md font-semibold">{t('quotes.materialsSectionTitle')}</h4>
+            <Button
+              variant="flat"
+              color="primary"
+              size="sm"
+              startContent={<PlusCircle size={16} />}
+              onPress={handleAddMaterial}
+            >
+              Add Material
+            </Button>
+          </div>
+
           {materialFields.length === 0 && (
-             <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-                 {t('quotes.noMaterialsForItemized')} {/* Add key */}
+            <p className="py-2 text-center text-gray-500 dark:text-gray-400">
+              No materials added yet
             </p>
           )}
+
           {materialFields.map((material, materialIndex) => {
-              const materialErrors = taskErrors?.materials?.[materialIndex];
-              return (
-                <div 
-                    key={material.id} // useFieldArray provides stable key
-                    className="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-600"
-                 > 
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                        {/* Product Selector */}
-                        <div className="flex-1">
-                            <Controller
-                                name={`tasks.${taskIndex}.materials.${materialIndex}.productId`}
-                                control={control}
-                                render={({ field }) => (
-                                    <ProductSelector
-                                        label={t('quotes.materialProductIdLabel')}
-                                        value={field.value}
-                                        onChange={(selectedProduct) => handleProductSelection(materialIndex, selectedProduct as Product | null)}
-                                        // Pass error state down if needed
-                                        // errorMessage={materialErrors?.productId?.message} // Prop likely not supported
-                                        // isInvalid={!!materialErrors?.productId} // Prop likely not supported
-                                        // TODO: Add custom error styling based on materialErrors?.productId
-                                    />
-                                )}
-                             />
-                        </div>
-                        {/* Quantity */}
-                        <div className="w-full sm:w-24">
-                            <Controller
-                                name={`tasks.${taskIndex}.materials.${materialIndex}.quantity`}
-                                control={control}
-                                render={({ field: { onChange, value, ...fieldProps } }) => (
-                                    <IntegerInput
-                                        label={t('quotes.materialQuantityLabel')}
-                                        value={value ?? 1}
-                                        onChange={(e) => {
-                                            const targetValue = typeof e === 'object' && e !== null && 'target' in e ? e.target.value : e;
-                                            const numValue = typeof targetValue === 'number' ? targetValue : parseInt(targetValue || '1');
-                                            onChange(isNaN(numValue) ? 1 : numValue);
-                                        }}
-                                        errorMessage={materialErrors?.quantity?.message}
-                                        isInvalid={!!materialErrors?.quantity}
-                                        min={1}
-                                        isRequired
-                                        classNames={{ input: 'py-2 text-sm' }}
-                                        {...fieldProps}
-                                    />
-                                )}
-                             />
-                        </div>
-                        {/* Unit Price */}
-                        <div className="w-full sm:w-32">
-                            <Controller
-                                name={`tasks.${taskIndex}.materials.${materialIndex}.unitPrice`}
-                                control={control}
-                                render={({ field: { onChange, value, ...fieldProps } }) => (
-                                    <CurrencyInput
-                                        label={t('quotes.materialUnitPriceLabel')}
-                                        value={value ?? 0}
-                                        onChange={(e) => {
-                                            const targetValue = typeof e === 'object' && e !== null && 'target' in e ? e.target.value : e;
-                                            const numValue = typeof targetValue === 'number' ? targetValue : parseFloat(targetValue || '0');
-                                            onChange(isNaN(numValue) ? 0 : numValue);
-                                        }}
-                                        errorMessage={materialErrors?.unitPrice?.message}
-                                        isInvalid={!!materialErrors?.unitPrice}
-                                        min={0}
-                                        isRequired
-                                        classNames={{ input: 'py-2 text-sm' }}
-                                        {...fieldProps}
-                                    />
-                                )}
-                             />
-                        </div>
-                    </div>
+            const materialErrors = taskErrors?.materials?.[materialIndex];
+            return (
+              <div
+                key={material.id} // useFieldArray provides stable key
+                className="rounded-md border border-gray-200 p-3 dark:border-gray-600"
+              >
+                <div className="mb-2 flex justify-between">
+                  <h5 className="text-sm font-medium">Material #{materialIndex + 1}</h5>
+                  <Button
+                    color="danger"
+                    variant="light"
+                    size="sm"
+                    isIconOnly
+                    onPress={() => removeMaterial(materialIndex)}
+                  >
+                    <Trash size={16} />
+                  </Button>
+                </div>
 
-                    {/* Notes */}
-                    <Textarea
-                        label={t('quotes.materialNotesHeader')} // Use more appropriate key if available
-                        placeholder="Enter any notes about this material..." // Placeholder
-                        {...register(`tasks.${taskIndex}.materials.${materialIndex}.notes`)}
-                        errorMessage={materialErrors?.notes?.message}
-                        isInvalid={!!materialErrors?.notes}
-                        minRows={2}
-                        classNames={{ input: 'text-sm' }}
+                {/* Product Selector */}
+                <div className="mb-3">
+                  <Controller
+                    name={`tasks.${taskIndex}.materials.${materialIndex}.productId`}
+                    control={control}
+                    render={({ field }) => (
+                      <ProductSelector
+                        label="Product/Material"
+                        value={field.value}
+                        onChange={(selectedProduct) =>
+                          handleProductSelection(materialIndex, selectedProduct as Product | null)
+                        }
+                      />
+                    )}
+                  />
+                </div>
+
+                {/* Quantity and Unit Price on Same Row */}
+                <div className="mb-3 grid grid-cols-2 gap-3">
+                  {/* Quantity */}
+                  <div>
+                    <Controller
+                      name={`tasks.${taskIndex}.materials.${materialIndex}.quantity`}
+                      control={control}
+                      render={({ field: { onChange, value, ...fieldProps } }) => (
+                        <IntegerInput
+                          label="Quantity"
+                          value={value}
+                          onValueChange={(val) => {
+                            // Handle value directly if it's a number
+                            if (typeof val === 'number') {
+                              onChange(val);
+                              return;
+                            }
+                          }}
+                          errorMessage={materialErrors?.quantity?.message}
+                          isInvalid={!!materialErrors?.quantity}
+                          min={1}
+                          isRequired
+                          {...fieldProps}
+                        />
+                      )}
                     />
+                  </div>
 
-                    {/* Delete Material Button */}
-                     <div className="flex justify-end">
-                        <Button
-                            variant="light"
-                            color="danger"
-                            size="sm"
-                            startContent={<Trash size={16} />}
-                            onPress={() => removeMaterial(materialIndex)}
-                        >
-                            {t('quotes.deleteMaterialButton')} {/* Placeholder */}
-                        </Button>
-                     </div>
-                 </div>
-              );
-            })}
+                  {/* Unit Price */}
+                  <div>
+                    <Controller
+                      name={`tasks.${taskIndex}.materials.${materialIndex}.unitPrice`}
+                      control={control}
+                      render={({ field: { onChange, value, ...fieldProps } }) => (
+                        <CurrencyInput
+                          label="Unit Price"
+                          value={value ?? 0}
+                          onValueChange={(val) => {
+                            // Handle value directly if it's a number
+                            if (typeof val === 'number') {
+                              onChange(val);
+                              return;
+                            }
+                          }}
+                          errorMessage={materialErrors?.unitPrice?.message}
+                          isInvalid={!!materialErrors?.unitPrice}
+                          isRequired
+                          {...fieldProps}
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
 
-          {/* Add Material Button */}
-          <Button
-            fullWidth
-            variant="bordered"
-            startContent={<PlusCircle size={16} />}
-            onPress={handleAddMaterial}
-            className="mt-4"
-          >
-            {t('quotes.addMaterialButton')}
-          </Button>
+                {/* Optional Notes Field */}
+                <div>
+                  <Textarea
+                    label="Notes"
+                    placeholder="Enter any notes..."
+                    {...register(`tasks.${taskIndex}.materials.${materialIndex}.notes`)}
+                    errorMessage={materialErrors?.notes?.message}
+                    isInvalid={!!materialErrors?.notes}
+                    minRows={2}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
-
-      {/* Delete Task Button */}
-      <Divider className="my-6" />
-      <div className="flex justify-end">
-        <Button
-            variant="light"
-            color="danger"
-            startContent={<Trash size={16} />}
-            onPress={removeTask} // removeTask is passed from QuoteForm
-        >
-            {t('common.delete')} {/* Placeholder - using common.delete */}
-        </Button>
-      </div>
     </div>
   );
-}; 
+};

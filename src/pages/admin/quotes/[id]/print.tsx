@@ -1,52 +1,51 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import {
-  Button,
-  Spinner,
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-} from '@heroui/react';
-import { Download, Printer } from 'lucide-react';
+import { Button, Spinner, Drawer } from '@heroui/react';
+import { X } from 'lucide-react';
 import { api } from '~/utils/api';
-import { useToastStore } from '~/store';
 import { useTranslation } from '~/hooks/useTranslation';
-import { useConfigStore } from '~/store/configStore';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import type { inferRouterOutputs } from '@trpc/server';
-import type { AppRouter } from '~/server/api/root';
 import type { NextPageWithLayout } from '~/types/next';
 import { PrintLayout } from '~/layouts/PrintLayout';
 import { routes } from '~/config/routes';
+import { useConfigStore } from '~/store/configStore';
 
-type RouterOutput = inferRouterOutputs<AppRouter>;
-type QuoteResponse = NonNullable<RouterOutput['quote']['getById']>;
-type Task = NonNullable<QuoteResponse['tasks']>[number];
-type MaterialItem = NonNullable<Task['materials']>[number];
+// Task type definitions
+interface Material {
+  id?: string;
+  quantity: string | number;
+  unitPrice: string | number;
+  productName?: string | null;
+  [key: string]: unknown;
+}
+
+interface Task {
+  id: string;
+  description: string;
+  price: string | number;
+  materialType: 'LUMPSUM' | 'ITEMIZED';
+  estimatedMaterialsCostLumpSum: string | number | null;
+  materials?: Material[];
+  [key: string]: unknown;
+}
 
 const PrintQuotePage: NextPageWithLayout = () => {
   const router = useRouter();
   const { id: quoteId } = router.query;
   const { status } = useSession();
-  const toast = useToastStore();
   const { formatCurrency, formatDate, t } = useTranslation();
-  const companyDetails = useConfigStore((state) => ({
-    name: state.settings?.companyName,
-    email: state.settings?.companyEmail,
-    phone: state.settings?.companyPhone,
-    address: state.settings?.companyAddress,
-  }));
   const [mounted, setMounted] = useState(false);
-  const [quoteData, setQuoteData] = useState<QuoteResponse | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  // Get company info from config store
+  const { settings } = useConfigStore();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { data: fetchedQuoteData, isLoading } = api.quote.getById.useQuery(
     { id: typeof quoteId === 'string' ? quoteId : '' },
@@ -56,135 +55,76 @@ const PrintQuotePage: NextPageWithLayout = () => {
     }
   );
 
-  useEffect(() => {
-    setMounted(true);
+  const toNumber = useCallback((value: string | number | null | undefined): number => {
+    if (value === null || value === undefined) return 0;
+    const parsed = typeof value === 'string' ? parseFloat(value) : value;
+    return isNaN(parsed) ? 0 : parsed;
   }, []);
 
-  useEffect(() => {
-    if (fetchedQuoteData) {
-      try {
-        setQuoteData(fetchedQuoteData);
-      } catch (error) {
-        console.error('Error processing quote data:', error);
-        toast.error('Error loading quote data');
-      }
-    }
-  }, [fetchedQuoteData, toast]);
+  const getLaborTotal = useCallback(
+    (tasks: Task[] = []) => {
+      return tasks.reduce((total, task) => total + toNumber(task.price), 0);
+    },
+    [toNumber]
+  );
 
-  const handleDownloadPDF = async () => {
-    if (!printRef.current || !quoteData) return;
+  const getMaterialsTotal = useCallback(
+    (tasks: Task[] = []) => {
+      return tasks.reduce((total, task) => {
+        if (task.materialType === 'LUMPSUM') {
+          return total + toNumber(task.estimatedMaterialsCostLumpSum);
+        } else if (task.materialType === 'ITEMIZED' && task.materials) {
+          return (
+            total +
+            task.materials.reduce(
+              (subtotal: number, material: Material) =>
+                subtotal + toNumber(material.quantity) * toNumber(material.unitPrice),
+              0
+            )
+          );
+        }
+        return total;
+      }, 0);
+    },
+    [toNumber]
+  );
 
-    try {
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-      });
+  const formatPercent = useCallback((value: number) => {
+    return `${value.toFixed(2)}%`;
+  }, []);
 
-      const data = canvas.toDataURL('image/png');
+  const handleTaskClick = useCallback((task: Task) => {
+    setSelectedTask(task);
+    setIsDrawerOpen(true);
+  }, []);
 
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
-      });
+  const handleCloseDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+  }, []);
 
-      const imgProps = pdf.getImageProperties(data);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      pdf.addImage(data, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`quote-${quoteData.sequentialId || quoteData.id}.pdf`);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Failed to generate PDF');
-    }
-  };
-
-  const getLaborTotal = (tasks: Task[]): number => {
-    return tasks.reduce((sum: number, task: Task) => {
-      const price = typeof task.price === 'string' ? parseFloat(task.price) : task.price;
-      return sum + (price || 0);
-    }, 0);
-  };
-
-  const getMaterialsTotal = (materials: MaterialItem[] = []): number => {
-    return materials.reduce((sum: number, material: MaterialItem) => {
-      const quantity = material.quantity ?? 0;
-      const unitPrice =
-        typeof material.unitPrice === 'string'
-          ? parseFloat(material.unitPrice)
-          : (material.unitPrice ?? 0);
-      return sum + quantity * unitPrice;
-    }, 0);
-  };
-
-  const calculatedTotals = useMemo(() => {
-    if (!quoteData?.tasks || quoteData.tasks.length === 0)
-      return {
-        subtotalTasks: 0,
-        subtotalMaterials: 0,
-        grandTotal: 0,
-      };
-
-    const subtotalTasks = getLaborTotal(quoteData.tasks);
-    const subtotalMaterials = quoteData.tasks.reduce((sum: number, task: Task) => {
-      if (task.materialType === 'ITEMIZED' && task.materials) {
-        return sum + getMaterialsTotal(task.materials);
-      } else if (task.materialType === 'LUMPSUM') {
-        return sum + (Number(task.estimatedMaterialsCostLumpSum) || 0);
-      }
-      return sum;
-    }, 0);
-
-    const grandTotal = Number(quoteData.grandTotal) || 0;
-
-    return {
-      subtotalTasks,
-      subtotalMaterials,
-      grandTotal,
-    };
-  }, [quoteData]);
-
-  const toNumber = (value: string | number | null | undefined): number => {
-    if (value === null || value === undefined) return 0;
-    if (typeof value === 'number') return value;
-    const num = parseFloat(value);
-    return isNaN(num) ? 0 : num;
-  };
-
-  const formatPercent = (value: number | string | null | undefined) => {
-    const num = toNumber(value);
-    return num.toLocaleString(undefined, {
-      style: 'percent',
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    });
-  };
-
+  // Loading state
   if (!mounted || status === 'loading' || isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
+      <div className="flex h-full items-center justify-center p-8 print:hidden">
         <Spinner size="lg" />
       </div>
     );
   }
 
+  // Authentication check
   if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
 
-  if (!isLoading && !quoteData) {
+  // Not found state
+  if (!isLoading && !fetchedQuoteData) {
     return (
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto p-4 print:hidden">
         <div className="py-12 text-center">
           <h2 className="mb-4 text-2xl font-bold">Quote Not Found</h2>
           <p className="mb-6 text-gray-500">
-            The quote you&apos;re looking for doesn&apos;t exist or has been removed.
+            The quote you're looking for doesn't exist or has been removed.
           </p>
           <Button color="primary" onPress={() => router.push(routes.admin.quotes.list)}>
             Back to Quotes
@@ -194,323 +134,224 @@ const PrintQuotePage: NextPageWithLayout = () => {
     );
   }
 
-  if (!quoteData) return null;
+  const quote = fetchedQuoteData;
+
+  // Calculate totals
+  const laborTotal = getLaborTotal(quote?.tasks || []);
+  const materialsTotal = getMaterialsTotal(quote?.tasks || []);
+  const subtotal = laborTotal + materialsTotal;
+  const markupAmount = subtotal * toNumber(quote?.markupPercentage || 0);
+  const grandTotal = subtotal + markupAmount;
 
   return (
     <>
       <Head>
-        <title>{t('quotes.print.title', { id: `#${quoteData.sequentialId}` })}</title>
+        <title>{quote ? `Quote #${quote.sequentialId}` : 'Quote Print'}</title>
+        <style type="text/css" media="print">{`
+          @page { 
+            size: letter portrait;
+            margin: 0.5in; 
+          }
+          body { 
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+            background-color: white !important;
+          }
+          .print-page {
+            page-break-inside: avoid;
+            background-color: white !important;
+          }
+          .page-break { 
+            page-break-after: always; 
+            height: 0;
+            display: block;
+          }
+          tr { page-break-inside: avoid; }
+          .hover-effect:hover { background-color: transparent !important; }
+          
+          /* Hide elements with print:hidden class */
+          .print\\:hidden {
+            display: none !important;
+          }
+        `}</style>
       </Head>
 
-      <div className="no-print fixed top-0 right-0 left-0 z-10 bg-white p-4 shadow-md print:hidden">
-        <div className="container mx-auto flex justify-between">
-          <Button variant="flat" onPress={() => router.push(routes.admin.quotes.detail(quoteId as string))}>
-            Back
-          </Button>
-          <div className="flex gap-2">
-            <Button
-              variant="flat"
-              color="primary"
-              startContent={<Download size={16} />}
-              onPress={handleDownloadPDF}
-            >
-              Download PDF
-            </Button>
-            <Button
-              color="primary"
-              startContent={<Printer size={16} />}
-              onPress={() => window.print()}
-            >
-              Print
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div
-        id="printable-area"
-        ref={printRef}
-        className="container mx-auto bg-white p-8 print:p-4 print:shadow-none"
-      >
-        <div className="mb-8 flex flex-col items-center justify-between border-b border-gray-300 pb-4 print:flex-row print:items-start print:border-b-2 print:border-black">
-          <div>
-            {companyDetails.name && (
-              <>
-                <h1 className="text-xl font-bold print:text-2xl">{companyDetails.name}</h1>
-                <div className="text-sm text-gray-500 print:text-xs">
-                  {companyDetails.address && <p>{companyDetails.address}</p>}
-                  {(companyDetails.phone || companyDetails.email) && (
-                    <p>
-                      {companyDetails.phone}
-                      {companyDetails.phone && companyDetails.email && ' | '}
-                      {companyDetails.email}
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <div className="mt-4 text-center print:mt-0 print:text-right">
-            <h2 className="mb-1 text-2xl font-bold text-gray-700 print:text-3xl">QUOTE</h2>
-            <p className="text-sm text-gray-500 print:text-base">
-              {t('quotes.id')}: #{quoteData.sequentialId}
-            </p>
-            <p className="text-sm text-gray-500 print:text-base">
-              {t('quotes.date')}: {formatDate(quoteData.createdAt)}
-            </p>
-            <p className="mt-2 text-sm font-medium uppercase print:mt-1 print:text-xs">
-              STATUS: {quoteData.status}
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-8 border-b border-gray-300 pb-4 print:border-b-2 print:border-black">
-          <h1 className="text-xl font-bold print:text-2xl">{quoteData.title}</h1>
-        </div>
-
-        <div className="mb-8 grid grid-cols-1 gap-6 print:grid-cols-2">
-          <div>
-            <h3 className="mb-2 text-base font-bold text-gray-700 print:text-lg">
-              Customer Information
-            </h3>
-            <div className="rounded-md border bg-gray-50 p-4 print:border-gray-300 print:bg-transparent print:p-0">
-              <p className="font-semibold print:font-bold">{quoteData.customer.name}</p>
-              {quoteData.customer.email && (
-                <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.email}</p>
-              )}
-              {quoteData.customer.phone && (
-                <p className="text-sm text-gray-600 print:text-sm">{quoteData.customer.phone}</p>
-              )}
-              {quoteData.customer.address && (
-                <p className="mt-1 text-sm whitespace-pre-line text-gray-600 print:text-sm">
-                  {quoteData.customer.address}
-                </p>
-              )}
-            </div>
-          </div>
-          <div>
-            <h3 className="mb-2 text-base font-bold text-gray-700 print:text-lg">Quote Summary</h3>
-            <div className="rounded-md border bg-gray-50 p-4 print:border-none print:bg-transparent print:p-0">
-              <div className="mb-1 flex justify-between print:mb-0.5">
-                <span className="text-sm text-gray-600 print:text-sm">Labor:</span>
-                <span className="text-sm print:text-sm">
-                  {formatCurrency(calculatedTotals.subtotalTasks)}
-                </span>
+      {quote && (
+        <div className="print-page mx-auto max-w-[8.5in] bg-white p-6 shadow print:max-w-none print:p-0 print:shadow-none">
+          {/* Company Header */}
+          <div className="mb-6 border-b border-gray-200 pb-6 print:border-b-gray-400">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">
+                  {quote.title || `Quote #${quote.sequentialId}`}
+                </h1>
+                <p className="text-gray-600">{formatDate(quote.createdAt)}</p>
               </div>
-              <div className="mb-1 flex justify-between print:mb-0.5">
-                <span className="text-sm text-gray-600 print:text-sm">Materials:</span>
-                <span className="text-sm print:text-sm">
-                  {formatCurrency(calculatedTotals.subtotalMaterials)}
-                </span>
-              </div>
-
-              {quoteData.markupCharge > 0 && (
-                <div className="mb-1 flex justify-between print:mb-0.5">
-                  <span className="text-sm text-gray-600 print:text-sm">
-                    Markup ({formatPercent(quoteData.markupPercentage)}):
-                  </span>
-                  <span className="text-sm print:text-sm">
-                    {formatCurrency(quoteData.markupCharge)}
-                  </span>
-                </div>
-              )}
-
-              <div className="mt-2 border-t border-gray-300 pt-1 print:mt-1 print:border-t-2 print:border-black">
-                <div className="flex justify-between font-bold print:text-lg">
-                  <span>Total:</span>
-                  <span>{formatCurrency(quoteData.grandTotal)}</span>
-                </div>
+              <div className="text-right">
+                <h2 className="text-lg font-semibold text-gray-800">{settings?.companyName}</h2>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="mb-8">
-          <h3 className="mb-4 text-lg font-bold text-gray-700 print:mt-6 print:border-t print:border-black print:pt-4 print:text-xl">
-            {t('quotes.tasksSectionTitle')}
-          </h3>
-          {quoteData.tasks && quoteData.tasks.length > 0 ? (
-            <div className="space-y-4 print:space-y-3">
-              {quoteData.tasks.map((task: Task, index: number) => (
-                <div
-                  key={task.id || index}
-                  className="break-inside-avoid border-b border-gray-200 pb-3 print:border-none print:pb-2"
-                >
-                  <div className="mb-1 print:mb-0.5">
-                    <p className="font-semibold print:text-base print:font-bold">
-                      {task.description}
-                    </p>
-                  </div>
-                  <div className="flex justify-between text-sm print:text-xs">
-                    <p>
-                      {t('quotes.taskPriceLabel')}: {formatCurrency(toNumber(task.price))}
-                    </p>
-                    <p>
-                      {t('quotes.materialTypeLabel')}:{' '}
-                      <span className="capitalize">{task.materialType?.toUpperCase() || '-'}</span>
-                    </p>
-                  </div>
+          <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div>
+              <h2 className="mb-3 border-b border-gray-200 pb-1 text-lg font-semibold text-gray-800">
+                Quote Information
+              </h2>
+              <div className="space-y-2">
+                {quote.title && (
+                  <p>
+                    <span className="font-medium text-black">Title:</span>{' '}
+                    <span className="text-black">{quote.title}</span>
+                  </p>
+                )}
+                {toNumber(quote.markupPercentage) > 0 && (
+                  <p>
+                    <span className="font-medium text-black">Markup:</span>{' '}
+                    <span className="text-black">
+                      {formatPercent(toNumber(quote.markupPercentage) * 100)}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
 
-                  {task.materialType === 'LUMPSUM' && (
-                    <div className="text-sm print:text-xs">
+            {quote.customer &&
+              Object.keys(quote.customer).some(
+                (key) =>
+                  quote.customer &&
+                  quote.customer[key as keyof typeof quote.customer] !== null &&
+                  quote.customer[key as keyof typeof quote.customer] !== undefined &&
+                  quote.customer[key as keyof typeof quote.customer] !== ''
+              ) && (
+                <div>
+                  <h2 className="mb-3 border-b border-gray-200 pb-1 text-lg font-semibold text-gray-800">
+                    Customer Information
+                  </h2>
+                  <div className="space-y-2">
+                    {quote.customer.name && (
                       <p>
-                        {t('quotes.estimatedMaterialCostLumpSumLabel')}:{' '}
-                        {formatCurrency(toNumber(task.estimatedMaterialsCostLumpSum) || 0)}
-                      </p>
-                    </div>
-                  )}
-
-                  {task.materialType === 'ITEMIZED' &&
-                    task.materials &&
-                    task.materials.length > 0 && (
-                      <div className="mt-2 pl-4 print:mt-1 print:pl-2">
-                        <Table
-                          removeWrapper
-                          aria-label={`Materials for task ${index + 1}`}
-                          className="print:text-xs"
-                          classNames={{ th: 'print:p-1 print:bg-transparent', td: 'print:p-1' }}
-                        >
-                          <TableHeader>
-                            <TableColumn className="print:font-semibold">
-                              {t('quotes.materialProductIdHeader')}
-                            </TableColumn>
-                            <TableColumn className="print:font-semibold">
-                              {t('quotes.materialNotesHeader')}
-                            </TableColumn>
-                            <TableColumn className="text-right print:font-semibold">
-                              {t('quotes.materialQuantityHeader')}
-                            </TableColumn>
-                            <TableColumn className="text-right print:font-semibold">
-                              {t('quotes.materialUnitPriceHeader')}
-                            </TableColumn>
-                            <TableColumn className="text-right print:font-semibold">
-                              {t('quotes.materialLineTotalHeader')}
-                            </TableColumn>
-                          </TableHeader>
-                          <TableBody items={task.materials as MaterialItem[]}>
-                            {(material) => (
-                              <TableRow key={material.id}>
-                                <TableCell>
-                                  {material.productId || t('common.notAvailable')}
-                                </TableCell>
-                                <TableCell>{material.notes || '-'}</TableCell>
-                                <TableCell className="text-right">
-                                  {toNumber(material.quantity)}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {formatCurrency(toNumber(material.unitPrice))}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {formatCurrency(
-                                    toNumber(material.quantity) * toNumber(material.unitPrice)
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  {task.materialType === 'ITEMIZED' &&
-                    (!task.materials || task.materials.length === 0) && (
-                      <p className="mt-1 pl-4 text-xs text-gray-500 italic print:pl-2">
-                        {t('quotes.noMaterialsAdded')}
+                        <span className="font-medium text-black">Name:</span>{' '}
+                        <span className="text-black">{quote.customer.name}</span>
                       </p>
                     )}
+                    {quote.customer.phone && (
+                      <p>
+                        <span className="font-medium text-black">Phone:</span>{' '}
+                        <span className="text-black">{quote.customer.phone}</span>
+                      </p>
+                    )}
+                    {quote.customer.email && (
+                      <p>
+                        <span className="font-medium text-black">Email:</span>{' '}
+                        <span className="text-black">{quote.customer.email}</span>
+                      </p>
+                    )}
+                    {quote.customer.address && (
+                      <p>
+                        <span className="font-medium text-black">Address:</span>{' '}
+                        <span className="text-black">{quote.customer.address}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-              ))}
+              )}
+          </div>
+
+          {quote.tasks && quote.tasks.length > 0 && (
+            <div className="mb-8">
+              <h2 className="mb-3 border-b border-gray-200 pb-1 text-lg font-semibold text-gray-800">
+                Tasks & Materials
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-gray-400 bg-gray-200 print:bg-gray-200">
+                      <th className="p-3 text-left font-semibold text-gray-700">Description</th>
+                      <th className="p-3 text-right font-semibold text-gray-700">Labor</th>
+                      <th className="p-3 text-right font-semibold text-gray-700">Materials</th>
+                      <th className="p-3 text-right font-semibold text-gray-700">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quote.tasks.map((task) => {
+                      const taskMaterialsTotal =
+                        task.materialType === 'LUMPSUM'
+                          ? toNumber(task.estimatedMaterialsCostLumpSum)
+                          : task.materials?.reduce(
+                              (sum, mat) => sum + toNumber(mat.quantity) * toNumber(mat.unitPrice),
+                              0
+                            ) || 0;
+
+                      const taskTotal = toNumber(task.price) + taskMaterialsTotal;
+
+                      return (
+                        <tr
+                          key={task.id}
+                          className="cursor-pointer border-b border-gray-200 hover:bg-gray-50 print:cursor-default print:hover:bg-transparent"
+                          onClick={() => handleTaskClick(task as Task)}
+                        >
+                          <td className="p-3 text-gray-700">{task.description}</td>
+                          <td className="p-3 text-right text-gray-700">
+                            {formatCurrency(toNumber(task.price))}
+                          </td>
+                          <td className="p-3 text-right text-gray-700">
+                            {formatCurrency(taskMaterialsTotal)}
+                          </td>
+                          <td className="p-3 text-right font-medium text-gray-700">
+                            {formatCurrency(taskTotal)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-400 bg-gray-200 print:bg-gray-200">
+                      <td className="p-3 text-left font-medium text-gray-800">Summary</td>
+                      <td className="p-3 text-right font-medium text-gray-800">
+                        {formatCurrency(laborTotal)}
+                      </td>
+                      <td className="p-3 text-right font-medium text-gray-800">
+                        {formatCurrency(materialsTotal)}
+                      </td>
+                      <td className="p-3 text-right font-bold text-black">
+                        {formatCurrency(grandTotal)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500 italic">{t('quotes.noTasksAddedReadOnly')}</p>
           )}
-        </div>
 
-        {quoteData.notes && (
-          <div className="mb-8 print:mt-4">
-            <h3 className="mb-2 text-lg font-bold text-gray-700 print:mt-3 print:border-t print:border-black print:pt-2 print:text-xl">
-              Notes
-            </h3>
-            <div className="rounded-md bg-gray-50 p-4 print:bg-transparent print:p-0 print:text-sm">
-              <p className="whitespace-pre-line">{quoteData.notes}</p>
+          {quote.notes && (
+            <div className="mb-8">
+              <h2 className="mb-3 border-b border-gray-200 pb-1 text-lg font-semibold text-gray-800">
+                Notes
+              </h2>
+              <div className="rounded border border-gray-200 bg-gray-50 p-3 print:bg-gray-50">
+                <p className="whitespace-pre-wrap text-gray-700">{quote.notes}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="mb-8 print:mt-4">
-          <h3 className="mb-2 text-lg font-bold text-gray-700 print:mt-3 print:border-t print:border-black print:pt-2 print:text-xl">
-            Terms & Conditions
-          </h3>
-          <div className="rounded-md bg-gray-50 p-4 text-sm text-gray-600 print:bg-transparent print:p-0 print:text-xs">
-            <p className="mb-1 print:mb-0.5">
-              <strong>1. Acceptance:</strong> This quote is valid for 30 days from the date of issue
-              unless otherwise stated. Acceptance of this quote constitutes an agreement to the
-              terms and conditions stated herein.
-            </p>
-            <p className="mb-1 print:mb-0.5">
-              <strong>2. Payment:</strong> A 50% deposit is required to begin work, with the
-              remaining balance due upon completion. All payments must be made within 15 days of
-              invoice receipt.
-            </p>
-            <p className="mb-1 print:mb-0.5">
-              <strong>3. Changes:</strong> Any changes to the scope of work may result in additional
-              charges. Changes must be agreed upon in writing before implementation.
-            </p>
+          <div className="mt-12 text-center text-xs text-gray-500 print:hidden">
             <p>
-              <strong>4. Warranty:</strong> All work is guaranteed for a period of one year from the
-              date of completion, covering defects in workmanship or materials.
+              This document was generated on {new Date().toLocaleDateString()} and is for estimation
+              purposes only.
             </p>
           </div>
         </div>
+      )}
 
-        <div className="mt-12 grid grid-cols-1 gap-8 border-t border-gray-300 pt-8 print:mt-8 print:grid-cols-2 print:gap-12 print:border-t-2 print:border-black print:pt-4">
-          <div>
-            <p className="mb-4 text-sm text-gray-600 print:mb-2 print:text-xs">
-              To accept this quote, please sign and date below:
-            </p>
-            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
-              <p className="text-xs text-gray-500 print:text-sm">Customer Signature</p>
-            </div>
-            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
-              <p className="text-xs text-gray-500 print:text-sm">Date</p>
-            </div>
-            <div className="mb-2 border-b border-gray-300 pb-1 print:mb-4 print:pb-2">
-              <p className="text-xs text-gray-500 print:text-sm">Print Name</p>
-            </div>
-          </div>
-          <div>
-            <p className="mb-4 text-sm text-gray-600 print:mb-2 print:text-xs">Approved by:</p>
-            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
-              <p className="text-xs text-gray-500 print:text-sm">Company Representative</p>
-            </div>
-            <div className="mb-4 border-b border-gray-300 pb-1 print:mb-6 print:pb-2">
-              <p className="text-xs text-gray-500 print:text-sm">Date</p>
-            </div>
-            <div className="mb-2 border-b border-gray-300 pb-1 print:mb-4 print:pb-2">
-              <p className="text-xs text-gray-500 print:text-sm">Title</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-12 border-t border-gray-300 pt-4 text-center text-sm text-gray-500 print:mt-6 print:border-t-2 print:border-black print:pt-2 print:text-xs">
-          <p>Thank you for your business!</p>
-          <p>For any questions regarding this quote, please contact us at (555) 123-4567.</p>
-        </div>
-
-        <div className="mt-8 text-right text-xs">
-          <p>Quote Generated On: {formatDate(new Date(), 'long')}</p>
-          <p>Thank you for your business!</p>
-          <p className="mt-2 italic">
-            {companyDetails.name ||
-              'Your Company Name - 123 Street, City, State ZIP - (555) 123-4567 - your@email.com'}
-          </p>
-        </div>
-      </div>
+      {/* Render the drawer component */}
     </>
   );
 };
 
 PrintQuotePage.getLayout = function getLayout(page: React.ReactElement) {
-  return <PrintLayout>{page}</PrintLayout>;
+  return <PrintLayout title="Quote Print">{page}</PrintLayout>;
 };
 
 export default PrintQuotePage;

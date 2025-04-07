@@ -45,6 +45,12 @@ function EditQuotePageContent() {
     if (id) {
       const { customerId, tasks: formTasks, ...restOfFormData } = formData; // Destructure tasks too
 
+      // Ensure customerId is present before proceeding
+      if (!customerId) {
+        toast.error('Customer selection is required to update a quote.');
+        return; // Stop execution if customerId is null or undefined
+      }
+
       // Transform tasks: convert materialType to lowercase and filter materials
       const transformedTasks = formTasks?.map(task => {
         // Filter materials to only include those with a valid productId
@@ -73,8 +79,8 @@ function EditQuotePageContent() {
 
       const dataToSend = {
         ...restOfFormData,
-        customerId: customerId === null ? undefined : customerId, // Convert null to undefined
-        markupPercentage: (formData.markupPercentage || 0) / 100, // Convert to decimal
+        customerId: customerId, // Use validated customerId (guaranteed string here)
+        markupPercentage: (formData.markupPercentage || 0) / 100, // Convert back to decimal (0-1)
         tasks: transformedTasks, // Use the transformed tasks array
         // Status is intentionally NOT included here
       };
@@ -101,7 +107,7 @@ function EditQuotePageContent() {
         <h2 className="text-xl font-semibold">Quote not found</h2>
         <Button
           color="primary"
-          variant="light"
+          variant="ghost"
           className="mt-4"
           startContent={<ArrowLeft size={16} />}
           onClick={() => router.push(routes.admin.quotes.list)}
@@ -162,10 +168,26 @@ function EditQuotePageContent() {
               initialValues={{
                 title: quote.title,
                 customerId: quote.customerId,
-                markupPercentage: quote.markupPercentage,
+                markupPercentage: quote.markupPercentage * 100, // Convert from decimal to percentage for the form
                 notes: quote.notes || '',
-                // Provide empty array for tasks
-                tasks: [],
+                // Map and transform tasks from the quote
+                tasks: quote.tasks?.map(task => ({
+                  id: task.id,
+                  description: task.description,
+                  price: parseFloat(task.price),
+                  materialType: task.materialType === 'LUMPSUM' ? 'LUMPSUM' : 'ITEMIZED',
+                  estimatedMaterialsCostLumpSum: task.estimatedMaterialsCostLumpSum 
+                    ? parseFloat(task.estimatedMaterialsCostLumpSum) 
+                    : null,
+                  // Map materials if they exist
+                  materials: task.materials?.map(material => ({
+                    id: material.id,
+                    productId: material.productId,
+                    quantity: material.quantity,
+                    unitPrice: parseFloat(material.unitPrice),
+                    notes: material.notes || null,
+                  })) || [],
+                })) || [],
               }}
               onSubmit={handleSubmit}
               isSubmitting={isSaving}

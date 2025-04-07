@@ -1,10 +1,19 @@
 'use client';
 
 import React from 'react';
-import { Button, Listbox, ListboxItem } from '@heroui/react';
-import { PlusCircle, Edit, Trash } from 'lucide-react';
+import {
+  Button,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@heroui/react';
+import { PlusCircle, Edit, Trash, ClipboardList } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import type { QuoteFormValues, TaskFormValues } from './QuoteForm';
+import type { UseFormWatch } from 'react-hook-form';
 
 // Extend TaskFormValues to include the 'id' provided by useFieldArray
 export interface TaskItem extends TaskFormValues {
@@ -16,7 +25,7 @@ interface TaskMasterListProps {
   onSelectTask: (index: number) => void;
   onAddTask: () => void;
   onDeleteTask: (index: number) => void;
-  // onMoveTask: (from: number, to: number) => void; // TODO: Implement reordering later
+  watch?: UseFormWatch<QuoteFormValues>;
 }
 
 export const TaskMasterList: React.FC<TaskMasterListProps> = ({
@@ -24,84 +33,117 @@ export const TaskMasterList: React.FC<TaskMasterListProps> = ({
   onSelectTask,
   onAddTask,
   onDeleteTask,
-  // onMoveTask
+  watch,
 }) => {
   const { t, formatCurrency } = useTranslation();
 
+  // Calculate task totals for display
+  const getTaskTotal = (task: TaskItem): number => {
+    const laborCost =
+      typeof task.price === 'number' ? task.price : parseFloat(String(task.price) || '0');
+
+    let materialsCost = 0;
+    if (task.materialType === 'LUMPSUM' && task.estimatedMaterialsCostLumpSum) {
+      materialsCost =
+        typeof task.estimatedMaterialsCostLumpSum === 'number'
+          ? task.estimatedMaterialsCostLumpSum
+          : parseFloat(String(task.estimatedMaterialsCostLumpSum) || '0');
+    } else if (task.materialType === 'ITEMIZED' && task.materials && task.materials.length > 0) {
+      materialsCost = task.materials.reduce((sum, material) => {
+        const quantity =
+          typeof material.quantity === 'number'
+            ? material.quantity
+            : parseFloat(String(material.quantity) || '0');
+        const unitPrice =
+          typeof material.unitPrice === 'number'
+            ? material.unitPrice
+            : parseFloat(String(material.unitPrice) || '0');
+        return sum + quantity * unitPrice;
+      }, 0);
+    }
+
+    return laborCost + materialsCost;
+  };
+
   return (
     <div className="space-y-4">
-      {tasks.length === 0 && (
-        <p className="py-4 text-center text-gray-500 dark:text-gray-400">
-          {/* {t('quotes.noTasksAddedEditable')} */} {/* Add this translation key */}
-          No tasks added yet. Click below to add the first task. {/* Placeholder */}
-        </p>
-      )}
+      {/* Add New Task Button - Always visible at the top */}
+      <div className="flex justify-end">
+        <Button color="primary" startContent={<PlusCircle size={18} />} onPress={onAddTask}>
+          Add Task
+        </Button>
+      </div>
 
-      {tasks.length > 0 && (
-        <Listbox
-          aria-label="Task List"
-          variant="flat"
-          className="rounded-md border p-0 dark:border-gray-700"
+      {tasks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 p-8 text-center dark:border-gray-600">
+          <ClipboardList size={40} className="mb-2 text-gray-400" />
+          <p className="mb-1 text-lg font-medium">No tasks added yet</p>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Add tasks to create a detailed quote
+          </p>
+          <Button color="primary" startContent={<PlusCircle size={16} />} onPress={onAddTask}>
+            Add Task
+          </Button>
+        </div>
+      ) : (
+        <Table
+          aria-label="Tasks table"
+          removeWrapper
+          classNames={{
+            base: 'border border-gray-200 rounded-lg',
+          }}
         >
-          {tasks.map((task, index) => (
-            <ListboxItem
-              key={task.id} // Use the field array item ID for the key
-              textValue={task.description || `Task ${index + 1}`}
-              className="border-b last:border-b-0 data-[hover=true]:bg-gray-100 dark:border-gray-700 dark:data-[hover=true]:bg-gray-700/50"
-            >
-              <div className="flex w-full items-center justify-between px-3 py-2">
-                {/* Task Description and Price */}
-                <div className="mr-4 min-w-0 flex-1 cursor-pointer" onClick={() => onSelectTask(index)}>
-                  <p className="truncate text-sm font-medium dark:text-gray-200">
-                    {/* {task.description || t('common.untitledTask')} */} {/* Add common.untitledTask */}
-                    {task.description || `Untitled Task ${index + 1}`} {/* Placeholder */}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {/* Assuming formatCurrency exists, otherwise use basic formatting */}
-                    {formatCurrency(task.price || 0)}
-                  </p>
-                </div>
+          <TableHeader>
+            <TableColumn>DESCRIPTION</TableColumn>
+            <TableColumn>LABOR COST</TableColumn>
+            <TableColumn>MATERIALS</TableColumn>
+            <TableColumn>TOTAL</TableColumn>
+            <TableColumn width={120}>ACTIONS</TableColumn>
+          </TableHeader>
+          <TableBody>
+            {tasks.map((task, index) => {
+              const taskTotal = getTaskTotal(task);
+              const materialCount =
+                task.materialType === 'ITEMIZED' ? task.materials?.length || 0 : null;
+              const materialInfo =
+                task.materialType === 'LUMPSUM' ? 'Lump sum' : `${materialCount} item(s)`;
 
-                {/* Action Buttons */}
-                <div className="flex items-center space-x-1">
-                  {/* TODO: Add Move Up/Down Buttons later if needed */}
-                  <Button
-                    isIconOnly
-                    size="sm" 
-                    variant="light" 
-                    onPress={() => onSelectTask(index)}
-                    aria-label={t('common.edit')} // Add translation key
-                  >
-                    <Edit size={16} />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm" 
-                    variant="light" 
-                    color="danger" 
-                    onPress={() => onDeleteTask(index)}
-                    aria-label={t('common.delete')} // Add translation key
-                  >
-                    <Trash size={16} />
-                  </Button>
-                </div>
-              </div>
-            </ListboxItem>
-          ))}
-        </Listbox>
+              return (
+                <TableRow key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <TableCell className="font-medium">
+                    {task.description || `Untitled Task ${index + 1}`}
+                  </TableCell>
+                  <TableCell>{formatCurrency(task.price || 0)}</TableCell>
+                  <TableCell>{materialInfo}</TableCell>
+                  <TableCell className="font-medium">{formatCurrency(taskTotal)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="primary"
+                        onPress={() => onSelectTask(index)}
+                        isIconOnly
+                      >
+                        <Edit size={16} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="light"
+                        onPress={() => onDeleteTask(index)}
+                        isIconOnly
+                      >
+                        <Trash size={16} />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
-
-      {/* Add Task Button */}
-      <Button
-        fullWidth
-        variant="ghost"
-        color="primary"
-        startContent={<PlusCircle size={18} />}
-        onPress={onAddTask}
-        className="mt-4 h-12 text-base"
-      >
-        {t('quotes.addTaskButton')} {/* Add this translation key */}
-      </Button>
     </div>
   );
 };

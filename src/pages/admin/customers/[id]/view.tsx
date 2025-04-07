@@ -1,192 +1,243 @@
-import { useRouter } from 'next/router';
-import { 
-  Card, 
-  CardHeader, 
-  CardBody, 
-  Button,
-  Spinner,
-  Divider,
-} from '@heroui/react';
-import { ArrowLeft, Edit, Trash } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import Head from 'next/head';
+import { Trash, Edit } from 'lucide-react';
+import { Button, Card, CardBody, CardHeader, Divider, Spinner } from '@heroui/react';
+
+import type { NextPageWithLayout } from '~/types/next';
+import { MainLayout } from '~/layouts/MainLayout';
 import { useTranslation } from '~/hooks/useTranslation';
-import { CustomerQuotes } from '~/components/customers/CustomerQuotes';
+import { useToastStore } from '~/store';
 import { api } from '~/utils/api';
-import { withMainLayout } from '~/utils/withAuth';
-import { useAppToast } from '~/components/providers/ToastProvider';
+import { routes } from '~/config/routes';
+import { formatDate } from '~/utils/date';
 import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
-import { useState } from 'react';
-import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { Breadcrumb } from '~/components/shared/Breadcrumb';
+import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
 
-function CustomerDetail() {
+const ViewCustomerPage: NextPageWithLayout = () => {
+  const { t } = useTranslation();
   const router = useRouter();
-  const { id } = router.query as { id: string };
-  const { t, formatDate } = useTranslation();
-  const toast = useAppToast();
+  const params = useParams<{ id: string }>();
+  const customerId = params?.id as string;
+  const { error: showErrorToast, success: showSuccessToast } = useToastStore();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  const { data: customer, isLoading } = api.customer.getById.useQuery(
-    { id },
+  // Fetch customer details
+  const {
+    data: customer,
+    isLoading,
+    error,
+  } = api.customer.getById.useQuery(
+    { id: customerId },
     {
-      enabled: !!id,
-      refetchOnWindowFocus: false,
+      enabled: !!customerId,
+      retry: false
     }
   );
 
-  const { mutate: deleteCustomer } = api.customer.delete.useMutation({
+  // Fetch quotes from this customer
+  const { data: customerQuotes } = api.quote.getAll.useQuery(
+    { 
+      customerId,
+      page: 1,
+      limit: 5 
+    },
+    {
+      enabled: !!customerId
+    }
+  );
+
+  // Handle errors from customer fetch
+  useEffect(() => {
+    if (error) {
+      showErrorToast(error.message);
+      router.push(routes.admin.customers.list);
+    }
+  }, [error, router, showErrorToast]);
+
+  // Delete customer mutation
+  const deleteMutation = api.customer.delete.useMutation({
     onSuccess: () => {
-      toast.success(t('customers.deleteSuccess'));
-      router.push('/admin/customers');
+      showSuccessToast(t('customers.deleteSuccess'));
+      router.push(routes.admin.customers.list);
     },
     onError: (error) => {
-      toast.error(error.message || t('customers.deleteError'));
-    },
-    onSettled: () => {
-      setIsDeleting(false);
+      showErrorToast(error.message);
     }
   });
 
-  const handleDelete = async (): Promise<void> => {
-    if (id) {
-      setIsDeleting(true);
-      return new Promise<void>((resolve) => {
-        deleteCustomer({ id });
-        // We resolve immediately but UI will wait for onSettled to hide loading state
-        resolve();
-      });
-    }
-    return Promise.resolve();
+  // Handle delete click
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
   };
 
+  // Confirm delete
+  const confirmDelete = async () => {
+    if (customerId) {
+      await deleteMutation.mutateAsync({ id: customerId });
+    }
+  };
+
+  const customerEntityName = t('customers.entityName');
+
+  // Define breadcrumb items
+  const breadcrumbItems: BreadcrumbItem[] | null = customer ? [
+    { label: t('nav.dashboard'), href: routes.admin.dashboard },
+    { label: t('breadcrumb.customers.list'), href: routes.admin.customers.list },
+    { label: customer.name, href: routes.admin.customers.detail(customerId), isCurrent: true },
+  ] : null;
+
+  // Loading state
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner size="lg" />
+      <div className="flex h-[400px] w-full items-center justify-center">
+        <Spinner size="lg" color="primary" />
       </div>
     );
   }
 
-  if (!customer) {
+  // Error state
+  if (error || !customer) {
     return (
-      <div className="flex h-full flex-col items-center justify-center">
-        <h2 className="text-xl font-semibold">Customer not found</h2>
-        <Button
-          color="primary"
-          variant="light"
-          className="mt-4"
-          startContent={<ArrowLeft size={16} />}
-          onPress={() => router.push('/admin/customers')}
-        >
-          Back to Customers
+      <div className="flex h-[400px] w-full flex-col items-center justify-center gap-4">
+        <p className="text-danger">{error?.message || t('common.error')}</p>
+        <Button color="primary" onPress={() => router.push(routes.admin.customers.list)}>
+          {t('common.back')}
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <nav className="flex items-center">
-          <Link 
-            href="/admin/customers" 
-            className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-          >
-            Customers
-          </Link>
-          <ChevronRight size={16} className="mx-2 text-gray-400" />
-          <span className="text-sm font-medium text-gray-900">
-            {customer?.name || 'Customer Details'}
-          </span>
-        </nav>
-        
-        <div className="flex gap-2">
-          <Button
-            color="primary"
-            variant="light"
-            startContent={<ArrowLeft size={16} />}
-            onPress={() => router.push('/admin/customers')}
-          >
-            Back
-          </Button>
-          <Button
-            color="primary"
-            variant="flat"
-            startContent={<Edit size={16} />}
-            onPress={() => router.push(`/admin/customers/${id}/edit`)}
-          >
-            Edit
-          </Button>
-          <Button
-            color="danger"
-            variant="flat"
-            startContent={<Trash size={16} />}
-            onPress={() => setIsDeleteDialogOpen(true)}
-          >
-            Delete
-          </Button>
-        </div>
-      </div>
+    <>
+      <Head>
+        <title>{customer.name}</title>
+      </Head>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-2xl font-bold">{customer.name}</h2>
-        </CardHeader>
-        <CardBody>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <h3 className="mb-2 text-lg font-semibold">Contact Information</h3>
-              <div className="space-y-2">
-                <p>
-                  <span className="font-medium">Email:</span>{' '}
-                  {customer.email || 'Not provided'}
-                </p>
-                <p>
-                  <span className="font-medium">Phone:</span>{' '}
-                  {customer.phone || 'Not provided'}
-                </p>
-              </div>
-            </div>
-            <div>
-              <h3 className="mb-2 text-lg font-semibold">Address</h3>
-              <p className="whitespace-pre-wrap">{customer.address || 'Not provided'}</p>
-            </div>
+      <div className="space-y-6">
+        {breadcrumbItems && <Breadcrumb items={breadcrumbItems} />}
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
+          <div className="flex gap-2 ml-auto">
+            <Button
+              size="sm"
+              color="primary"
+              variant="flat"
+              startContent={<Edit className="h-4 w-4" />}
+              onPress={() => router.push(routes.admin.customers.edit(customerId))}
+            >
+              {t('common.edit')}
+            </Button>
+            <Button
+              size="sm"
+              color="danger"
+              variant="flat"
+              startContent={<Trash className="h-4 w-4" />}
+              onPress={handleDeleteClick}
+            >
+              {t('common.delete')}
+            </Button>
           </div>
+        </div>
 
-          <Divider className="my-6" />
-
-          {customer.notes && (
-            <>
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">{customer.name}</h2>
+          </CardHeader>
+          <Divider />
+          <CardBody className="space-y-4">
+            <div>
+              <p className="text-sm text-default-500">{t('customers.list.name')}</p>
+              <p className="text-lg font-medium">{customer.name}</p>
+            </div>
+            
+            <div>
+              <p className="text-sm text-default-500">{t('customers.list.email')}</p>
+              <p>{customer.email || t('common.notSpecified')}</p>
+            </div>
+            
+            <div>
+              <p className="text-sm text-default-500">{t('customers.list.phone')}</p>
+              <p>{customer.phone || t('common.notSpecified')}</p>
+            </div>
+            
+            <div>
+              <p className="text-sm text-default-500">{t('customers.list.address')}</p>
+              <p className="whitespace-pre-wrap">{customer.address || t('common.notSpecified')}</p>
+            </div>
+            
+            {customer.notes && (
               <div>
-                <h3 className="mb-2 text-lg font-semibold">Notes</h3>
+                <p className="text-sm text-default-500">{t('customers.list.notes')}</p>
                 <p className="whitespace-pre-wrap">{customer.notes}</p>
               </div>
-              <Divider className="my-6" />
-            </>
-          )}
-
-          <div className="text-sm text-gray-500">
-            <p>Created at: {formatDate(customer.createdAt)}</p>
-            <p>Updated at: {formatDate(customer.updatedAt)}</p>
-            {customer.creatorName && (
-              <p>Created by: {customer.creatorName}</p>
             )}
-          </div>
-        </CardBody>
-      </Card>
 
-      <CustomerQuotes customerId={id} />
+            <div>
+              <p className="text-sm text-default-500">{t('common.createdAt')}</p>
+              <p>{formatDate(customer.createdAt)}</p>
+            </div>
+            
+            <div>
+              <p className="text-sm text-default-500">{t('common.updatedAt')}</p>
+              <p>{formatDate(customer.updatedAt)}</p>
+            </div>
+          </CardBody>
+        </Card>
+        
+        {customerQuotes?.items && customerQuotes.items.length > 0 && (
+          <Card>
+            <CardHeader>
+              <h2 className="text-xl font-semibold">{t('quotes.title')} ({Math.min(customerQuotes.items.length, 5)} / {customerQuotes.total})</h2>
+            </CardHeader>
+            <Divider />
+            <CardBody>
+              <ul className="space-y-2">
+                {customerQuotes.items.map((quote) => (
+                  <li key={quote.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{quote.title || `Quote #${quote.id.substring(0, 8)}`}</p>
+                      <p className="text-sm text-default-500">{formatDate(quote.createdAt)}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      onPress={() => router.push(routes.admin.quotes.detail(quote.id))}
+                    >
+                      {t('common.view')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              {customerQuotes.total > 5 && (
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="light"
+                    onPress={() => router.push(routes.admin.quotes.list)}
+                  >
+                    {t('dashboard.recentQuotes.viewAll')}
+                  </Button>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        )}
+      </div>
 
       <DeleteEntityDialog
-        entityName="customer"
-        entityLabel={customer.name}
         isOpen={isDeleteDialogOpen}
-        isLoading={isDeleting}
         onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleDelete}
+        onConfirm={confirmDelete}
+        entityName={customerEntityName}
+        entityLabel={customer.name}
+        isLoading={deleteMutation.isPending}
       />
-    </div>
+    </>
   );
-}
+};
 
-export default withMainLayout(CustomerDetail); 
+ViewCustomerPage.getLayout = (page) => <MainLayout>{page}</MainLayout>;
+
+export default ViewCustomerPage; 

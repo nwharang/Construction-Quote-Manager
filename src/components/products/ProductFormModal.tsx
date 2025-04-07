@@ -204,6 +204,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 errorMessage={errors.categoryId?.message}
                 isLoading={isLoadingCategories}
                 className="mt-1"
+                aria-label={t('productFields.category')}
               >
                 {(categories ?? []).map((category) => (
                   <SelectItem key={category.id} textValue={category.name}>

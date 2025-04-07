@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { Navigation } from '~/components/shared/Navigation';
@@ -11,76 +12,32 @@ interface MainLayoutProps {
 /**
  * Main layout component for the application
  * Includes sidebar navigation, top navbar, and content area
- * Fully responsive with mobile-optimized sidebar
+ * Relies on Tailwind CSS for responsiveness
  */
 export function MainLayout({ children }: MainLayoutProps) {
   useSession();
-  useTranslation();
-
+  const { t } = useTranslation();
+  const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
 
-  // Only run client-side
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen((prevState) => !prevState);
-  };
-
-  const closeSidebar = () => {
-    setIsSidebarOpen(false);
-  };
-
-  // Add event listener to close sidebar on window resize (to desktop)
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsSidebarOpen(false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Lock body scroll when sidebar is open on mobile
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    if (isSidebarOpen && window.innerWidth < 768) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
-    }
-    
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
-  }, [isSidebarOpen, isMounted]);
+  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
-      
-      {/* Mobile overlay */}
+    <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar} />
+
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden" 
-          onClick={closeSidebar}
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden transition-opacity duration-300"
+          onClick={toggleSidebar}
           aria-hidden="true"
         />
       )}
 
-      {/* Main content area with navbar */}
-      <div className="flex flex-grow flex-col w-full">
-        {/* Top Navigation */}
+      <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         <Navigation onMenuClick={toggleSidebar} />
 
-        {/* Main content */}
-        <main className="flex-1 p-4 md:p-6">          
+        <main className="flex-1 p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>

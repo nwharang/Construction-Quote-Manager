@@ -183,10 +183,10 @@ export class QuoteService extends BaseService {
     };
 
     // Create quote and related tasks/materials in a transaction
-    const result = await this.db.transaction(async (tx) => {
-      const [quote] = await tx.insert(quotes).values(quoteData).returning();
+    const quote = await this.db.transaction(async (tx) => {
+      const [insertedQuote] = await tx.insert(quotes).values(quoteData).returning();
 
-      if (!quote) {
+      if (!insertedQuote) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to create quote',
@@ -196,10 +196,10 @@ export class QuoteService extends BaseService {
       // If tasks provided, insert them
       if (data.tasks && data.tasks.length > 0) {
         for (const taskData of data.tasks) {
-          const [task] = await tx
+          const [insertedTask] = await tx
             .insert(tasks)
             .values({
-              quoteId: quote.id,
+              quoteId: insertedQuote.id,
               description: taskData.description,
               price: taskData.price.toString(),
               materialType: taskData.materialType.toUpperCase() as
@@ -215,11 +215,11 @@ export class QuoteService extends BaseService {
             taskData.materialType === 'itemized' &&
             taskData.materials &&
             taskData.materials.length > 0 &&
-            task
+            insertedTask // Check if task was inserted successfully
           ) {
             await tx.insert(materials).values(
               taskData.materials.map((materialData) => ({
-                taskId: task.id,
+                taskId: insertedTask.id,
                 productId: materialData.productId,
                 quantity: materialData.quantity,
                 unitPrice: materialData.unitPrice.toString(),
@@ -228,16 +228,20 @@ export class QuoteService extends BaseService {
             );
           }
         }
-
-        // Recalculate quote totals
-        await this.recalculateQuoteTotals({ quoteId: quote.id });
+        // DO NOT Recalculate quote totals inside the transaction
+        // await this.recalculateQuoteTotals({ quoteId: insertedQuote.id, tx });
       }
 
-      return quote;
+      return insertedQuote; // Return the basic inserted quote data
     });
 
-    // Return the created quote with numeric values
-    return this.getQuoteById({ id: result.id, includeRelated: true });
+    // After the transaction is successful, recalculate totals
+    if (quote) {
+      await this.recalculateQuoteTotals({ quoteId: quote.id });
+    }
+
+    // Return the created quote with potentially updated totals (fetched by getQuoteById)
+    return this.getQuoteById({ id: quote.id, includeRelated: true });
   }
 
   /**

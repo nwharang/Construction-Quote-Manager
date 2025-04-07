@@ -1,6 +1,34 @@
 @import 'tailwindcss';
 @config "../../tailwind.config.js";
 
+/* Theme transition handling */
+:root {
+  --transition-duration: 200ms;
+}
+
+/* Apply transition to all elements that could change with theme */
+.theme-transition * {
+  transition: background-color var(--transition-duration) ease-in-out,
+              color var(--transition-duration) ease-in-out,
+              border-color var(--transition-duration) ease-in-out,
+              box-shadow var(--transition-duration) ease-in-out,
+              fill var(--transition-duration) ease-in-out;
+}
+
+/* Disable transition during initial page load and theme changes */
+.disable-transitions * {
+  transition: none !important;
+}
+
+/* Theme-specific focus styles */
+.dark *:focus-visible {
+  outline-color: rgba(var(--color-primary-400), 0.8);
+}
+
+*:focus-visible {
+  outline-color: rgba(var(--color-primary-500), 0.8);
+}
+
 /* Prevent content jumps during scrolling */
 html {
   overflow-y: scroll;

@@ -10,10 +10,19 @@ type PercentageInputProps = Omit<
   'formatOptions' | 'startContent' | 'endContent' | 'step' | 'min'
 > & {
   // Allow overriding min/step
-  min?: number;
-  step?: number;
 };
 
 export const PercentageInput: React.FC<PercentageInputProps> = (props) => {
-  return <ConfiguredNumberInput numberType="percentage" {...props} />;
-}; 
+  // Set default step to 1 (representing 1%) unless overridden
+  return (
+    <ConfiguredNumberInput
+      {...props}
+      step={0.01}
+      min={0}
+      max={1}
+      formatOptions={{
+        style: 'percent',
+      }}
+    />
+  );
+};

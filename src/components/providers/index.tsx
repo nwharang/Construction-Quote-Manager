@@ -8,6 +8,7 @@ import { ThemeProvider } from './ThemeProvider';
 import { ConfigLoader } from './ConfigLoader';
 import { useConfigStore } from '~/store';
 import type { Session } from 'next-auth';
+import { useRouter } from 'next/router';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -33,6 +34,23 @@ function AppContent({ children }: { children: ReactNode }) {
 }
 
 /**
+ * HeroUI provider with Next.js Pages router integration
+ */
+function HeroUIWithRouting({ children }: { children: ReactNode }) {
+  const router = useRouter();
+
+  return (
+    <HeroUIProvider
+      navigate={(path) => router.push(path)}
+      useHref={(href) => href}
+      labelPlacement="outside"
+    >
+      {children}
+    </HeroUIProvider>
+  );
+}
+
+/**
  * Centralized providers component for the application
  * Wraps the application with all necessary providers
  */
@@ -41,14 +59,14 @@ export function Providers({ children, session }: ProvidersProps) {
     <SessionProvider session={session}>
       <ConfigLoader />
       <ThemeProvider>
-        <HeroUIProvider>
+        <HeroUIWithRouting>
           <AppContent>
             <I18nProvider>
               <ToastContainer />
               {children}
             </I18nProvider>
           </AppContent>
-        </HeroUIProvider>
+        </HeroUIWithRouting>
       </ThemeProvider>
     </SessionProvider>
   );

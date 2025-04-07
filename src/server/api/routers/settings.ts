@@ -40,19 +40,9 @@ export const settingsRouter = createTRPCRouter({
         companyEmail: z.string().email('Invalid email address'),
         companyPhone: z.string().optional(),
         companyAddress: z.string().optional(),
-        defaultComplexityCharge: z.number().min(0).max(100),
-        defaultMarkupCharge: z.number().min(0).max(100),
-        defaultTaskPrice: z.number().min(0),
-        defaultMaterialPrice: z.number().min(0),
         emailNotifications: z.boolean(),
         quoteNotifications: z.boolean(),
         taskNotifications: z.boolean(),
-        theme: z.enum(['light', 'dark', 'system']),
-        locale: z.enum(Object.keys(locales) as [AppLocale, ...AppLocale[]]),
-        currency: z.string().min(1, 'Currency is required'),
-        currencySymbol: z.string().min(1, 'Currency symbol is required'),
-        dateFormat: z.string().min(1, 'Date format is required'),
-        timeFormat: z.enum(['12h', '24h']),
       })
     )
     .mutation(async ({ ctx, input }) => {

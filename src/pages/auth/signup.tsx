@@ -100,15 +100,15 @@ const SignUp: NextPage = () => {
   };
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md" data-testid="signup-form">
       <CardHeader className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold">{t('auth.signUp.title')}</h2>
+        <h2 className="text-2xl font-bold" data-testid="signup-title">{t('auth.signUp.title')}</h2>
         <p className="text-sm text-gray-500">{t('auth.signUp.subtitle')}</p>
       </CardHeader>
       <CardBody>
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4">
+            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4" data-testid="signup-error">
               {error}
             </Alert>
           )}
@@ -120,6 +120,7 @@ const SignUp: NextPage = () => {
             onChange={handleChange}
             isRequired
             disabled={isLoading}
+            data-testid="name-input"
           />
           <Input
             label={t('auth.signUp.emailLabel')}
@@ -129,6 +130,7 @@ const SignUp: NextPage = () => {
             onChange={handleChange}
             isRequired
             disabled={isLoading}
+            data-testid="email-input"
           />
           <Input
             label={t('auth.signUp.passwordLabel')}
@@ -139,6 +141,7 @@ const SignUp: NextPage = () => {
             isRequired
             description={t('auth.signUp.passwordHint', { min: 8 })}
             disabled={isLoading}
+            data-testid="password-input"
           />
           <Input
             label={t('auth.signUp.confirmPasswordLabel')}
@@ -148,9 +151,10 @@ const SignUp: NextPage = () => {
             onChange={handleChange}
             isRequired
             disabled={isLoading}
+            data-testid="confirm-password-input"
           />
 
-          <Button type="submit" color="primary" className="w-full" isLoading={isLoading}>
+          <Button type="submit" color="primary" className="w-full" isLoading={isLoading} data-testid="signup-button">
             {t('auth.signUp.submitButton')}
           </Button>
         </form>
@@ -159,7 +163,7 @@ const SignUp: NextPage = () => {
         <div className="relative z-10">
           <p className="text-sm opacity-80">
             {t('auth.signUp.signInPrompt')}{' '}
-            <a href="#" onClick={handleSignInClick} className="text-sm underline hover:opacity-100">
+            <a href="#" onClick={handleSignInClick} className="text-sm underline hover:opacity-100" data-testid="signin-link">
               {t('auth.signUp.signInLink')}
             </a>
           </p>

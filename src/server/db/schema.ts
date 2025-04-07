@@ -13,6 +13,7 @@ import {
   primaryKey,
   serial,
   index,
+  numeric,
 } from 'drizzle-orm/pg-core';
 import { type AdapterAccount } from 'next-auth/adapters';
 
@@ -89,43 +90,31 @@ export const customers = pgTable('customers', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const productCategories = pgTable('product_categories', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
-  creatorName: varchar('creator_name', { length: 255 }),
-  name: varchar('name', { length: 255 }).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+export const productCategories = pgTable('productCategories', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  creatorId: uuid('creator_id').references(() => users.id),
 });
 
-export const products = pgTable(
-  'products',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    // sequentialId: serial('sequential_id').notNull(), // Decided against adding sequentialId here for now
-    creatorId: uuid('creator_id').references(() => users.id, { onDelete: 'set null' }),
-    creatorName: varchar('creator_name', { length: 255 }),
-    categoryId: uuid('category_id').references(() => productCategories.id, {
-      onDelete: 'set null',
-    }),
-    categoryName: varchar('category_name', { length: 255 }),
-    name: varchar('name', { length: 255 }).notNull(),
-    description: text('description'),
-    unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull().default('0'),
-    unit: varchar('unit', { length: 50 }),
-    sku: varchar('sku', { length: 100 }),
-    manufacturer: varchar('manufacturer', { length: 255 }),
-    supplier: varchar('supplier', { length: 255 }),
-    location: varchar('location', { length: 255 }),
-    notes: text('notes'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  },
-  (table) => ({
-    creatorIdIdx: index('products_creator_id_idx').on(table.creatorId),
-    createdAtIdx: index('products_created_at_idx').on(table.createdAt),
-  })
-);
+export const products = pgTable('products', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  unitPrice: numeric('unit_price', { precision: 10, scale: 2 }).notNull().default('0'),
+  unit: text('unit'),
+  sku: text('sku'),
+  manufacturer: text('manufacturer'),
+  supplier: text('supplier'),
+  location: text('location'),
+  notes: text('notes'),
+  categoryId: uuid('category_id').references(() => productCategories.id),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  creatorId: uuid('creator_id').references(() => users.id),
+});
 
 export const quotes = pgTable(
   'quotes',
@@ -227,18 +216,6 @@ export const settings = pgTable(
     companyEmail: text('company_email').notNull().default(''),
     companyPhone: text('company_phone'),
     companyAddress: text('company_address'),
-    defaultComplexityCharge: decimal('default_complexity_charge', { precision: 5, scale: 2 })
-      .notNull()
-      .default('0'),
-    defaultMarkupCharge: decimal('default_markup_charge', { precision: 5, scale: 2 })
-      .notNull()
-      .default('0'),
-    defaultTaskPrice: decimal('default_task_price', { precision: 10, scale: 2 })
-      .notNull()
-      .default('0'),
-    defaultMaterialPrice: decimal('default_material_price', { precision: 10, scale: 2 })
-      .notNull()
-      .default('0'),
     emailNotifications: boolean('email_notifications').notNull().default(true),
     quoteNotifications: boolean('quote_notifications').notNull().default(true),
     taskNotifications: boolean('task_notifications').notNull().default(true),
@@ -335,16 +312,15 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
-  user: one(users, {
-    fields: [products.creatorId],
-    references: [users.id],
-  }),
-  materials: many(materials),
-  // Add relation back to productCategories
   category: one(productCategories, {
     fields: [products.categoryId],
     references: [productCategories.id],
   }),
+  creator: one(users, {
+    fields: [products.creatorId],
+    references: [users.id],
+  }),
+  materials: many(materials),
 }));
 
 export const materialsRelations = relations(materials, ({ one }) => ({
@@ -404,10 +380,10 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
 }));
 
 // Added ProductCategories relations
-export const productCategoriesRelations = relations(productCategories, ({ one, many }) => ({
+export const productCategoriesRelations = relations(productCategories, ({ many, one }) => ({
+  products: many(products),
   creator: one(users, {
     fields: [productCategories.creatorId],
     references: [users.id],
   }),
-  products: many(products),
 }));

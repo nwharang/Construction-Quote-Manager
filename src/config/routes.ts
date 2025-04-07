@@ -2,6 +2,46 @@
  * Application route definitions
  * Centralized route configuration to avoid hardcoding URLs throughout the application
  */
+
+export type BreadcrumbItem = {
+  label: string;
+  href: string;
+};
+
+/**
+ * Helper type for entity names used in breadcrumbs
+ */
+export type EntityNames = {
+  singular: string;
+  plural: string;
+};
+
+/**
+ * Entity definitions for consistent naming throughout the application
+ */
+export const entities = {
+  dashboard: {
+    singular: 'Dashboard',
+    plural: 'Dashboard',
+  },
+  product: {
+    singular: 'Product',
+    plural: 'Products',
+  },
+  category: {
+    singular: 'Category',
+    plural: 'Categories',
+  },
+  customer: {
+    singular: 'Customer',
+    plural: 'Customers',
+  },
+  quote: {
+    singular: 'Quote',
+    plural: 'Quotes',
+  },
+} as const;
+
 export const routes = {
   auth: {
     signIn: '/auth/signin',
@@ -40,13 +80,29 @@ export const routes = {
        * @param id Product ID
        * @returns Product detail URL
        */
-      detail: (id: string) => `/admin/products/${id}`,
+      detail: (id: string) => `/admin/products/${id}/view`,
       /**
        * Generate a route to edit a specific product
        * @param id Product ID
        * @returns Product edit URL
        */
       edit: (id: string) => `/admin/products/${id}/edit`,
+    },
+    categories: {
+      list: '/admin/categories',
+      new: '/admin/categories/new',
+      /**
+       * Generate a route to a specific category details page
+       * @param id Category ID
+       * @returns Category detail URL
+       */
+      detail: (id: string) => `/admin/categories/${id}/view`,
+      /**
+       * Generate a route to edit a specific category
+       * @param id Category ID
+       * @returns Category edit URL
+       */
+      edit: (id: string) => `/admin/categories/${id}/edit`,
     },
     customers: {
       list: '/admin/customers',
@@ -56,7 +112,7 @@ export const routes = {
        * @param id Customer ID
        * @returns Customer detail URL
        */
-      detail: (id: string) => `/admin/customers/${id}`,
+      detail: (id: string) => `/admin/customers/${id}/view`,
       /**
        * Generate a route to edit a specific customer
        * @param id Customer ID
@@ -64,11 +120,7 @@ export const routes = {
        */
       edit: (id: string) => `/admin/customers/${id}/edit`,
     },
-    accessibility: {
-      index: '/admin/accessibility',
-      guidelines: '/admin/accessibility/guidelines',
-      demo: '/admin/accessibility/demo',
-    },
+    settings: '/admin/settings',
   },
 } as const;
 

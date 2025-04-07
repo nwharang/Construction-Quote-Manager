@@ -116,7 +116,7 @@ export function Navigation({ onMenuClick }: NavigationProps) {
             <DropdownTrigger>
               <Avatar
                 as="button"
-                className="transition-transform"
+                className="transition-transform rounded-full"
                 size="sm"
                 src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
                   session?.user?.name || t('common.user')

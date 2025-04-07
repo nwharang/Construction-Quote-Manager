@@ -49,7 +49,7 @@ export const QuoteSummary: React.FC<QuoteSummaryProps> = ({ tasks, markupPercent
 
   return (
     <Card className="mt-6">
-      <CardBody className="p-6">
+      <CardBody>
         <h3 className="mb-4 text-lg font-semibold">{t('quoteSummary.title')}</h3>
         <div className="space-y-2">
           <div className="flex justify-between">
@@ -86,4 +86,4 @@ export const QuoteSummary: React.FC<QuoteSummaryProps> = ({ tasks, markupPercent
       </CardBody>
     </Card>
   );
-}; 
+};

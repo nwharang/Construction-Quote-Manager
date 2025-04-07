@@ -11,7 +11,7 @@ import { type AppLocale, isSupportedLocale } from '~/i18n/locales';
  * This component is responsible for:
  * 1. Fetching user settings from the database (if logged in) and hydrating the useConfigStore
  * 2. Loading settings from localStorage/cookies for unauthenticated users
- * 
+ *
  * It doesn't render any UI itself.
  */
 
@@ -33,10 +33,6 @@ const defaultSettingsData: Settings = {
   companyPhone: null,
   companyAddress: null,
   // Use strings for numeric-like fields as expected by Settings type from `settings.get`
-  defaultComplexityCharge: 0,
-  defaultMarkupCharge: 0,
-  defaultTaskPrice: 0,
-  defaultMaterialPrice: 0,
   emailNotifications: true,
   quoteNotifications: true,
   taskNotifications: true,
@@ -73,17 +69,17 @@ export function ConfigLoader() {
     // Get theme from cookie or localStorage with proper validation
     const rawTheme = Cookies.get(themeCookieKey) || localStorage.getItem('theme');
     // Validate that theme is one of the allowed values
-    const theme = (rawTheme && VALID_THEMES.includes(rawTheme as Theme)) 
-      ? rawTheme as Theme 
-      : defaultSettingsData.theme;
-                 
+    const theme =
+      rawTheme && VALID_THEMES.includes(rawTheme as Theme)
+        ? (rawTheme as Theme)
+        : defaultSettingsData.theme;
+
     // Get locale from cookie or localStorage with validation
     const rawLocale = Cookies.get(localeCookieKey) || localStorage.getItem('locale');
     // Validate that locale is supported
-    const locale = rawLocale && isSupportedLocale(rawLocale)
-      ? rawLocale
-      : defaultSettingsData.locale;
-    
+    const locale =
+      rawLocale && isSupportedLocale(rawLocale) ? rawLocale : defaultSettingsData.locale;
+
     // Create partial settings object with client preferences
     return {
       ...defaultSettingsData,
@@ -107,27 +103,29 @@ export function ConfigLoader() {
       return;
     }
 
-    // --- Hydrate if authenticated and settings loaded --- 
+    // --- Hydrate if authenticated and settings loaded ---
     if (status === 'authenticated' && dbSettings) {
       console.log('[ConfigLoader] Hydrating store with fetched DB settings.');
       setSettings({ ...dbSettings }); // Hydrate with DB settings
       initialized.current = true;
-    } 
+    }
     // --- For unauthenticated users, load from localStorage/cookies ---
     else if (status === 'unauthenticated') {
-      console.log('[ConfigLoader] User unauthenticated, loading settings from localStorage/cookies.');
+      console.log(
+        '[ConfigLoader] User unauthenticated, loading settings from localStorage/cookies.'
+      );
       const localSettings = loadLocalSettings();
-      
+
       if (localSettings) {
         // Only set if we successfully loaded local settings
         setSettings(localSettings);
       }
-      
+
       // Always ensure loading is set to false for unauthenticated users
       if (useConfigStore.getState().isLoading) {
         useConfigStore.setState({ isLoading: false });
       }
-      
+
       initialized.current = true;
     }
   }, [status, dbSettings, isLoadingDbSettings, setSettings, loadLocalSettings]);

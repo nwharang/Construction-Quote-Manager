@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUIStore } from '~/store/uiStore';
+import { ListToolbar } from '~/components/shared/ListToolbar';
 
 // Use inferred type from the API output for the list items
 type CustomerListItem = RouterOutputs['customer']['getAll']['customers'][number];
@@ -229,69 +230,69 @@ export function CustomersList() {
         shadow="sm"
         radius="lg"
         isHoverable
-        isPressable
-        onPress={() => handleView(customer)}
-        classNames={{
-          base: 'overflow-hidden',
-          body: 'p-0',
-        }}
+        className="overflow-hidden"
+        as="div" // Force it to render as a div instead of a button
       >
         {/* Card Header */}
-        <CardHeader className="flex flex-col items-start p-4 pb-3">
-          <h3 className="text-lg font-semibold">{customer.name}</h3>
-          <p className="text-default-400 mt-1 text-[11px]">
-            {customer.createdAt ? formatDate(customer.createdAt, 'short') : '-'}
-          </p>
-        </CardHeader>
+        <div 
+          className="flex flex-col cursor-pointer" 
+          onClick={() => handleView(customer)}
+        >
+          <CardHeader className="flex flex-col items-start p-4 pb-3">
+            <h3 className="text-lg font-semibold">{customer.name}</h3>
+            <p className="text-default-400 mt-1 text-[11px]">
+              {customer.createdAt ? formatDate(customer.createdAt, 'short') : '-'}
+            </p>
+          </CardHeader>
 
-        <Divider className="opacity-50" />
+          <Divider className="opacity-50" />
 
-        <CardBody className="p-4">
-          <div className="flex flex-col gap-4">
-            {/* Always show address field */}
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <MapPin size={14} className="text-primary" />
+          <CardBody className="p-4">
+            <div className="flex flex-col gap-4">
+              {/* Always show address field */}
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full">
+                  <MapPin size={14} className="text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-default-400 text-xs">{t('customers.contact')}</p>
+                  <p className="text-sm">{customer.address || '-'}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-default-400 text-xs">{t('customers.contact')}</p>
-                <p className="text-sm">{customer.address || '-'}</p>
+
+              {/* Always show email field */}
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full">
+                  <Mail size={14} className="text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-default-400 text-xs">{t('customers.list.email')}</p>
+                  {customer.email ? (
+                    <Tooltip content={customer.email}>
+                      <p className="truncate text-sm">{customer.email}</p>
+                    </Tooltip>
+                  ) : (
+                    <p className="text-default-400 text-sm">-</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Always show phone field */}
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full">
+                  <Phone size={14} className="text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-default-400 text-xs">{t('customers.list.phone')}</p>
+                  <p className="text-sm">{customer.phone || '-'}</p>
+                </div>
               </div>
             </div>
-
-            {/* Always show email field */}
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <Mail size={14} className="text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-default-400 text-xs">{t('customers.list.email')}</p>
-                {customer.email ? (
-                  <Tooltip content={customer.email}>
-                    <p className="truncate text-sm">{customer.email}</p>
-                  </Tooltip>
-                ) : (
-                  <p className="text-default-400 text-sm">-</p>
-                )}
-              </div>
-            </div>
-
-            {/* Always show phone field */}
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                <Phone size={14} className="text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-default-400 text-xs">{t('customers.list.phone')}</p>
-                <p className="text-sm">{customer.phone || '-'}</p>
-              </div>
-            </div>
-          </div>
-        </CardBody>
+          </CardBody>
+        </div>
 
         <div
           className="border-default-100 flex gap-2 border-t p-3"
-          onClick={(e) => e.stopPropagation()}
         >
           <Button
             size="sm"
@@ -353,135 +354,89 @@ export function CustomersList() {
   );
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-col gap-y-4 sm:flex-row">
-        {/* First row: View toggle and search */}
-        <div className="flex w-full flex-row items-start gap-3 sm:items-center">
-          {/* View Toggle */}
-          <Tabs
-            selectedKey={viewType}
-            onSelectionChange={(key) => setViewType(key as 'card' | 'table')}
-            aria-label="View Options"
-            size="sm"
-            className="sm:w-auto"
-          >
-            <Tab
-              key="card"
-              title={
-                <div className="flex items-center gap-2">
-                  <LayoutGrid size={16} />
-                  <span className="hidden sm:inline">{t('common.cardView')}</span>
-                </div>
-              }
-            />
-            <Tab
-              key="table"
-              title={
-                <div className="flex items-center gap-2">
-                  <LayoutList size={16} />
-                  <span className="hidden sm:inline">{t('common.tableView')}</span>
-                </div>
-              }
-            />
-          </Tabs>
-
-          {/* Search Input */}
-          <Input
-            placeholder={t('customers.list.searchPlaceholder')}
-            value={search}
-            onValueChange={setSearch}
-            startContent={<Search size={16} className="text-default-300" />}
-            size={buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'}
-            className="w-full flex-1 sm:w-auto sm:max-w-md"
-          />
-        </div>
-
-        {/* Second row: New button */}
-        <div className="flex w-full justify-end">
-          <Button
-            color="primary"
-            startContent={<Plus size={16} />}
-            onPress={handleCreateCustomer}
-            size={buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'}
-            className="w-fit sm:w-auto"
-          >
-            <span className="hidden sm:inline">{t('common.new')}</span>
-            <span className="sm:hidden">New</span>
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardBody>
-        {isLoading ? (
-          renderLoadingState()
-        ) : (customersData?.customers?.length ?? 0) === 0 ? (
-          renderEmptyState()
-        ) : viewType === 'card' ? (
-          // Card View
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {customersData?.customers.map(renderCustomerCard)}
-          </div>
-        ) : (
-          // Table View - responsive with horizontal scroll on small screens
-          <div className="-mx-4 overflow-x-auto sm:mx-0">
-            <Table
-              aria-label="Customers table"
-              isStriped={tableSettings.stripedRows}
-              isHeaderSticky
-              classNames={{
-                wrapper: 'max-h-[calc(100vh-350px)] min-w-[600px]',
-                th: 'bg-default-100/80 backdrop-blur-md',
-              }}
-            >
-              <TableHeader>
-                {visibleColumns.map((column) => (
-                  <TableColumn key={column.uid}>{column.name}</TableColumn>
-                ))}
-              </TableHeader>
-              <TableBody
-                items={customersData?.customers ?? []}
-                emptyContent={t('common.noResults')}
-              >
-                {(item) => (
-                  <TableRow key={item.id} className="hover:bg-default-50">
-                    {visibleColumns.map((column) => (
-                      <TableCell key={column.uid}>{renderCell(item, column.uid)}</TableCell>
-                    ))}
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {(customersData?.total ?? 0) > pageSize && (
-          <div className="mt-6 flex justify-center">
-            <Pagination
-              page={page}
-              total={Math.ceil((customersData?.total ?? 0) / pageSize)}
-              onChange={setPage}
-              size={
-                buttonSettings.size === 'sm' ? 'sm' : buttonSettings.size === 'lg' ? 'lg' : 'md'
-              }
-              showControls
-              classNames={{
-                item: 'w-8 h-8',
-              }}
-            />
-          </div>
-        )}
-      </CardBody>
-
-      {/* Delete Confirmation Dialog */}
-      <DeleteEntityDialog
-        isOpen={isDeleteOpen}
-        onClose={onDeleteClose}
-        onConfirm={handleDeleteConfirm}
-        isLoading={isDeleting}
-        entityName={t('customers.entityName')}
-        entityLabel={customerToDelete?.name ?? ''}
+    <div className="space-y-4">
+      <ListToolbar
+        viewType={viewType}
+        onViewTypeChange={(type) => setViewType(type)}
+        searchValue={search}
+        onSearchChange={setSearch}
+        onCreateClick={handleCreateCustomer}
+        createButtonLabel={t('common.new')}
+        searchPlaceholder={t('customers.list.searchPlaceholder')}
       />
-    </Card>
+      
+      <Card className="w-full">
+        <CardBody className="px-2 sm:px-4">
+          {isLoading ? (
+            renderLoadingState()
+          ) : (customersData?.customers?.length ?? 0) === 0 ? (
+            renderEmptyState()
+          ) : viewType === 'card' ? (
+            // Card View - single column on mobile
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {customersData?.customers.map(renderCustomerCard)}
+            </div>
+          ) : (
+            // Table View - responsive with horizontal scroll on small screens
+            <div className="-mx-2 sm:-mx-4 overflow-x-auto">
+              <Table
+                aria-label="Customers table"
+                isStriped={tableSettings.stripedRows}
+                isHeaderSticky
+                classNames={{
+                  wrapper: 'max-h-[calc(100vh-350px)] min-w-[600px]',
+                  th: 'bg-default-100/80 backdrop-blur-md text-xs sm:text-sm',
+                  td: 'text-xs sm:text-sm py-2 sm:py-4',
+                }}
+              >
+                <TableHeader>
+                  {visibleColumns.map((column) => (
+                    <TableColumn key={column.uid}>{column.name}</TableColumn>
+                  ))}
+                </TableHeader>
+                <TableBody
+                  items={customersData?.customers ?? []}
+                  emptyContent={t('common.noResults')}
+                >
+                  {(item) => (
+                    <TableRow key={item.id} className="hover:bg-default-50">
+                      {visibleColumns.map((column) => (
+                        <TableCell key={column.uid}>{renderCell(item, column.uid)}</TableCell>
+                      ))}
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {(customersData?.total ?? 0) > pageSize && (
+            <div className="mt-4 sm:mt-6 flex justify-center">
+              <Pagination
+                page={page}
+                total={Math.ceil((customersData?.total ?? 0) / pageSize)}
+                onChange={setPage}
+                size="sm"
+                showControls
+                classNames={{
+                  item: 'w-8 h-8',
+                }}
+              />
+            </div>
+          )}
+        </CardBody>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteEntityDialog
+          isOpen={isDeleteOpen}
+          onClose={onDeleteClose}
+          onConfirm={handleDeleteConfirm}
+          isLoading={isDeleting}
+          entityName={t('customers.entityName')}
+          entityLabel={customerToDelete?.name ?? ''}
+        />
+      </Card>
+    </div>
   );
 }

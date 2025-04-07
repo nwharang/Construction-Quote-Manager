@@ -66,7 +66,6 @@ export class ProductService extends BaseService {
       offset: offset,
       with: {
         category: true,
-        user: { columns: { name: true } },
       },
     });
 
@@ -80,7 +79,6 @@ export class ProductService extends BaseService {
       ...p,
       unitPrice: this.toNumber(p.unitPrice),
       category: p.category,
-      categoryName: p.category?.name ?? p.categoryName ?? null,
     }));
 
     return {
@@ -110,7 +108,6 @@ export class ProductService extends BaseService {
       ...product,
       unitPrice: this.toNumber(product.unitPrice),
       category: product.category,
-      categoryName: product.category?.name ?? product.categoryName ?? null,
     };
   }
 
@@ -134,8 +131,6 @@ export class ProductService extends BaseService {
         ...validatedData,
         unitPrice: validatedData.unitPrice.toString(), // Convert number to string for DB
         creatorId: this.currentUser?.user.id,
-        creatorName: this.currentUser?.user.name ?? null, // Store denormalized name
-        categoryName: category?.name ?? null, // Store denormalized name
       })
       .returning();
 
@@ -147,8 +142,8 @@ export class ProductService extends BaseService {
     return {
       ...newProduct,
       unitPrice: this.toNumber(newProduct.unitPrice),
-      // Return the names we just inserted
-      categoryName: category?.name ?? null,
+      // Return the category with the product
+      category,
     };
   }
 
@@ -164,7 +159,6 @@ export class ProductService extends BaseService {
       where: eq(products.id, id),
       with: {
         category: true,
-        user: { columns: { name: true } },
       },
     });
 
@@ -193,7 +187,6 @@ export class ProductService extends BaseService {
             where: eq(productCategories.id, updateData.categoryId),
           })
         : null;
-      updatePayload.categoryName = newCategory?.name ?? null;
       // Ensure updatedCategoryData is explicitly null if newCategory is null
       updatedCategoryData = newCategory ?? null;
     }
@@ -212,7 +205,6 @@ export class ProductService extends BaseService {
       ...updatedProductRaw,
       unitPrice: this.toNumber(updatedProductRaw.unitPrice),
       category: updatedCategoryData, // Return the correct full category object
-      categoryName: updatedCategoryData?.name ?? updatedProductRaw.categoryName ?? null, // Ensure categoryName is consistent
     };
   }
 

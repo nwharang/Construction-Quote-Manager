@@ -1,7 +1,8 @@
-import { useRouter } from 'next/router';
-import { useState, useEffect } from 'react';
-import { 
-  Button, 
+import React, { useEffect } from 'react';
+import Head from 'next/head';
+import { useRouter, useParams } from 'next/navigation';
+import {
+  Button,
   Card,
   CardBody,
   CardHeader,
@@ -21,6 +22,12 @@ import { withMainLayout } from '~/utils/withAuth';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import Link from 'next/link';
 import { CurrencyInput } from '~/components/ui/CurrencyInput';
+import type { NextPageWithLayout } from '~/types/next';
+import { ProductForm } from '~/components/products/ProductForm';
+import { useToastStore } from '~/store';
+import { routes } from '~/config/routes';
+import { Breadcrumb } from '~/components/shared/Breadcrumb';
+import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
 
 // Validation schema for product form
 const productSchema = z.object({
@@ -38,85 +45,52 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
-function EditProduct() {
-  const router = useRouter();
-  const { id } = router.query as { id: string };
+const EditProductPage: NextPageWithLayout = () => {
   const { t } = useTranslation();
-  const toast = useAppToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const productId = params?.id as string;
+  const { success: showSuccessToast, error: showErrorToast } = useToastStore();
 
-  // Fetch categories
-  const { data: categories, isLoading: isLoadingCategories } = api.productCategory.getAll.useQuery();
-
-  // Get product data
-  const { data: product, isLoading } = api.product.getById.useQuery(
-    { id },
-    {
-      enabled: !!id,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  // Set up form with validation
+  // Fetch product details
   const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
-    defaultValues: {
-      name: '',
-      description: null,
-      categoryId: null,
-      unitPrice: 0,
-      unit: null,
-      sku: null,
-      manufacturer: null,
-      supplier: null,
-      location: null,
-      notes: null,
-    },
-  });
+    data: product,
+    isLoading,
+    error,
+  } = api.product.getById.useQuery({ id: productId }, { enabled: !!productId, retry: false });
 
-  // Update form values when product data is loaded
-  useEffect(() => {
-    if (product) {
-      reset({
-        name: product.name,
-        description: product.description,
-        categoryId: product.categoryId,
-        unitPrice: Number(product.unitPrice),
-        unit: product.unit,
-        sku: product.sku,
-        manufacturer: product.manufacturer,
-        supplier: product.supplier,
-        location: product.location,
-        notes: product.notes,
-      });
-    }
-  }, [product, reset]);
-
-  // Update mutation
-  const { mutate: updateProduct } = api.product.update.useMutation({
+  // Update product mutation
+  const updateMutation = api.product.update.useMutation({
     onSuccess: () => {
-      toast.success(t('products.updateSuccess'));
-      router.push(`/admin/products/${id}/view`);
+      showSuccessToast(t('products.updateSuccess'));
+      router.push(routes.admin.products.list);
     },
     onError: (error) => {
-      toast.error(error.message || t('products.updateError'));
-      setIsSubmitting(false);
+      showErrorToast(error.message);
     },
   });
 
-  // Handle form submission
-  const onSubmit = (data: ProductFormValues) => {
-    setIsSubmitting(true);
-    updateProduct({
-      id,
-      ...data,
-    });
-  };
+  // Handle errors from product fetch
+  useEffect(() => {
+    if (error) {
+      showErrorToast(error.message);
+      router.push(routes.admin.products.list);
+    }
+  }, [error, router, showErrorToast]);
+
+  // Define breadcrumb items (conditionally based on product loading/existence)
+  const breadcrumbItems: BreadcrumbItem[] | null = product
+    ? [
+        { label: t('nav.dashboard'), href: routes.admin.dashboard },
+        { label: t('breadcrumb.products.list'), href: routes.admin.products.list },
+        { label: product.name, href: routes.admin.products.detail(productId) }, // Link to view page
+        {
+          label: t('breadcrumb.edit'),
+          href: routes.admin.products.edit(productId),
+          isCurrent: true,
+        }, // Current Edit page
+      ]
+    : null; // Don't show breadcrumbs until product is loaded
 
   if (isLoading) {
     return (
@@ -127,253 +101,35 @@ function EditProduct() {
   }
 
   if (!product) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center">
-        <h2 className="text-xl font-semibold">Product not found</h2>
-        <Button
-          color="primary"
-          variant="light"
-          className="mt-4"
-          startContent={<ArrowLeft size={16} />}
-          onPress={() => router.push('/admin/products')}
-        >
-          Back to Products
-        </Button>
-      </div>
-    );
+    // Error handled by useEffect, this is a fallback/safety
+    return <p>Product not found or error loading.</p>;
   }
 
+  // Ensure the key type is correct for parameters - this requires updating keys.ts later
+  // For now, let's assume the type will be fixed. If errors persist, we adjust KeyToParams.
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <nav className="flex items-center">
-          <Link 
-            href="/admin/products" 
-            className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-          >
-            Products
-          </Link>
-          <ChevronRight size={16} className="mx-2 text-gray-400" />
-          <Link 
-            href={`/admin/products/${id}`}
-            className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-          >
-            {product?.name || 'Product Details'}
-          </Link>
-          <ChevronRight size={16} className="mx-2 text-gray-400" />
-          <span className="text-sm font-medium text-gray-900">Edit</span>
-        </nav>
-        
-        <div className="flex gap-2">
-          <Button
-            color="primary"
-            variant="light"
-            startContent={<ArrowLeft size={16} />}
-            onPress={() => router.push(`/admin/products/${id}`)}
-          >
-            Back
-          </Button>
-        </div>
+    <>
+      <Head>
+        <title>{t('products.edit.pageTitle', { name: product.name })}</title>
+      </Head>
+
+      <div className="space-y-6">
+        {/* Render Breadcrumb if items exist */}
+        {breadcrumbItems && <Breadcrumb items={breadcrumbItems} />}
+
+        <ProductForm
+          initialData={product} // Pass fetched product data
+          onSubmit={async (data) => {
+            // Ensure ID is included in the update payload
+            await updateMutation.mutateAsync({ ...data, id: productId });
+          }}
+          isLoading={updateMutation.isPending}
+        />
       </div>
-
-      <Card>
-        <CardHeader>
-          <h2 className="text-2xl font-bold">Edit Product</h2>
-        </CardHeader>
-        <CardBody>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <Controller
-                  name="name"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label="Name"
-                      isRequired
-                      isInvalid={!!errors.name}
-                      errorMessage={errors.name?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
-
-              <div>
-                <Controller
-                  name="description"
-                  control={control}
-                  render={({ field }) => (
-                    <Textarea
-                      {...field}
-                      label="Description"
-                      isInvalid={!!errors.description}
-                      errorMessage={errors.description?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Controller
-                    name="unitPrice"
-                    control={control}
-                    render={({ field }) => (
-                      <CurrencyInput
-                        label="Price"
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        isInvalid={!!errors.unitPrice}
-                        errorMessage={errors.unitPrice?.message}
-                      />
-                    )}
-                  />
-                </div>
-
-                <div>
-                  <Controller
-                    name="unit"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        label="Unit"
-                        isInvalid={!!errors.unit}
-                        errorMessage={errors.unit?.message}
-                        value={field.value || ''}
-                      />
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Controller
-                    name="sku"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        label="SKU"
-                        isInvalid={!!errors.sku}
-                        errorMessage={errors.sku?.message}
-                        value={field.value || ''}
-                      />
-                    )}
-                  />
-                </div>
-
-                <div>
-                  <Controller
-                    name="categoryId"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        label="Category"
-                        placeholder="Select a category"
-                        selectedKeys={field.value ? [field.value] : []}
-                        onSelectionChange={(keys) => field.onChange(Array.from(keys)[0] || null)}
-                        isLoading={isLoadingCategories}
-                        isInvalid={!!errors.categoryId}
-                        errorMessage={errors.categoryId?.message}
-                      >
-                        {(categories || []).map((category) => (
-                          <SelectItem key={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </Select>
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Controller
-                    name="manufacturer"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        label="Manufacturer"
-                        isInvalid={!!errors.manufacturer}
-                        errorMessage={errors.manufacturer?.message}
-                        value={field.value || ''}
-                      />
-                    )}
-                  />
-                </div>
-
-                <div>
-                  <Controller
-                    name="supplier"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        label="Supplier"
-                        isInvalid={!!errors.supplier}
-                        errorMessage={errors.supplier?.message}
-                        value={field.value || ''}
-                      />
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Controller
-                  name="location"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label="Location"
-                      isInvalid={!!errors.location}
-                      errorMessage={errors.location?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
-
-              <div>
-                <Controller
-                  name="notes"
-                  control={control}
-                  render={({ field }) => (
-                    <Textarea
-                      {...field}
-                      label="Notes"
-                      isInvalid={!!errors.notes}
-                      errorMessage={errors.notes?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                color="primary"
-                isLoading={isSubmitting}
-                startContent={<Save size={16} />}
-              >
-                Save Changes
-              </Button>
-            </div>
-          </form>
-        </CardBody>
-      </Card>
-    </div>
+    </>
   );
-}
+};
 
-export default withMainLayout(EditProduct);
+// Assuming layout applied via HOC
+export default EditProductPage;

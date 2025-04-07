@@ -1,100 +1,104 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useCallback, type ReactNode } from 'react';
-import { useSession } from 'next-auth/react';
-import Cookies from 'js-cookie';
-import { useConfigStore } from '~/store/configStore';
+import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';
+import { useConfigStore } from '~/store';
 
-type Theme = 'light' | 'dark' | 'system';
-const themeCookieKey = 'app-theme';
-
-interface ThemeContextType {
-  theme: Theme;
-  isDark: boolean;
-  setTheme: (theme: Theme) => void;
+// Client component that manages smooth theme transitions
+function TransitionManager() {
+  const { resolvedTheme } = useTheme();
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Add/remove transition classes on theme change
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      // Apply theme transition class to enable transitions
+      document.documentElement.classList.add('theme-transition');
+      
+      // When a theme change is detected, temporarily disable transitions
+      // This prevents flash on initial render
+      if (resolvedTheme) {
+        setIsTransitioning(true);
+        document.documentElement.classList.add('disable-transitions');
+        
+        // Remove the disable class after the theme has been applied
+        const timeoutId = setTimeout(() => {
+          document.documentElement.classList.remove('disable-transitions');
+          setIsTransitioning(false);
+        }, 100); // Short delay allows theme to apply without transition
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [resolvedTheme]);
+  
+  return null;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
+// Client component that observes theme changes
+function ThemeObserver() {
+  const { theme, resolvedTheme } = useTheme();
+  const { settings, setSettings } = useConfigStore();
+  
+  // Use the resolvedTheme to sync with the store
+  // This ensures system preference changes are captured
+  useEffect(() => {
+    if (resolvedTheme && settings) {
+      // Only update if the theme has actually changed
+      if (settings.theme !== resolvedTheme && 
+          (resolvedTheme === 'dark' || resolvedTheme === 'light')) {
+        console.log('[ThemeObserver] Syncing resolved theme to store:', resolvedTheme);
+        setSettings({ theme: resolvedTheme });
+      }
+    }
+  }, [resolvedTheme, settings, setSettings]);
+  
+  // Also listen for explicit theme changes
+  useEffect(() => {
+    if (theme && settings && theme !== 'system') {
+      // Only update if the theme has actually changed
+      if (settings.theme !== theme) {
+        console.log('[ThemeObserver] Syncing selected theme to store:', theme);
+        setSettings({ theme });
+        
+        // Dispatch an event that can be detected by other components
+        document.dispatchEvent(
+          new CustomEvent('theme-change', { detail: { theme } })
+        );
+      }
+    }
+  }, [theme, settings, setSettings]);
+  
+  return null;
+}
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  useSession();
-  const setStoreSettings = useConfigStore((state) => state.setSettings);
-  const currentStoreTheme = useConfigStore((state) => state.settings?.theme);
-  const isStoreDarkMode = useConfigStore((state) => state.isDarkMode);
-  const isLoadingStore = useConfigStore((state) => state.isLoading);
-
-  const updateDocumentClass = useCallback((themeToApply: Theme) => {
-    if (typeof document !== 'undefined') {
-      const root = document.documentElement;
-      root.classList.remove('light', 'dark');
-      let effectiveTheme = themeToApply;
-      if (themeToApply === 'system') {
-        effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light';
-      }
-      root.classList.add(effectiveTheme);
-    }
-  }, []);
-
-  const setTheme = useCallback(
-    (newTheme: Theme) => {
-      console.log('[ThemeProvider] setTheme called with:', newTheme);
-      
-      // Skip if store is loading
-      if (isLoadingStore) {
-        console.log('[ThemeProvider] Store is loading, skipping theme set.');
-        return;
-      }
-
-      // 1. Update the store
-      setStoreSettings({ theme: newTheme });
-
-      // 2. Update document class for immediate visual change
-      updateDocumentClass(newTheme);
-
-      // 3. Always persist to localStorage and cookies for all users
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('theme', newTheme);
-        Cookies.set(themeCookieKey, newTheme, { expires: 365 });
-      }
-    },
-    [setStoreSettings, updateDocumentClass, isLoadingStore]
+  const { settings } = useConfigStore();
+  
+  // Use the store's theme setting or fall back to system
+  const initialTheme = useMemo(() => settings?.theme || 'system', [settings?.theme]);
+  
+  return (
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      value={{
+        dark: 'dark',
+        light: 'light',
+        system: 'system'
+      }}
+      enableSystem
+      disableTransitionOnChange={false} // Let our custom transition manager handle this
+      storageKey="app-theme"
+      forcedTheme={undefined}  // Never force a theme, allow user choice
+      themes={['light', 'dark', 'system']}
+    >
+      <ThemeObserver />
+      <TransitionManager />
+      {children}
+    </NextThemesProvider>
   );
-
-  useEffect(() => {
-    const cookieTheme = Cookies.get(themeCookieKey) as Theme | undefined;
-    const localTheme = localStorage.getItem('theme') as Theme | undefined;
-
-    if (cookieTheme && cookieTheme !== localTheme && ['light', 'dark', 'system'].includes(cookieTheme)) {
-      console.log(`[ThemeProvider] Syncing cookie theme ('${cookieTheme}') to localStorage.`);
-      localStorage.setItem('theme', cookieTheme);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isLoadingStore && currentStoreTheme) {
-      console.log('[ThemeProvider] Syncing store theme to document:', currentStoreTheme);
-      updateDocumentClass(currentStoreTheme as Theme);
-    }
-  }, [currentStoreTheme, isLoadingStore, updateDocumentClass]);
-
-  const contextValue = useMemo(
-    () => ({
-      theme: (currentStoreTheme as Theme | undefined) ?? 'system',
-      isDark: isStoreDarkMode,
-      setTheme,
-    }),
-    [currentStoreTheme, isStoreDarkMode, setTheme]
-  );
-
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;
 }
+
+// Re-export the useTheme hook from next-themes
+export { useTheme };

@@ -75,7 +75,6 @@ export class ProductCategoryService extends BaseService {
       .values({
         ...validatedData,
         creatorId: this.currentUser?.user.id,
-        creatorName: this.currentUser?.user.name ?? null, // Store denormalized name
       })
       .returning();
 

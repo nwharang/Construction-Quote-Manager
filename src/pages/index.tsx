@@ -38,10 +38,135 @@ export default function Home() {
     );
   }
 
-  // If not logged in, redirect to signin
+  // Unauthenticated User View - Public Home Page
   if (authStatus === 'unauthenticated') {
-    router.push('/auth/signin');
-    return null;
+    return (
+      <div>
+        {/* Header/Navigation */}
+        <header className="bg-background border-b border-border/30" data-testid="main-header">
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold">Construction Quotes</h1>
+            </div>
+            <nav className="flex items-center space-x-4">
+              <a 
+                href="/pricing" 
+                className="text-foreground/80 hover:text-foreground transition"
+                data-testid="pricing-link"
+              >
+                Pricing
+              </a>
+              <a 
+                href="/auth/signin" 
+                className="text-foreground/80 hover:text-foreground transition"
+                data-testid="signin-link"
+              >
+                Sign In
+              </a>
+              <a 
+                href="/auth/signup" 
+                className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition"
+                data-testid="signup-link"
+              >
+                Sign Up
+              </a>
+            </nav>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <section className="bg-background py-16 md:py-24" data-testid="hero-section">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <h1 className="text-3xl md:text-5xl font-bold mb-6" data-testid="hero-heading">
+                The Fastest Way to Create Construction Quotes
+              </h1>
+              <p className="text-foreground/70 text-lg md:text-xl mb-8">
+                Save time, increase accuracy, and win more business with our easy-to-use quoting software.
+              </p>
+              <Button 
+                size="lg" 
+                color="primary" 
+                as="a" 
+                href="/auth/signup"
+                data-testid="cta-button"
+              >
+                Get Started Free
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section className="py-16 bg-background/50" data-testid="features-section">
+          <div className="container mx-auto px-4">
+            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
+              Features Designed for Contractors
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Feature 1 */}
+              <div className="bg-card border border-border/30 rounded-lg p-6" data-testid="feature-card">
+                <div className="bg-primary/10 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+                  <FileText className="text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Easy Quote Creation</h3>
+                <p className="text-foreground/70">
+                  Create professional quotes in minutes with our intuitive interface.
+                </p>
+              </div>
+              
+              {/* Feature 2 */}
+              <div className="bg-card border border-border/30 rounded-lg p-6" data-testid="feature-card">
+                <div className="bg-primary/10 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+                  <CheckCircle2 className="text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Product Catalog</h3>
+                <p className="text-foreground/70">
+                  Manage your products and services with prices for quick addition to quotes.
+                </p>
+              </div>
+              
+              {/* Feature 3 */}
+              <div className="bg-card border border-border/30 rounded-lg p-6" data-testid="feature-card">
+                <div className="bg-primary/10 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
+                  <Users className="text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Customer Management</h3>
+                <p className="text-foreground/70">
+                  Keep track of all your customers and their project history in one place.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="bg-background border-t border-border/30 py-8" data-testid="footer">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col md:flex-row justify-between items-center">
+              <div className="mb-4 md:mb-0">
+                <h2 className="text-xl font-bold">Construction Quotes</h2>
+                <p className="text-foreground/60 text-sm mt-1">Simplifying quoting for contractors</p>
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-8">
+                <a href="/pricing" className="text-foreground/70 hover:text-foreground transition text-sm">
+                  Pricing
+                </a>
+                <a href="/auth/signin" className="text-foreground/70 hover:text-foreground transition text-sm">
+                  Sign In
+                </a>
+                <a href="/auth/signup" className="text-foreground/70 hover:text-foreground transition text-sm">
+                  Sign Up
+                </a>
+              </div>
+            </div>
+            <div className="mt-8 pt-4 border-t border-border/30 text-center text-foreground/60 text-sm" data-testid="copyright">
+              © {new Date().getFullYear()} Construction Quotes. All rights reserved.
+            </div>
+          </div>
+        </footer>
+      </div>
+    );
   }
 
   // Get stats from the quotes data

@@ -7,14 +7,13 @@ import {
   Spinner,
   Divider,
 } from '@heroui/react';
-import { ArrowLeft, Edit, Trash, Printer, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Edit, Trash, Printer } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { api } from '~/utils/api';
 import { withMainLayout } from '~/utils/withAuth';
 import { useAppToast } from '~/components/providers/ToastProvider';
 import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
 import { useState } from 'react';
-import Link from 'next/link';
 import { routes } from '~/config/routes';
 import { QuoteStatusBadge } from '~/components/quotes/QuoteStatusBadge';
 import Head from 'next/head';
@@ -102,30 +101,9 @@ function QuoteDetailContent() {
       </Head>
       
       <div className="space-y-6">
-        {/* Breadcrumb and Actions */}
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <nav className="flex items-center">
-            <Link 
-              href={routes.admin.quotes.list} 
-              className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-            >
-              Quotes
-            </Link>
-            <ChevronRight size={16} className="mx-2 text-gray-400" />
-            <span className="text-sm font-medium text-gray-900">
-              {quote.title || 'Quote Details'}
-            </span>
-          </nav>
-          
-          <div className="flex gap-2">
-            <Button
-              color="primary"
-              variant="light"
-              startContent={<ArrowLeft size={16} />}
-              onClick={() => router.push(routes.admin.quotes.list)}
-            >
-              Back
-            </Button>
+        {/* Actions */}
+        <div className="flex flex-col justify-end gap-4 sm:flex-row sm:items-center">
+          <div className="flex gap-2 ml-auto">
             <Button
               color="primary"
               variant="flat"
@@ -157,12 +135,9 @@ function QuoteDetailContent() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">{quote.title}</h2>
+              <h2 className="text-2xl font-bold">{quote.title || `Quote #${quote.sequentialId || quote.id.substring(0, 8)}`}</h2>
               <QuoteStatusBadge status={quote.status} size="md" />
             </div>
-            <p className="text-sm text-gray-500">
-              Quote #{quote.sequentialId || quote.id.substring(0, 8)}
-            </p>
           </CardHeader>
           <CardBody>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -278,15 +253,12 @@ function QuoteDetailContent() {
           onClose={() => setIsDeleteDialogOpen(false)}
           onConfirm={handleDelete}
           isLoading={isDeleting}
-          entityName="Quote"
-          entityLabel={quote.title}
+          entityName={t('quotes.entityName')}
+          entityLabel={quote.title || `#${quote.sequentialId || quote.id.substring(0, 8)}`}
         />
       </div>
     </>
   );
 }
 
-// Apply the withMainLayout HOC to create the NextPageWithLayout component
-const QuoteDetail = withMainLayout(QuoteDetailContent);
-
-export default QuoteDetail; 
+export default withMainLayout(QuoteDetailContent); 

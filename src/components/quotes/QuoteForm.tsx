@@ -10,16 +10,14 @@ import {
   Card,
   CardBody,
   Input,
-  Select,
   Textarea,
-  Spinner,
-  Divider,
-  SelectItem,
+  Drawer,
+  DrawerHeader,
+  DrawerBody,
+  DrawerFooter,
+  DrawerContent,
 } from '@heroui/react';
-import { PlusCircle, ArrowLeft, Save, LayoutList, Edit } from 'lucide-react';
-import { api } from '~/utils/api';
-import { type QuoteStatusType, QuoteStatus } from '~/server/db/schema';
-import { QuoteStatusSettings } from './QuoteStatusBadge';
+import { PlusCircle, ArrowLeft, Save, LayoutList, Edit, X, Trash } from 'lucide-react';
 import { CustomerSelector } from '../customers/CustomerSelector';
 import { useTranslation } from '~/hooks/useTranslation';
 import { PercentageInput } from '../ui/PercentageInput';
@@ -63,7 +61,6 @@ const quoteFormSchema = z.object({
 
 export type QuoteFormValues = z.infer<typeof quoteFormSchema>;
 
-
 // --- Prop Types ---
 interface QuoteFormProps {
   initialValues?: Partial<QuoteFormValues>; // Make tasks optional here for creation
@@ -85,28 +82,39 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
     setValue,
     formState: { errors, isValid, isDirty },
     reset,
+    getValues,
   } = useForm<QuoteFormValues>({
     resolver: zodResolver(quoteFormSchema),
-    defaultValues: initialValues ? initialValues : {
-      title: '',
-      customerId: '',
-      markupPercentage: 0,
-      notes: '',
-      tasks: [],
-    },
+    defaultValues: initialValues
+      ? initialValues
+      : {
+          title: '',
+          customerId: '',
+          markupPercentage: 0,
+          notes: '',
+          tasks: [],
+        },
     mode: 'onChange', // Validate on change for better UX
   });
 
-  const { fields: taskFields, append: appendTask, remove: removeTask, move: moveTask } = useFieldArray({
+  const {
+    fields: taskFields,
+    append: appendTask,
+    remove: removeTask,
+    move: moveTask,
+  } = useFieldArray({
     control,
     name: 'tasks',
   });
 
-  // --- State for Master-Detail View ---
+  // --- State for Drawer and Task Management ---
   const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // Update handlers to manage drawer state
   const handleSelectTask = (index: number) => {
     setSelectedTaskIndex(index);
+    setIsDrawerOpen(true);
   };
 
   const handleAddTask = () => {
@@ -116,34 +124,39 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
       materialType: 'ITEMIZED',
       estimatedMaterialsCostLumpSum: null,
       materials: [],
-      // Generate a temporary client-side ID if needed for keys, but RHF handles array indices
     };
     appendTask(newTask);
     // Automatically select the new task for editing
     setSelectedTaskIndex(taskFields.length); // New task will be at the end
+    setIsDrawerOpen(true);
   };
 
   const handleGoBackToList = () => {
+    setIsDrawerOpen(false);
+  };
+
+  const handleTaskDrawerClose = () => {
     setSelectedTaskIndex(null);
+    setIsDrawerOpen(false);
   };
 
   const handleSaveAndCloseTask = () => {
-     // Potentially add validation check here before closing
-     setSelectedTaskIndex(null);
+    setIsDrawerOpen(false);
   };
 
-   const handleDeleteTask = (index: number) => {
+  const handleDeleteTask = (index: number) => {
     // Add confirmation dialog logic here if needed
-    if (confirm('Are you sure you want to delete this task?')) { // Placeholder confirm
-        removeTask(index);
-        // If the deleted task was selected, go back to the list
-        if (selectedTaskIndex === index) {
-            setSelectedTaskIndex(null);
-        } else if (selectedTaskIndex !== null && index < selectedTaskIndex) {
-             // Adjust selected index if an earlier task was removed
-            setSelectedTaskIndex(selectedTaskIndex - 1);
-        }
-        showSuccessToast('Task deleted'); // Call the destructured function
+    if (confirm('Are you sure you want to delete this task?')) {
+      // Placeholder confirm
+      removeTask(index);
+      // If the deleted task was selected, close the drawer
+      if (selectedTaskIndex === index) {
+        setIsDrawerOpen(false);
+      } else if (selectedTaskIndex !== null && index < selectedTaskIndex) {
+        // Adjust selected index if an earlier task was removed
+        setSelectedTaskIndex(selectedTaskIndex - 1);
+      }
+      showSuccessToast('Task deleted');
     }
   };
 
@@ -154,46 +167,86 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
   // Reset form if initialValues change (e.g., navigating between new/edit)
   useEffect(() => {
     if (initialValues) {
-       // Deep compare or use a version/timestamp if needed for complex scenarios
-       // For simplicity, resetting based on quoteId presence change
+      // Deep compare or use a version/timestamp if needed for complex scenarios
+      // For simplicity, resetting based on quoteId presence change
       reset({
         title: '',
         customerId: '',
         markupPercentage: 0,
         notes: '',
         tasks: [],
-        ...initialValues
+        ...initialValues,
       });
       setSelectedTaskIndex(null); // Reset selection on form reset
+      setIsDrawerOpen(false);
     }
   }, [initialValues, reset]);
 
   // Map taskFields from RHF to TaskItem array expected by TaskMasterList
   const watchedTasksData = watch('tasks'); // Watch the whole tasks array for rendering the list
   const mappedTaskItems: TaskItem[] = taskFields.map((field, index) => {
-     const taskData = watchedTasksData[index];
-     return {
-        // Include all fields from TaskFormValues:
-        description: taskData?.description || '',
-        price: taskData?.price ?? 0,
-        materialType: taskData?.materialType || 'ITEMIZED', // Default if somehow missing
-        estimatedMaterialsCostLumpSum: taskData?.estimatedMaterialsCostLumpSum ?? null,
-        materials: taskData?.materials || [], // Include materials array
-        // Plus the ID from useFieldArray:
-        id: field.id, // RHF's stable ID
-        // 'order' was incorrectly added before, it's not part of TaskItem
-     };
-  }); // No need for 'as TaskItem' assertion now
+    const taskData = watchedTasksData[index];
+    return {
+      // Include all fields from TaskFormValues:
+      description: taskData?.description || '',
+      price: taskData?.price ?? 0,
+      materialType: taskData?.materialType || 'ITEMIZED', // Default if somehow missing
+      estimatedMaterialsCostLumpSum: taskData?.estimatedMaterialsCostLumpSum ?? null,
+      materials: taskData?.materials || [], // Include materials array
+      // Plus the ID from useFieldArray:
+      id: field.id, // RHF's stable ID
+    };
+  });
 
-  // --- Render Logic ---
-  const isDetailViewVisible = selectedTaskIndex !== null;
+  // Create a variable for the drawer content
+  const taskDetailDrawerContent =
+    selectedTaskIndex !== null ? (
+      <>
+        <DrawerHeader>
+          <h3 className="text-lg font-bold">
+            {watch(`tasks.${selectedTaskIndex}.description`) || 'Edit Task'}
+          </h3>
+        </DrawerHeader>
+        <DrawerBody className="overflow-auto">
+          <TaskDetailView
+            taskIndex={selectedTaskIndex}
+            control={control}
+            register={register}
+            errors={errors}
+            watch={watch}
+            getValues={getValues}
+            setValue={setValue}
+            removeTask={() => handleDeleteTask(selectedTaskIndex)}
+          />
+        </DrawerBody>
+        <DrawerFooter>
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="flat"
+              color="default"
+              onPress={handleTaskDrawerClose}
+            >
+              {t('common.close')}
+            </Button>
+            <Button
+              color="primary"
+              variant="solid"
+              startContent={<Save size={16} />}
+              onPress={handleSaveAndCloseTask}
+            >
+              {t('common.save')}
+            </Button>
+          </div>
+        </DrawerFooter>
+      </>
+    ) : null;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* --- Top Quote Details --- */}
       <Card>
-        <CardBody className="p-6 space-y-6">
-          <h2 className="text-xl font-semibold mb-4">{t('quotes.detailsSectionTitle')}</h2>
+        <CardBody className="space-y-6">
+          <h2 className="mb-4 text-xl font-semibold">{t('quotes.detailsSectionTitle')}</h2>
           {/* Title */}
           <div>
             <Input
@@ -208,7 +261,7 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
 
           {/* Customer Selector */}
           <div>
-             <Controller
+            <Controller
               name="customerId"
               control={control}
               render={({ field }) => (
@@ -226,26 +279,40 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
           </div>
 
           {/* Markup Percentage */}
-           <div>
-             <Controller
-                name="markupPercentage"
-                control={control}
-                render={({ field: { onChange, value, ...fieldProps } }) => (
-                    <PercentageInput
-                        label={t('quoteSummary.markupInputLabel')}
-                        value={value ?? 0}
-                        onChange={(e) => {
-                             const targetValue = typeof e === 'object' && e !== null && 'target' in e ? e.target.value : e;
-                             const numValue = typeof targetValue === 'number' ? targetValue : parseFloat(targetValue || '0');
-                             onChange(isNaN(numValue) ? 0 : numValue);
-                        }}
-                        disabled={isSubmitting}
-                        errorMessage={errors.markupPercentage?.message}
-                        isInvalid={!!errors.markupPercentage}
-                        min={0}
-                        {...fieldProps}
-                    />
-                )}
+          <div>
+            <Controller
+              name="markupPercentage"
+              control={control}
+              render={({ field: { onChange, value, ...fieldProps } }) => (
+                <PercentageInput
+                  label={t('quoteSummary.markupInputLabel')}
+                  value={value ?? 0}
+                  onValueChange={(val) => {
+                    // Handle value directly if it's a number
+                    if (typeof val === 'number') {
+                      onChange(val);
+                      return;
+                    }
+
+                    // Handle event objects
+                    const targetValue =
+                      typeof val === 'object' && val !== null && 'target' in val
+                        ? (val as { target: { value: string } }).target.value
+                        : val;
+
+                    // Clean the value (remove % symbols if present)
+                    const strValue = String(targetValue).replace(/%/g, '');
+                    const numValue = parseFloat(strValue || '0');
+
+                    // Update with the numeric value - 50 means 50%, not 0.5
+                    onChange(isNaN(numValue) ? 0 : numValue);
+                  }}
+                  disabled={isSubmitting}
+                  errorMessage={errors.markupPercentage?.message}
+                  isInvalid={!!errors.markupPercentage}
+                  {...fieldProps}
+                />
+              )}
             />
           </div>
 
@@ -258,69 +325,74 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
               disabled={isSubmitting}
               errorMessage={errors.notes?.message}
               isInvalid={!!errors.notes}
-              minRows={3}
+              minRows={2}
             />
           </div>
         </CardBody>
       </Card>
 
-      {/* --- Tasks & Materials Section (Master/Detail) --- */}
+      {/* --- Tasks & Materials Section --- */}
       <Card>
-         <CardBody className="p-6">
-             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">{t('quotes.tasksSectionTitle')}</h2>
-                 {isDetailViewVisible && (
-                    <Button
-                        variant="light"
-                        color="secondary"
-                        size="sm"
-                        startContent={<ArrowLeft size={16} />}
-                        onClick={handleGoBackToList}
-                        aria-label={t('common.back')}
-                    >
-                       {t('common.back')}
-                    </Button>
-                 )}
-             </div>
+        <CardBody>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">{t('quotes.tasksSectionTitle')}</h2>
+          </div>
 
-             {/* Conditional Rendering for Master-Detail */}
-             {isDetailViewVisible && selectedTaskIndex !== null ? (
-                // --- Task Detail View ---
-                <TaskDetailView
-                    control={control}
-                    register={register}
-                    setValue={setValue}
-                    watch={watch}
-                    taskIndex={selectedTaskIndex}
-                    errors={errors}
-                    removeTask={() => handleDeleteTask(selectedTaskIndex)} // Pass the specific index to delete
-                />
-             ) : (
-                 // --- Task Master List ---
-                 <TaskMasterList
-                    tasks={mappedTaskItems} // Pass the mapped items
-                    onAddTask={handleAddTask}
-                    onSelectTask={handleSelectTask}
-                    onDeleteTask={handleDeleteTask}
-                    // onMoveTask={moveTask} // Add move later if needed - Requires dnd-kit setup
-                 />
-             )}
-         </CardBody>
+          {/* Task Master List */}
+          <TaskMasterList
+            tasks={mappedTaskItems}
+            onAddTask={handleAddTask}
+            onSelectTask={handleSelectTask}
+            onDeleteTask={handleDeleteTask}
+            watch={watch}
+          />
+        </CardBody>
       </Card>
 
+      {/* Drawer for Task Detail View */}
+      <Drawer
+        isOpen={selectedTaskIndex !== null}
+        onOpenChange={handleTaskDrawerClose}
+        placement="right"
+        size="md"
+        classNames={{
+          wrapper: 'z-50',
+          base: 'h-full max-w-md',
+        }}
+        motionProps={{
+          variants: {
+            enter: {
+              x: 0,
+              opacity: 1,
+              transition: {
+                duration: 0.3,
+                ease: 'easeOut',
+              },
+            },
+            exit: {
+              x: 100,
+              opacity: 0,
+              transition: {
+                duration: 0.2,
+                ease: 'easeIn',
+              },
+            },
+          },
+        }}
+      >
+        <DrawerContent>{taskDetailDrawerContent}</DrawerContent>
+      </Drawer>
 
       {/* --- Quote Summary --- */}
       <QuoteSummary tasks={watchedTasks} markupPercentage={watchedMarkup ?? 0} />
 
       {/* --- Form Actions --- */}
       <div className="mt-8 flex justify-end space-x-4">
-        {/* <Button variant="bordered" onPress={() => reset()} disabled={isSubmitting || !isDirty}>Reset</Button> */}
         <Button
           type="submit"
           color="primary"
           isLoading={isSubmitting}
           isDisabled={!isValid || !isDirty} // Only enable if valid and changed
-          className="min-w-[120px]"
         >
           {t('common.save')} {/* Use translation key */}
         </Button>

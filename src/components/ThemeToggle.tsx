@@ -59,7 +59,7 @@ export function ThemeToggle({
   const { t } = useTranslation();
   const { theme: contextTheme, setTheme } = useTheme();
 
-  const currentTheme = value !== undefined ? value : contextTheme;
+  const currentTheme = value !== undefined ? (value as Theme) : (contextTheme as Theme);
 
   const getNextTheme = (current: Theme): Theme => {
     if (current === 'light') return 'dark';
@@ -91,7 +91,7 @@ export function ThemeToggle({
   return (
     <Button
       size={size}
-      variant="ghost"
+      variant="light"
       isIconOnly
       onClick={handleClick}
       aria-label={t('settings.changeTheme')}
