@@ -129,6 +129,13 @@ alwaysApply: true
       1. Add the key string literal to the `TranslationKey` union type in `src/types/i18n/keys.ts`.
       2. Add the corresponding key and translated string to **ALL** language implementation files (e.g., `src/utils/locales/en.ts`, `src/utils/locales/vi.ts`).
     - **Failure to synchronize** the implementation files after updating the type will result in TypeScript errors when using the `t()` function with the new key.
+  - **7. Quote Form Task/Material UI (Master-Detail Pattern):**
+    - **Mandatory Pattern:** The UI for adding, viewing, and editing Tasks and their associated Materials within the Quote Form (`/admin/quotes/new`, `/admin/quotes/[id]/edit`) **MUST** implement the **Master-Detail pattern**.
+    - **Mobile Adaptation:** On narrower viewports (typical mobile screens), the pattern **MUST** be adapted to show *either* the Master list (Tasks) *or* the Detail view (selected Task's details, including its Materials if itemized) at one time. Navigation between the list and detail views (e.g., tapping a task item, using "Back" or "Done" buttons) **MUST** be clear and intuitive.
+    - **Desktop Adaptation:** On wider viewports, the Master list (Tasks) and the Detail view (Selected Task) **MAY** be displayed side-by-side.
+    - **Master View (Task List):** Displays a condensed list of tasks (e.g., description, price). Provides controls for adding new tasks and selecting a task to view/edit in the Detail panel. Includes controls for deleting/reordering tasks directly from the list.
+    - **Detail View (Selected Task):** Contains all input fields for the *currently selected* task (description, price, material type toggle). Conditionally displays inputs for Lump Sum cost or the Itemized Material list based on the toggle. The Itemized Material list within the Detail view **MUST** allow inline adding/editing/deleting of materials for *that specific task*.
+    - **State Management:** This pattern **MUST** be implemented using React Hook Form (`useFieldArray`) to manage the overall task and nested material state. Local component state (e.g., `useState`) **MUST** be used to track the currently selected task index for the Detail view.
 
 **Component Usage Standards (Linked to UI Consistency):**
 

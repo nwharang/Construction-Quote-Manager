@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useToastStore } from '@/store/toastStore';
+import { useToastStore } from '~/store/toastStore';
 
 interface QueryOptions<T> {
   enabled?: boolean;

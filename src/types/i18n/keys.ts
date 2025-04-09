@@ -277,7 +277,53 @@ export type TranslationKey = 'appName'
   | 'products.edit.pageTitle'
   | 'quotes.new.pageTitle'
   | 'breadcrumb.customers.new'
-  | 'settings.pageTitle';
+  | 'settings.pageTitle'
+  // Company settings
+  | 'settings.company.title'
+  | 'settings.company.name'
+  | 'settings.company.email'
+  | 'settings.company.phone'
+  | 'settings.company.address'
+  | 'settings.company.taxId'
+  | 'settings.company.logo'
+  | 'settings.company.website'
+  // Profile settings
+  | 'settings.profile.title'
+  | 'settings.profile.name'
+  | 'settings.profile.email'
+  | 'settings.profile.phone'
+  | 'settings.profile.position'
+  | 'settings.profile.language'
+  // Appearance settings
+  | 'settings.appearance.title'
+  | 'settings.appearance.theme'
+  | 'settings.appearance.density'
+  | 'settings.appearance.density.compact'
+  | 'settings.appearance.density.comfortable'
+  // Notification settings
+  | 'settings.notifications.title'
+  | 'settings.notifications.email'
+  | 'settings.notifications.app'
+  | 'settings.notifications.quotes'
+  | 'settings.notifications.customers'
+  // Default settings
+  | 'settings.defaults.title'
+  | 'settings.defaults.currency'
+  | 'settings.defaults.taxRate'
+  | 'settings.defaults.quoteExpiry'
+  | 'settings.defaults.terms'
+  // Security settings
+  | 'settings.security.title'
+  | 'settings.security.changePassword'
+  | 'settings.security.twoFactor'
+  | 'settings.security.sessions'
+  | 'settings.security.apiKeys'
+  // Action buttons
+  | 'settings.actions.save'
+  | 'settings.actions.cancel'
+  | 'settings.actions.reset'
+  | 'settings.actions.upload'
+  | 'settings.actions.remove';
 
 // --- Conditional Mapping Type --- //
 

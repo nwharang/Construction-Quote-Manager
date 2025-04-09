@@ -55,17 +55,17 @@ export function useTranslation(): UseTranslationReturn {
     ): string => {
       const currentLocale = locale in translations ? locale : 'en'; // Ensure locale is valid
       const translationSet = translations[currentLocale as AppLocale] || translations['en']; // Fallback safely
-      let translation = translationSet[key] || key; // Fallback to key if not found
+      let translation = translationSet[key as keyof typeof translationSet] || key; // Fallback to key if not found
 
       if (params) {
         Object.entries(params).forEach(([paramKey, value]) => {
           // Use a safer regex that accounts for potential template issues
           // Or better, ensure consistent placeholder format like {{paramKey}}
           const regex = new RegExp(`\{\{\s*${paramKey}\s*\}\}`, 'g'); // Assuming {{ key }} format
-          translation = translation.replace(regex, String(value));
+          translation = translation.toString().replace(regex, String(value));
         });
       }
-      return translation;
+      return translation as string;
     },
     [locale]
   );
@@ -131,21 +131,21 @@ export function useTranslation(): UseTranslationReturn {
         // Adjust format string manually if Intl doesn't match exactly (e.g., separators)
         // This part is brittle and might need refinement based on observed Intl outputs
         if (userDateFormat === 'YYYY-MM-DD') {
-             const year = dateObj.getFullYear();
-             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-             const day = String(dateObj.getDate()).padStart(2, '0');
-             formattedDate = `${year}-${month}-${day}`;
-         } else if (userDateFormat === 'MM/DD/YYYY') {
-             const year = dateObj.getFullYear();
-             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-             const day = String(dateObj.getDate()).padStart(2, '0');
-             formattedDate = `${month}/${day}/${year}`;
-         } else if (userDateFormat === 'DD/MM/YYYY') {
-             const year = dateObj.getFullYear();
-             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-             const day = String(dateObj.getDate()).padStart(2, '0');
-             formattedDate = `${day}/${month}/${year}`;
-         }
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const day = String(dateObj.getDate()).padStart(2, '0');
+          formattedDate = `${year}-${month}-${day}`;
+        } else if (userDateFormat === 'MM/DD/YYYY') {
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const day = String(dateObj.getDate()).padStart(2, '0');
+          formattedDate = `${month}/${day}/${year}`;
+        } else if (userDateFormat === 'DD/MM/YYYY') {
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const day = String(dateObj.getDate()).padStart(2, '0');
+          formattedDate = `${day}/${month}/${year}`;
+        }
 
         return formattedDate;
       } catch (error) {

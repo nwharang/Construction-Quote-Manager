@@ -19,14 +19,17 @@ const nextConfig = {
 
   reactStrictMode: true,
 
-  // i18n configuration for pages directory
+  // i18n configuration for app router
   i18n: {
     // These are all the locales supported in the application
     locales: ['en', 'vi'],
     // Default locale used when a non-locale path is visited
     defaultLocale: 'en',
     // Set to false to let our custom middleware handle detection
+    localeDetection: false,
   },
+
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js', 'mdx'],
 
   images: {
     domains: ['images.unsplash.com', 'tailwindui.com'],

@@ -1,4 +1,4 @@
-import '@/styles/globals.css';
+import '~/styles/globals.css';
 import React from 'react';
 import type { AppProps } from 'next/app';
 import { api } from '~/utils/api';

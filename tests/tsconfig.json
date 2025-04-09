@@ -11,16 +11,28 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "types": ["node", "@playwright/test"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node",
+      "@playwright/test"
+    ],
     "skipDefaultLibCheck": true,
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": ["../src/*"],
-      "@/*": ["../src/*"]
+      "~/*": [
+        "../src/*"
+      ],
     }
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules"]
-} 
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
