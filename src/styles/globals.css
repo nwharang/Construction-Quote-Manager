@@ -1,9 +1,9 @@
-@import 'tailwindcss';
-@config "../../tailwind.config.js";
+@import "tailwindcss/preflight";
+@tailwind utilities;
 
 /* Theme transition handling */
 :root {
-  --transition-duration: 200ms;
+  --transition-duration: 0.3s;
 }
 
 /* Apply transition to all elements that could change with theme */
@@ -181,5 +181,159 @@ body {
   /* Only apply hover effects on devices that support hover */
   button:hover, [role="button"]:hover {
     opacity: 0.9;
+  }
+}
+
+/* Print styles */
+@media print {
+  /* Remove browser headers and footers */
+  @page {
+    margin: 0.5cm;
+    size: auto;
+  }
+  
+  /* Hide unnecessary elements when printing */
+  header, footer, nav, .no-print {
+    display: none !important;
+  }
+  
+  /* Ensure text is readable when printed */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  /* Ensure form fields print with visible contents */
+  input, textarea, select {
+    border: 1px solid #ddd !important;
+    background: transparent !important;
+  }
+}
+
+/* globals.css */
+@import "tailwindcss/preflight";
+@tailwind utilities;
+
+/* Add responsive design base rules */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  body {
+    @apply antialiased text-gray-800 bg-gray-50;
+  }
+  
+  /* Improve touch targets on mobile */
+  @media (max-width: 640px) {
+    button, 
+    [role="button"],
+    a.btn,
+    input[type="button"],
+    input[type="submit"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+}
+
+/* Add component specific styles */
+@layer components {
+  /* Currency value formatting */
+  .currency-value {
+    @apply whitespace-nowrap font-mono tabular-nums;
+  }
+  
+  /* Responsive tables for mobile */
+  .responsive-table {
+    @apply w-full overflow-x-auto -mx-4 sm:mx-0;
+  }
+  
+  /* Responsive grid layouts */
+  .responsive-grid {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+}
+
+/* Print-specific styles */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0.5in;
+  }
+  
+  html, body {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: white !important;
+    font-size: 12pt;
+  }
+  
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  /* Hide non-essential elements */
+  header, footer, nav, .no-print, .print\:hidden {
+    display: none !important;
+  }
+  
+  /* Ensure content doesn't break across pages */
+  tr, td, th, img, h2, h3 {
+    page-break-inside: avoid;
+  }
+  
+  h2, h3, h4 {
+    page-break-after: avoid;
+  }
+  
+  /* Ensure tables display properly */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  
+  /* Improve link display in print */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+  
+  /* Ensure form fields print with visible content */
+  input, select, textarea {
+    border: 1px solid #ddd;
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Fix for Firefox printing transparent backgrounds as black */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  /* Force background colors to show in print */
+  .print\:bg-white {
+    background-color: white !important;
+  }
+  
+  .print\:bg-gray-50 {
+    background-color: #f9fafb !important;
+  }
+  
+  .print\:bg-gray-100 {
+    background-color: #f3f4f6 !important;
+  }
+  
+  .print\:bg-gray-200 {
+    background-color: #e5e7eb !important;
   }
 }

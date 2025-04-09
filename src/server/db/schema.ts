@@ -212,8 +212,8 @@ export const settings = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' })
       .unique(),
-    companyName: text('company_name').notNull().default(''),
-    companyEmail: text('company_email').notNull().default(''),
+    companyName: text('company_name'),
+    companyEmail: text('company_email'),
     companyPhone: text('company_phone'),
     companyAddress: text('company_address'),
     emailNotifications: boolean('email_notifications').notNull().default(true),

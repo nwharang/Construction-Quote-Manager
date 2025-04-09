@@ -32,7 +32,7 @@ export function AuthLayout({ children, title }: AuthLayoutProps) {
         <title>{pageTitle}</title>
         <meta name="description" content="Quoting tool for construction contractors" />
       </Head>
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
         <div className="absolute right-4 top-4 flex items-center gap-2">
           {/* Only render client-side components after client-side hydration */}
           {isMounted && (

@@ -1,1 +1,0 @@
-{"cookies":[{"name":"next-auth.session-token","value":"mock-session-token","domain":"localhost","path":"/","expires":1744076862,"httpOnly":true,"secure":false,"sameSite":"Lax"}],"origins":[{"origin":"http://localhost:3000","localStorage":[{"name":"theme","value":"light"}]}]}

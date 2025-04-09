@@ -142,18 +142,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Main Navigation Items */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <Tabs fullWidth variant="light" aria-label="Main Navigation" isVertical={true}>
+        <Tabs
+          fullWidth
+          variant="light"
+          aria-label="Main Navigation"
+          isVertical={true}
+          onSelectionChange={(key) => {
+            if (window.innerWidth < 768) {
+              onClose();
+            }
+          }}
+        >
           {mainNavItems.map((tab) => (
             <Tab
               key={tab.key}
               href={tab.href}
               as={Link}
               className="justify-start"
-              onVolumeChange={() => {
-                if (window.innerWidth < 768) {
-                  onClose();
-                }
-              }}
               title={
                 <div className="flex w-full items-center gap-2.5">
                   <span>{tab.icon}</span>

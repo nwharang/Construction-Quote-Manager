@@ -59,16 +59,18 @@ export function PrintLayout({ children, title }: PrintLayoutProps) {
             color="primary" 
             startContent={<Printer size={18} />}
             onPress={handlePrint}
+            aria-label={t('print.printNow')}
           >
-            {t('print.printNow')}
+            <span className="hidden sm:inline">{t('print.printNow')}</span>
           </Button>
           <Button 
             variant="light" 
             className="ml-2" 
             startContent={<ArrowLeft size={18} />}
             onPress={handleBack}
+            aria-label={t('common.back')}
           >
-            {t('common.back')}
+            <span className="hidden sm:inline">{t('common.back')}</span>
           </Button>
         </NavbarContent>
       </Navbar>

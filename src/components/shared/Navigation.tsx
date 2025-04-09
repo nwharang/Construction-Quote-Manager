@@ -14,7 +14,7 @@ import {
 } from '@heroui/react';
 import { Menu, Settings, LogOut, Users } from 'lucide-react';
 import { ThemeToggle } from '~/components/ThemeToggle';
-import { LocaleSwitch } from '~/components/LocaleSwitch';
+import { LocaleSelector } from '~/components/ui/LocaleSelector';
 import { useTranslation } from '~/hooks/useTranslation';
 
 interface NavigationProps {
@@ -80,7 +80,7 @@ export function Navigation({ onMenuClick }: NavigationProps) {
       {/* Right side items */}
       <NavbarContent justify="end" className="gap-2">
         <NavbarItem>
-          <LocaleSwitch />
+          <LocaleSelector variant="mini" />
         </NavbarItem>
 
         <NavbarItem>

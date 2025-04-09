@@ -12,6 +12,7 @@ import {
 } from '@heroui/react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useI18n } from '~/hooks/useI18n';
+import { useLocaleCurrency } from '~/hooks/useLocaleCurrency';
 import { Globe } from 'lucide-react';
 import type { AppLocale } from '~/i18n/locales';
 
@@ -56,6 +57,7 @@ interface LocaleSwitchProps {
 /**
  * A component for switching between supported locales
  * Displays flags and language names for each locale option
+ * Automatically synchronizes currency with the selected locale
  *
  * @example
  * // Dropdown variant (default) for navbar - applies changes immediately
@@ -81,6 +83,7 @@ export function LocaleSwitch({
 }: LocaleSwitchProps) {
   const { t, locales } = useTranslation();
   const { currentLocale: contextLocale, changeLocale } = useI18n();
+  const { syncLocaleCurrency } = useLocaleCurrency();
 
   // Map locale codes to flag emojis (or use a proper flag icon library in a real app)
   const effectiveLocale = value !== undefined ? value : contextLocale;
@@ -101,21 +104,25 @@ export function LocaleSwitch({
       }
 
       if (applyImmediately) {
-        // Only call changeLocale from context, which handles store update and side effects
+        // First, change the locale
         changeLocale(appLocale);
+        
+        // Then explicitly trigger currency synchronization
+        setTimeout(() => {
+          syncLocaleCurrency();
+        }, 0);
       } else if (onLocaleChange) {
         // Defer changes to parent component
         onLocaleChange(appLocale);
       }
     },
-    [effectiveLocale, changeLocale, applyImmediately, onLocaleChange]
+    [effectiveLocale, changeLocale, applyImmediately, onLocaleChange, syncLocaleCurrency]
   );
+
   // Add a check here: If locales is not ready, don't render anything
   if (!locales) {
     return null;
   }
-
-  // Determine the effective locale: controlled or from context
 
   // Render as dropdown (for navbar)
   if (variant === 'dropdown') {

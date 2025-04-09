@@ -78,22 +78,78 @@ export function useTranslation(): UseTranslationReturn {
     (value: number | string): string => {
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
       const effectiveLocale = settings?.locale || locale || 'en';
-      const effectiveCurrency = settings?.currency || 'USD';
+      
+      // If locale is Vietnamese, default to VND if not specified
+      const effectiveCurrency = 
+        effectiveLocale === 'vi' && !settings?.currency 
+          ? 'VND' 
+          : settings?.currency || 'USD';
 
       if (isNaN(numValue)) return 'NaN';
 
       try {
-        return new Intl.NumberFormat(effectiveLocale, {
+        // Create options based on the currency
+        const options: Intl.NumberFormatOptions = {
           style: 'currency',
           currency: effectiveCurrency,
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(numValue);
+          // Adjust fractional digits based on currency (many currencies like VND don't use decimal places)
+          minimumFractionDigits: ['VND', 'JPY', 'KRW'].includes(effectiveCurrency) ? 0 : 2,
+          maximumFractionDigits: ['VND', 'JPY', 'KRW'].includes(effectiveCurrency) ? 0 : 2,
+          // Ensure currencyDisplay respects the locale's preferences
+          currencyDisplay: 'symbol',
+          // Add useGrouping for proper thousand separators
+          useGrouping: true,
+        };
+
+        // Special handling for VND in Vietnamese locale
+        if (effectiveCurrency === 'VND' && effectiveLocale === 'vi') {
+          // Use the native Intl formatter for Vietnamese Dong
+          return new Intl.NumberFormat('vi-VN', options).format(numValue);
+        }
+
+        return new Intl.NumberFormat(effectiveLocale, options).format(numValue);
       } catch (error) {
-        // Fallback for unsupported locales/currencies
+        // More robust fallback that respects currency type
         console.error(`Currency formatting error: ${error}`);
-        const symbolToUse = effectiveCurrency === 'VND' ? '₫' : '$'; // Example fallback symbol logic
-        return `${symbolToUse}${numValue.toFixed(2)}`;
+        let symbol = '$';
+        let fractionDigits = 2;
+        
+        // Simple mapping for fallback symbols and decimal places
+        if (effectiveCurrency === 'VND') {
+          symbol = '₫';
+          fractionDigits = 0; // VND typically doesn't use decimal places
+        } else if (effectiveCurrency === 'EUR') {
+          symbol = '€';
+        } else if (effectiveCurrency === 'GBP') {
+          symbol = '£';
+        } else if (effectiveCurrency === 'JPY' || effectiveCurrency === 'KRW') {
+          symbol = effectiveCurrency === 'JPY' ? '¥' : '₩';
+          fractionDigits = 0; // JPY and KRW don't use decimal places
+        }
+        
+        // Format with appropriate decimal places and thousand separators
+        const formattedValue = numValue.toFixed(fractionDigits);
+        
+        // Add thousand separators based on locale
+        // Vietnamese uses periods for thousand separators
+        const withSeparators = effectiveLocale === 'vi'
+          ? formattedValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+          : formattedValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        
+        // Position the symbol according to locale conventions
+        // In Vietnamese the currency symbol comes after the amount
+        if (effectiveLocale === 'vi') {
+          // For Vietnamese, VND symbol after the number with a space
+          return effectiveCurrency === 'VND' 
+            ? `${withSeparators} ${symbol}`
+            : `${withSeparators} ${effectiveCurrency}`;
+        } else if (['fr', 'es', 'it'].includes(effectiveLocale)) {
+          // Other locales that place symbol after the number
+          return `${withSeparators} ${symbol}`;
+        } else {
+          // Default format with symbol before the number
+          return `${symbol}${withSeparators}`;
+        }
       }
     },
     [settings?.locale, locale, settings?.currency]

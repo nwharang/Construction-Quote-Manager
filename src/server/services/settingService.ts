@@ -137,8 +137,8 @@ export class SettingsService extends BaseService {
   }): Promise<ClientSettingsData> {
     const defaultSettingsData: Omit<InsertSetting, 'id' | 'createdAt' | 'updatedAt'> = {
       userId: userId,
-      companyName: '',
-      companyEmail: '',
+      companyName: null,
+      companyEmail: null,
       companyPhone: null,
       companyAddress: null,
       emailNotifications: true,

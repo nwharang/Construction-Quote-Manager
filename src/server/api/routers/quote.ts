@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { createServices } from '~/server/services';
 import { AuthService } from '~/server/services/authService';
 import { db } from '~/server/db';
+import { QuoteService } from '~/server/services/quoteService';
 
 // Define reusable nested schemas with UUIDs
 const quoteMaterialInputSchema = z.object({
@@ -347,33 +348,36 @@ export const quoteRouter = createTRPCRouter({
   updateStatus: protectedProcedure
     .input(
       z.object({
-        id: z.string().uuid('Invalid quote ID format'),
-        status: z.enum(
-          [QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.REJECTED],
-          {
-            errorMap: () => ({ message: 'Status must be one of: DRAFT, SENT, ACCEPTED, REJECTED' }),
-          }
-        ),
-      })
+        id: z.string().uuid(),
+        status: z.enum([
+          QuoteStatus.DRAFT,
+          QuoteStatus.SENT,
+          QuoteStatus.ACCEPTED,
+          QuoteStatus.REJECTED,
+        ]),
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        const { id, status } = input;
         const services = createServices(ctx);
 
-        const updatedQuote = await services.quote.updateStatus({
-          id: input.id,
-          status: input.status,
-        });
-
+        // Check if the quote exists and belongs to the current user
+        const existingQuote = await services.quote.getQuoteById({ id, includeRelated: true });
+        
+        if (!existingQuote) {
+          throw new Error('Quote not found');
+        }
+        
+        // Update the quote status
+        const updatedQuote = await services.quote.updateStatus({ id, status });
+        
         return updatedQuote;
       } catch (error) {
-        console.error('Error updating quote status:', error);
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to update quote status',
-          cause: error,
-        });
+        if (error instanceof Error) {
+          throw new Error(`Failed to update quote status: ${error.message}`);
+        }
+        throw new Error('Failed to update quote status');
       }
     }),
 

@@ -5,7 +5,9 @@ class MyDocument extends Document {
   render() {
     return (
       <Html lang="en">
-        <Head>{/* Inject the theme initializer script */}</Head>
+        <Head>
+          <meta name="apple-mobile-web-app-title" content="TTXD" />
+        </Head>
         <body>
           <Main />
           <NextScript />

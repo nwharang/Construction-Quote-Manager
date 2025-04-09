@@ -36,8 +36,8 @@ export const settingsRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        companyName: z.string().min(1, 'Company name is required'),
-        companyEmail: z.string().email('Invalid email address'),
+        companyName: z.string().optional(),
+        companyEmail: z.string().email('Invalid email address').optional(),
         companyPhone: z.string().optional(),
         companyAddress: z.string().optional(),
         emailNotifications: z.boolean(),
