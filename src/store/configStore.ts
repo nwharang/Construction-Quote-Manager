@@ -1,10 +1,30 @@
 import { create } from 'zustand';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '~/server/api/root';
+import { DEFAULT_LOCALE } from '~/i18n/locales';
 
 type Settings = inferRouterOutputs<AppRouter>['settings']['get'];
 
 type Theme = 'light' | 'dark' | 'system';
+
+// Default settings structure - use actual defaults
+const defaultSettingsData: Settings = {
+  id: 'default',
+  userId: 'default-user',
+  companyName: null,
+  companyEmail: null,
+  companyPhone: null,
+  companyAddress: null,
+  emailNotifications: true,
+  quoteNotifications: true,
+  taskNotifications: true,
+  theme: 'system',
+  locale: DEFAULT_LOCALE,
+  currency: 'USD',
+  dateFormat: 'DD/MM/YYYY',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 interface ConfigState {
   settings: Settings | null;
@@ -30,13 +50,13 @@ export const useConfigStore = create<ConfigState>((set) => ({
 
   setSettings: (newSettingsOrFull: Partial<Settings> | Settings) =>
     set((state) => {
-      // Determine if this is the initial full hydration call (assume it has an 'id')
       const isFullHydration = 'id' in newSettingsOrFull && !!newSettingsOrFull.id;
+
+      let newStateSlice = {};
 
       if (isFullHydration) {
         const fullSettings = newSettingsOrFull as Settings;
 
-        // Calculate isDarkMode based on the incoming theme
         const potentialNextTheme = fullSettings.theme;
         const updatedIsDarkMode =
           potentialNextTheme === 'dark' ||
@@ -44,21 +64,18 @@ export const useConfigStore = create<ConfigState>((set) => ({
             typeof window !== 'undefined' &&
             window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-        const newStateSlice = {
+        newStateSlice = {
           settings: fullSettings,
           isDarkMode: updatedIsDarkMode,
-          isLoading: false, // *** Set isLoading to false ONLY on full hydration ***
+          isLoading: false,
         };
-        return newStateSlice;
       } else if (state.settings) {
-        // Handle partial update ONLY if settings already exist
-        const partialSettings = newSettingsOrFull as Partial<Settings>; // Cast to Partial
+        const partialSettings = newSettingsOrFull as Partial<Settings>;
         const updatedSettings = {
           ...state.settings,
           ...partialSettings,
         };
 
-        // Recalculate isDarkMode if theme is part of the partial update
         let updatedIsDarkMode = state.isDarkMode;
         if ('theme' in partialSettings) {
           const potentialNextTheme = partialSettings.theme;
@@ -69,21 +86,20 @@ export const useConfigStore = create<ConfigState>((set) => ({
               window.matchMedia('(prefers-color-scheme: dark)').matches);
         }
 
-        const newStateSlice = {
+        newStateSlice = {
           settings: updatedSettings,
           isDarkMode: updatedIsDarkMode,
-          // isLoading remains unchanged during partial updates
         };
-        return newStateSlice;
       } else {
-        // If it's not full hydration and settings are null, it's likely an update attempt before hydration.
-        // Log this and do nothing to prevent corrupting the state.
-
-        return {}; // Return empty object, no state change
+         console.warn('[ConfigStore] setSettings called with partial update before full hydration. Ignoring.', newSettingsOrFull);
+        newStateSlice = {};
       }
+      return newStateSlice;
     }),
 
-  setLoading: (isLoading) => set({ isLoading }),
+  setLoading: (isLoading) => set((state) => {
+    return { isLoading };
+  }),
 
   setUpdating: (isUpdating) => set({ isUpdating }),
 
@@ -92,19 +108,7 @@ export const useConfigStore = create<ConfigState>((set) => ({
       isNavOpen: !state.isNavOpen,
     })),
 
-  toggleDarkMode: () =>
-    set((state) => {
-      if (!state?.settings) return {};
-      const currentTheme = state.settings.theme;
-      const nextTheme: Theme = currentTheme === 'light' ? 'dark' : 'light';
-
-      const isNextDark = nextTheme === 'dark';
-
-      return {
-        settings: { ...state.settings, theme: nextTheme },
-        isDarkMode: isNextDark,
-      };
-    }),
+  toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
 }));
 
 export type { Settings };

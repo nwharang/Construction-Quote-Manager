@@ -20,7 +20,6 @@ type UpdateSettingsInputType = inferRouterInputs<AppRouter>['settings']['update'
 export class SettingsService extends BaseService {
   constructor(db: DB, ctx: { session: Session | null }) {
     super(db, ctx);
-    // Removed binding logic
   }
 
   // --- Methods moved from settingsMethods.ts ---
@@ -43,14 +42,12 @@ export class SettingsService extends BaseService {
       return existingSettings;
     }
 
-    console.log(`No settings found for user ${userId}, creating defaults.`);
     return this.createAndReturnDefaultSettings({ userId });
   }
 
   /**
    * Update settings for a user.
-   * Input data should match the structure expected by the frontend/Zod schema (e.g., numbers).
-   * This method handles converting numbers back to strings for DB storage.
+   * Input data should match the structure expected by the frontend/Zod schema.
    */
   public async updateSettings({
     userId,
@@ -64,9 +61,9 @@ export class SettingsService extends BaseService {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'User ID is required.' });
     }
 
+    // Prepare data for the database update
     const dataToUpdate: Partial<Omit<InsertSetting, 'id' | 'userId' | 'createdAt' | 'updatedAt'>> =
       {
-        // Copy non-numeric fields directly
         companyName: data.companyName,
         companyEmail: data.companyEmail,
         companyPhone: data.companyPhone,
@@ -74,12 +71,12 @@ export class SettingsService extends BaseService {
         emailNotifications: data.emailNotifications,
         quoteNotifications: data.quoteNotifications,
         taskNotifications: data.taskNotifications,
-        currency: data.currency || 'en',
-        locale: data.locale || 'USD',
-        dateFormat: data.dateFormat || 'DD/MM/YYYY',
+        currency: data.currency ?? undefined,
+        locale: data.locale ?? undefined,
+        dateFormat: data.dateFormat ?? undefined,
       };
 
-    // Remove undefined properties
+    // Remove properties that are explicitly undefined in the input
     Object.keys(dataToUpdate).forEach((keyStr) => {
       const key = keyStr as keyof typeof dataToUpdate;
       if (dataToUpdate[key] === undefined) {
@@ -105,10 +102,7 @@ export class SettingsService extends BaseService {
           where: eq(settings.userId, userId),
         });
         if (!existing) {
-          console.log('Settings not found during update, attempting to create defaults first.');
-          // Changed from private method call
           const createdDefaults = await this.createAndReturnDefaultSettings({ userId });
-          // Since defaults are now created, return them instead of throwing NOT_FOUND
           return createdDefaults;
         }
         throw new TRPCError({

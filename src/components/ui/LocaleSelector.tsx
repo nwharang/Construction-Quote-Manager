@@ -2,8 +2,8 @@ import React, { useCallback } from 'react';
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button } from '@heroui/react';
 import { Globe } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
-import { useConfigStore } from '~/store/configStore';
-import { useLocaleCurrency } from '~/hooks/useLocaleCurrency';
+import { useConfigStore } from '~/store';
+import { useI18n } from '~/hooks/useI18n';
 import type { AppLocale } from '~/i18n/locales';
 
 interface LocaleSelectorProps {
@@ -19,20 +19,16 @@ export const LocaleSelector: React.FC<LocaleSelectorProps> = ({
   className = '',
 }) => {
   const { t, locales } = useTranslation();
-  const { settings, setSettings } = useConfigStore();
-  const { syncLocaleCurrency } = useLocaleCurrency();
+  const { settings } = useConfigStore();
+  const { changeLocale } = useI18n();
   
   const currentLocale = settings?.locale || 'en';
   
   const handleLocaleChange = useCallback((locale: AppLocale) => {
     if (locale !== currentLocale) {
-      // Update the locale in settings
-      setSettings({ locale });
-      
-      // The useLocaleCurrency hook will automatically update the currency
-      // based on the new locale via its useEffect
+      changeLocale(locale);
     }
-  }, [currentLocale, setSettings]);
+  }, [currentLocale, changeLocale]);
 
   if (variant === 'mini') {
     return (

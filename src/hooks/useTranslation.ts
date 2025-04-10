@@ -79,11 +79,22 @@ export function useTranslation(): UseTranslationReturn {
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
       const effectiveLocale = settings?.locale || locale || 'en';
       
-      // If locale is Vietnamese, default to VND if not specified
-      const effectiveCurrency = 
+      // Determine the intended currency, defaulting based on locale
+      let effectiveCurrency = 
         effectiveLocale === 'vi' && !settings?.currency 
           ? 'VND' 
           : settings?.currency || 'USD';
+
+      // *** ADD VALIDATION ***
+      // Ensure effectiveCurrency is a valid 3-letter code before using it.
+      // If it's something like 'en' or 'vi', fallback to a default.
+      const isValidCurrencyCode = /^[A-Z]{3}$/.test(effectiveCurrency);
+      if (!isValidCurrencyCode) {
+        console.warn(`[formatCurrency] Invalid currency code "${effectiveCurrency}" detected for locale "${effectiveLocale}". Falling back.`);
+        // Fallback logic: VND for Vietnamese locale, otherwise USD
+        effectiveCurrency = effectiveLocale === 'vi' ? 'VND' : 'USD';
+      }
+      // *** END VALIDATION ***
 
       if (isNaN(numValue)) return 'NaN';
 

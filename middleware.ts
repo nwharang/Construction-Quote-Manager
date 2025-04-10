@@ -18,13 +18,11 @@ function getLocaleFromHeaders(request: NextRequest): string {
   });
 
   // Get preferred language from headers
-  const languages = new Negotiator({ headers: negotiatorHeaders }).languages();
+  const languages = new Negotiator({ headers: negotiatorHeaders }).languages(
+    supportedLocales
+  );
 
-  try {
-    return matchLocale(languages, supportedLocales, DEFAULT_LOCALE);
-  } catch {
-    return DEFAULT_LOCALE;
-  }
+  return matchLocale(languages, supportedLocales, DEFAULT_LOCALE);
 }
 
 /**
@@ -32,7 +30,6 @@ function getLocaleFromHeaders(request: NextRequest): string {
  * This implementation supports both Pages router and App router
  */
 export function middleware(request: NextRequest) {
-  // Get pathname from the URL
   const { pathname } = request.nextUrl;
 
   // Skip middleware for non-page resources
@@ -40,7 +37,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/static') ||
-    pathname.includes('.') ||
+    pathname.includes('.') || // Matches any file with an extension
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
@@ -51,16 +48,16 @@ export function middleware(request: NextRequest) {
     (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   );
 
-  // If path already has a locale, don't redirect
   if (hasLocale) {
     return NextResponse.next();
   }
 
   // Get preferred locale from cookie or accept-language header
   const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
-  const locale = cookieLocale && supportedLocales.includes(cookieLocale) 
-    ? cookieLocale 
-    : getLocaleFromHeaders(request);
+  const headersLocale = getLocaleFromHeaders(request);
+  const locale = cookieLocale && supportedLocales.includes(cookieLocale)
+    ? cookieLocale
+    : headersLocale;
 
   // Create a URL with the locale prefix
   const url = new URL(
@@ -69,7 +66,6 @@ export function middleware(request: NextRequest) {
   );
   url.search = request.nextUrl.search;
 
-  // Redirect to the localized URL
   return NextResponse.redirect(url);
 }
 

@@ -1,6 +1,5 @@
 import { useCallback, useEffect } from 'react';
 import { useConfigStore } from '~/store/configStore';
-import { useTranslation } from './useTranslation';
 
 /**
  * Hook to handle automatic currency based on locale
@@ -20,32 +19,21 @@ export const useLocaleCurrency = () => {
     }
   }, []);
 
-  // Effect to update currency when locale changes
-  const syncLocaleCurrency = useCallback(() => {
+  // Automatically sync currency when locale changes
+  useEffect(() => {
     if (settings?.locale) {
       const currentLocale = settings.locale;
-      // Check if currency exists in settings before accessing it
       const currentCurrency = settings.currency ?? getDefaultCurrencyForLocale(currentLocale);
       const defaultCurrency = getDefaultCurrencyForLocale(currentLocale);
 
-      // Only update if the current currency doesn't match the expected default
       if (currentCurrency !== defaultCurrency) {
-        console.log(
-          `[useLocaleCurrency] Updating currency to ${defaultCurrency} for locale ${currentLocale}`
-        );
-        setSettings({
-          currency: defaultCurrency,
-        });
+        setSettings({ currency: defaultCurrency });
       }
     }
-  }, [settings?.locale, settings?.currency, getDefaultCurrencyForLocale, setSettings]);
+  }, [settings?.locale, settings?.currency, setSettings, getDefaultCurrencyForLocale]);
 
-  // Automatically sync currency when locale changes
-  useEffect(() => {
-    syncLocaleCurrency();
-  }, [settings?.locale, syncLocaleCurrency]);
-
+  // Return the utility function if needed elsewhere
   return {
-    syncLocaleCurrency,
+    getDefaultCurrencyForLocale,
   };
 };

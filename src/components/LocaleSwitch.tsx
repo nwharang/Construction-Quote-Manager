@@ -12,7 +12,6 @@ import {
 } from '@heroui/react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useI18n } from '~/hooks/useI18n';
-import { useLocaleCurrency } from '~/hooks/useLocaleCurrency';
 import { Globe } from 'lucide-react';
 import type { AppLocale } from '~/i18n/locales';
 
@@ -83,7 +82,6 @@ export function LocaleSwitch({
 }: LocaleSwitchProps) {
   const { t, locales } = useTranslation();
   const { currentLocale: contextLocale, changeLocale } = useI18n();
-  const { syncLocaleCurrency } = useLocaleCurrency();
 
   // Map locale codes to flag emojis (or use a proper flag icon library in a real app)
   const effectiveLocale = value !== undefined ? value : contextLocale;
@@ -104,19 +102,12 @@ export function LocaleSwitch({
       }
 
       if (applyImmediately) {
-        // First, change the locale
         changeLocale(appLocale);
-        
-        // Then explicitly trigger currency synchronization
-        setTimeout(() => {
-          syncLocaleCurrency();
-        }, 0);
       } else if (onLocaleChange) {
-        // Defer changes to parent component
         onLocaleChange(appLocale);
       }
     },
-    [effectiveLocale, changeLocale, applyImmediately, onLocaleChange, syncLocaleCurrency]
+    [effectiveLocale, changeLocale, applyImmediately, onLocaleChange]
   );
 
   // Add a check here: If locales is not ready, don't render anything
@@ -146,9 +137,7 @@ export function LocaleSwitch({
                 const selectedLocale = selectedLocaleArray[0];
                 if (selectedLocale) {
                   // Prevent the event from continuing to bubble up
-                  setTimeout(() => {
-                    handleLocaleChange(selectedLocale);
-                  }, 0);
+                  handleLocaleChange(selectedLocale);
                 }
               }
             }
@@ -183,9 +172,7 @@ export function LocaleSwitch({
             const selectedLocale = selectedLocaleArray[0];
             if (selectedLocale) {
               // Prevent the event from continuing to bubble up
-              setTimeout(() => {
-                handleLocaleChange(selectedLocale);
-              }, 0);
+              handleLocaleChange(selectedLocale);
             }
           }
         }

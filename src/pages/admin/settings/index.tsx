@@ -78,13 +78,10 @@ const processSettingsForForm = (data: SettingsData): SettingUpdateInput => {
  * Settings page component for user preferences
  */
 export default function SettingsPage() {
-  const { t, locales } = useTranslation();
+  const { t } = useTranslation();
   const { data: session } = useSession();
   const toast = useAppToast();
   const { setSettings: setStoreSettings } = useConfigStore();
-  const { currentLocale } = useI18n();
-  const { syncLocaleCurrency } = useLocaleCurrency();
-  const router = useRouter();
 
   const [formState, setFormState] = useState<SettingUpdateInput | null>(null);
   const [validationErrors, setValidationErrors] = useState<ZodIssue[]>([]);
@@ -109,8 +106,9 @@ export default function SettingsPage() {
       // 2. Invalidate relevant queries
       utils.settings.get.invalidate();
 
-      // 3. Show success toast
-      toast.success(t('settings.saveSuccess'));
+      // 3. Show success toast (making it unique with a timestamp for testing)
+      const uniqueMessage = `${t('settings.saveSuccess')} (${new Date().toLocaleTimeString()})`;
+      toast.success(uniqueMessage);
 
       // 4. Clear validation errors on successful save
       setValidationErrors([]);
@@ -265,9 +263,6 @@ export default function SettingsPage() {
                             onChange={(e) => handleFormChange('companyName', e.target.value)}
                             isInvalid={!!getFieldError('companyName')}
                             errorMessage={getFieldError('companyName')}
-                            classNames={{
-                              label: 'text-gray-700 dark:text-gray-300 font-medium',
-                            }}
                           />
                         </div>
                         <div>
@@ -278,9 +273,6 @@ export default function SettingsPage() {
                             type="email"
                             isInvalid={!!getFieldError('companyEmail')}
                             errorMessage={getFieldError('companyEmail')}
-                            classNames={{
-                              label: 'text-gray-700 dark:text-gray-300 font-medium',
-                            }}
                           />
                         </div>
                       </div>
@@ -294,21 +286,15 @@ export default function SettingsPage() {
                             type="tel"
                             isInvalid={!!getFieldError('companyPhone')}
                             errorMessage={getFieldError('companyPhone')}
-                            classNames={{
-                              label: 'text-gray-700 dark:text-gray-300 font-medium',
-                            }}
                           />
                         </div>
                         <div>
-                          <Textarea
+                          <Input
                             label={t('settings.company.address')}
                             value={formState.companyAddress ?? ''}
                             onChange={(e) => handleFormChange('companyAddress', e.target.value)}
                             isInvalid={!!getFieldError('companyAddress')}
                             errorMessage={getFieldError('companyAddress')}
-                            classNames={{
-                              label: 'text-gray-700 dark:text-gray-300 font-medium',
-                            }}
                           />
                         </div>
                       </div>

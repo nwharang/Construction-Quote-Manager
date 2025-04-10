@@ -38,11 +38,11 @@ function AppContent({ children }: { children: ReactNode }) {
  */
 function HeroUIWithRouting({ children }: { children: ReactNode }) {
   const router = useRouter();
-
   return (
     <HeroUIProvider
       navigate={(path) => router.push(path)}
       useHref={(href) => href}
+      labelPlacement="outside"
     >
       {children}
     </HeroUIProvider>

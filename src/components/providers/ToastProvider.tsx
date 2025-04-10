@@ -32,21 +32,8 @@ const cleanupOldToasts = () => {
 export function ToastProvider({ children }: ToastProviderProps) {
   return (
     <>
+      <HeroUIToastProvider />
       {children}
-      <HeroUIToastProvider
-        toastProps={{
-          classNames: {
-            base: 'bg-background/95 backdrop-blur border border-border shadow-md',
-            content: 'flex gap-2 text-foreground',
-            title: 'text-sm font-medium',
-            description: 'text-xs',
-            closeButton: 'text-foreground',
-          },
-          timeout: 3000,
-          variant: 'solid',
-          hideIcon: false,
-        }}
-      />
     </>
   );
 }

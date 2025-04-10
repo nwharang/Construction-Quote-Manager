@@ -3,7 +3,7 @@ import { useSession } from 'next-auth/react';
 import { api } from '~/utils/api';
 import { useConfigStore, type Settings } from '~/store/configStore'; // Import Settings type
 import Cookies from 'js-cookie';
-import { type AppLocale, isSupportedLocale } from '~/i18n/locales';
+import { type AppLocale, isSupportedLocale, DEFAULT_LOCALE } from '~/i18n/locales';
 
 /**
  * ConfigLoader Component
@@ -17,31 +17,24 @@ import { type AppLocale, isSupportedLocale } from '~/i18n/locales';
 
 // Define Theme type locally if not imported
 type Theme = 'light' | 'dark' | 'system';
+
+// Cookie keys
 const themeCookieKey = 'app-theme';
 const localeCookieKey = 'app-locale';
 
-// Valid theme values for type checking
+// Allowed themes
 const VALID_THEMES: Theme[] = ['light', 'dark', 'system'];
 
-// Define default settings matching the Settings type structure
-// (Derived from inferRouterOutputs<AppRouter>['settings']['get'])
-const defaultSettingsData: Settings = {
-  id: 'default-settings-placeholder', // Placeholder ID
-  userId: 'default-user-placeholder', // Placeholder user ID
-  companyName: 'My Company',
-  companyEmail: 'default@example.com',
-  companyPhone: null,
-  companyAddress: null,
-  // Use strings for numeric-like fields as expected by Settings type from `settings.get`
+// Define default settings data structure directly here
+const defaultSettingsData: Partial<Settings> = {
+  // No ID needed for default, it represents non-persisted state
+  theme: 'system',
+  locale: DEFAULT_LOCALE,
+  currency: 'USD', // Default currency
+  dateFormat: 'DD/MM/YYYY', // Default date format
   emailNotifications: true,
   quoteNotifications: true,
   taskNotifications: true,
-  theme: 'system', // Default theme
-  locale: 'en', // Default locale
-  currency: 'USD', // Default currency
-  dateFormat: 'DD/MM/YYYY', // Default date format
-  createdAt: new Date(), // Placeholder date
-  updatedAt: new Date(), // Placeholder date
 };
 
 export function ConfigLoader() {
@@ -53,6 +46,7 @@ export function ConfigLoader() {
   const { data: dbSettings, isLoading: isLoadingDbSettings } = api.settings.get.useQuery(
     undefined,
     {
+      enabled: status === 'authenticated',
       refetchOnWindowFocus: false,
       staleTime: Infinity, // Cache indefinitely until invalidated
     }
@@ -60,24 +54,18 @@ export function ConfigLoader() {
 
   // Load settings from localStorage/cookies
   const loadLocalSettings = useCallback(() => {
-    // Only run in client
     if (typeof window === 'undefined') return null;
 
-    // Get theme from cookie or localStorage with proper validation
     const rawTheme = Cookies.get(themeCookieKey) || localStorage.getItem('theme');
-    // Validate that theme is one of the allowed values
     const theme =
       rawTheme && VALID_THEMES.includes(rawTheme as Theme)
         ? (rawTheme as Theme)
         : defaultSettingsData.theme;
 
-    // Get locale from cookie or localStorage with validation
     const rawLocale = Cookies.get(localeCookieKey) || localStorage.getItem('locale');
-    // Validate that locale is supported
     const locale =
       rawLocale && isSupportedLocale(rawLocale) ? rawLocale : defaultSettingsData.locale;
 
-    // Create partial settings object with client preferences
     return {
       ...defaultSettingsData,
       theme,
@@ -85,44 +73,41 @@ export function ConfigLoader() {
     };
   }, []);
 
-  // Main effect for loading settings
   useEffect(() => {
-    const isUserLoading = status === 'loading';
-    const areSettingsLoading = status === 'authenticated' && isLoadingDbSettings;
-
-    // Still show loading state initially
-    if (isUserLoading || areSettingsLoading) {
-      if (useConfigStore.getState().isLoading) {
-        // If already loading, do nothing
-      } else {
-        useConfigStore.setState({ isLoading: true });
-      }
+    if (initialized.current || status === 'loading' || isLoadingDbSettings) {
       return;
     }
 
-    // --- Hydrate if authenticated and settings loaded ---
+    const localPreferences = loadLocalSettings() || defaultSettingsData;
+
+    let finalSettings: Settings;
+
     if (status === 'authenticated' && dbSettings) {
-      setSettings({ ...dbSettings }); // Hydrate with DB settings
-      initialized.current = true;
+      finalSettings = {
+        ...dbSettings,
+        theme: localPreferences.theme || dbSettings.theme,
+        locale: localPreferences.locale || dbSettings.locale,
+      };
+    } else {
+      finalSettings = {
+        ...(defaultSettingsData as Settings), // Need to cast default data
+        ...localPreferences,
+        id: 'unauthenticated', // Use a placeholder or derive
+        userId: 'unauthenticated-user',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        companyName: null,
+        companyEmail: null,
+        companyPhone: null,
+        companyAddress: null,
+      };
     }
-    // --- For unauthenticated users, load from localStorage/cookies ---
-    else if (status === 'unauthenticated') {
-      const localSettings = loadLocalSettings();
 
-      if (localSettings) {
-        // Only set if we successfully loaded local settings
-        setSettings(localSettings);
-      }
+    setSettings(finalSettings);
+    initialized.current = true;
 
-      // Always ensure loading is set to false for unauthenticated users
-      if (useConfigStore.getState().isLoading) {
-        useConfigStore.setState({ isLoading: false });
-      }
-
-      initialized.current = true;
-    }
   }, [status, dbSettings, isLoadingDbSettings, setSettings, loadLocalSettings]);
 
-  // This component doesn't render anything
+  // This component doesn't render anything visible
   return null;
 }

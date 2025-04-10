@@ -16,7 +16,6 @@ export function useAuthNavigation() {
    * @param path The path to navigate to
    */
   const navigateWithLocale = (path: string) => {
-    console.log(`[AuthNav] Navigating to ${path} with locale ${currentLocale}`);
     // Use router.push with locale option to preserve current locale
     return router.push(path, path, { locale: currentLocale });
   };

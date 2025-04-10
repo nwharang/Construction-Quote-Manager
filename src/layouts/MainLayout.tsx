@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import { Navigation } from '~/components/shared/Navigation';
 import { Sidebar } from '~/components/shared/Sidebar';
 import { useConfigStore } from '~/store';
+import { shallow } from 'zustand/shallow';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -16,10 +17,8 @@ interface MainLayoutProps {
  */
 export function MainLayout({ children }: MainLayoutProps) {
   useSession();
-  const { isNavOpen, toggleNav } = useConfigStore((state) => ({
-    isNavOpen: state.isNavOpen,
-    toggleNav: state.toggleNav,
-  }));
+  const isNavOpen = useConfigStore((state) => state.isNavOpen);
+  const toggleNav = useConfigStore((state) => state.toggleNav);
 
   const toggleSidebar = () => toggleNav();
 
