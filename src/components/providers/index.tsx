@@ -59,12 +59,12 @@ export function Providers({ children, session }: ProvidersProps) {
       <ConfigLoader />
       <ThemeProvider>
         <HeroUIWithRouting>
-          <AppContent>
-            <I18nProvider>
+          <I18nProvider>
+            <AppContent>
               <ToastContainer />
               {children}
-            </I18nProvider>
-          </AppContent>
+            </AppContent>
+          </I18nProvider>
         </HeroUIWithRouting>
       </ThemeProvider>
     </SessionProvider>
@@ -73,3 +73,5 @@ export function Providers({ children, session }: ProvidersProps) {
 
 // Re-export all providers for direct imports
 export * from './I18nProvider';
+export * from './ThemeProvider';
+export * from './ConfigLoader';
