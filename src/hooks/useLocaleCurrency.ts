@@ -24,7 +24,8 @@ export const useLocaleCurrency = () => {
   const syncLocaleCurrency = useCallback(() => {
     if (settings?.locale) {
       const currentLocale = settings.locale;
-      const currentCurrency = settings.currency;
+      // Check if currency exists in settings before accessing it
+      const currentCurrency = settings.currency ?? getDefaultCurrencyForLocale(currentLocale);
       const defaultCurrency = getDefaultCurrencyForLocale(currentLocale);
 
       // Only update if the current currency doesn't match the expected default

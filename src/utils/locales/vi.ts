@@ -348,6 +348,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.view.lumpSum': 'Tổng gộp',
   'quotes.view.itemized': 'Chi tiết',
   'quotes.view.materialsLumpSum': 'Vật liệu (Tổng gộp)',
+  'quotes.summary.markupCalculated': 'Tính toán tăng giá',
 };
 
 export default viTranslations;

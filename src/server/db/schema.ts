@@ -221,6 +221,8 @@ export const settings = pgTable(
     taskNotifications: boolean('task_notifications').notNull().default(true),
     theme: text('theme').notNull().default('system'),
     locale: text('locale').notNull().default('en'),
+    currency: text('currency').notNull().default('USD'),
+    dateFormat: text('date_format').notNull().default('DD/MM/YYYY'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

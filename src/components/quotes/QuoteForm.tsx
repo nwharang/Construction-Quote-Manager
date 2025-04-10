@@ -84,7 +84,7 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
     reset,
     getValues,
   } = useForm<QuoteFormValues>({
-    resolver: zodResolver(quoteFormSchema),
+    resolver: zodResolver(quoteFormSchema) as any,
     defaultValues: initialValues
       ? initialValues
       : {

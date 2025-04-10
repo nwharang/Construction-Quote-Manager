@@ -38,6 +38,8 @@ const defaultSettingsData: Settings = {
   taskNotifications: true,
   theme: 'system', // Default theme
   locale: 'en', // Default locale
+  currency: 'USD', // Default currency
+  dateFormat: 'DD/MM/YYYY', // Default date format
   createdAt: new Date(), // Placeholder date
   updatedAt: new Date(), // Placeholder date
 };

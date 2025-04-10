@@ -42,6 +42,8 @@ export const settingsRouter = createTRPCRouter({
         quoteNotifications: z.boolean(),
         taskNotifications: z.boolean(),
         currency: z.string().nullish(),
+        dateFormat: z.string().nullish(),
+        locale: z.string().nullish(),
       })
     )
     .mutation(async ({ ctx, input }) => {

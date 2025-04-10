@@ -74,6 +74,9 @@ export class SettingsService extends BaseService {
         emailNotifications: data.emailNotifications,
         quoteNotifications: data.quoteNotifications,
         taskNotifications: data.taskNotifications,
+        currency: data.currency || 'en',
+        locale: data.locale || 'USD',
+        dateFormat: data.dateFormat || 'DD/MM/YYYY',
       };
 
     // Remove undefined properties
@@ -146,6 +149,8 @@ export class SettingsService extends BaseService {
       taskNotifications: true,
       theme: 'system',
       locale: DEFAULT_LOCALE,
+      currency: 'USD',
+      dateFormat: 'MM/DD/YYYY',
     };
 
     try {

@@ -332,6 +332,7 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.view.lumpSum': 'Lump Sum',
   'quotes.view.itemized': 'Itemized',
   'quotes.view.materialsLumpSum': 'Materials (Lump Sum)',
+  'quotes.summary.markupCalculated': 'Markup Calculated',
 };
 
 export default enTranslations;
