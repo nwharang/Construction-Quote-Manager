@@ -43,7 +43,6 @@ function HeroUIWithRouting({ children }: { children: ReactNode }) {
     <HeroUIProvider
       navigate={(path) => router.push(path)}
       useHref={(href) => href}
-      labelPlacement="outside"
     >
       {children}
     </HeroUIProvider>

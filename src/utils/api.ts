@@ -5,7 +5,6 @@ import { httpBatchLink, loggerLink } from '@trpc/client';
 import { createTRPCNext } from '@trpc/next';
 import { type inferRouterInputs, type inferRouterOutputs } from '@trpc/server';
 import superjson from 'superjson';
-import fetchPonyfill from 'fetch-ponyfill';
 
 import { type AppRouter } from '~/server/api/root';
 
@@ -14,8 +13,6 @@ const getBaseUrl = () => {
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`; // SSR should use vercel url
   return `http://localhost:${process.env.PORT ?? 3000}`; // dev SSR should use localhost
 };
-
-const { fetch } = fetchPonyfill();
 
 /**
  * Safely determine if we're in a browser environment
@@ -40,8 +37,6 @@ export const api = createTRPCNext<AppRouter>({
         httpBatchLink({
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
-          // Use fetch-ponyfill to fix request issues
-          fetch: fetch,
           headers: () => {
             return {
               // Add any required headers

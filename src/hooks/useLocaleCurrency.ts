@@ -8,7 +8,6 @@ import { useTranslation } from './useTranslation';
  */
 export const useLocaleCurrency = () => {
   const { settings, setSettings } = useConfigStore();
-  const { t } = useTranslation();
 
   // Function to get the default currency for a locale
   const getDefaultCurrencyForLocale = useCallback((locale: string): string => {
@@ -16,15 +15,6 @@ export const useLocaleCurrency = () => {
       case 'vi':
         return 'VND';
       case 'en':
-        return 'USD';
-      case 'fr':
-        return 'EUR';
-      case 'de':
-        return 'EUR';
-      case 'ja':
-        return 'JPY';
-      case 'ko':
-        return 'KRW';
       default:
         return 'USD';
     }
@@ -39,9 +29,11 @@ export const useLocaleCurrency = () => {
 
       // Only update if the current currency doesn't match the expected default
       if (currentCurrency !== defaultCurrency) {
-        console.log(`[useLocaleCurrency] Updating currency to ${defaultCurrency} for locale ${currentLocale}`);
+        console.log(
+          `[useLocaleCurrency] Updating currency to ${defaultCurrency} for locale ${currentLocale}`
+        );
         setSettings({
-          currency: defaultCurrency
+          currency: defaultCurrency,
         });
       }
     }
@@ -53,6 +45,6 @@ export const useLocaleCurrency = () => {
   }, [settings?.locale, syncLocaleCurrency]);
 
   return {
-    syncLocaleCurrency
+    syncLocaleCurrency,
   };
-}; 
+};

@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - '@heroui/shared-utils'
+  - bufferutil
+  - esbuild
+  - sharp
+  - utf-8-validate

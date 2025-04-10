@@ -21,7 +21,17 @@ import {
   Textarea,
   ButtonGroup,
 } from '@heroui/react';
-import { Save, Palette, Settings as SettingsIcon, Bell, X, Check, FileImage, Upload, Trash2 } from 'lucide-react';
+import {
+  Save,
+  Palette,
+  Settings as SettingsIcon,
+  Bell,
+  X,
+  Check,
+  FileImage,
+  Upload,
+  Trash2,
+} from 'lucide-react';
 import { api } from '~/trpc/react';
 import { MainLayout } from '~/layouts';
 import { useTranslation } from '~/hooks/useTranslation';
@@ -54,13 +64,13 @@ type SettingUpdateInput = inferRouterInputs<AppRouter>['settings']['update'] & {
 // Ensures numeric fields are numbers and handles nulls/undefined
 const processSettingsForForm = (data: SettingsData): SettingUpdateInput => {
   return {
-    companyName: data.companyName ?? '',
-    companyEmail: data.companyEmail ?? '',
-    companyPhone: data.companyPhone ?? '', // Keep as string for input, Zod handles optional
-    companyAddress: data.companyAddress ?? '', // Keep as string for input, Zod handles optional
-    emailNotifications: data.emailNotifications ?? true,
-    quoteNotifications: data.quoteNotifications ?? true,
-    taskNotifications: data.taskNotifications ?? true,
+    companyName: data.companyName,
+    companyEmail: data.companyEmail,
+    companyPhone: data.companyPhone,
+    companyAddress: data.companyAddress,
+    emailNotifications: data.emailNotifications,
+    quoteNotifications: data.quoteNotifications,
+    taskNotifications: data.taskNotifications,
   };
 };
 
@@ -197,65 +207,6 @@ export default function SettingsPage() {
     updateSettingsMutation.mutate(formState);
   };
 
-  // Handle locale change
-  const handleLocaleChange = (newLocale: AppLocale) => {
-    // Create a new form state with the updated locale
-    const updatedFormState = {
-      ...formState,
-      locale: newLocale
-    };
-    
-    // Update form state
-    setFormState(updatedFormState);
-    
-    // Sync currency with the new locale if needed
-    if (newLocale !== formState.locale) {
-      const defaultCurrency = getDefaultCurrencyForLocale(newLocale);
-      if (defaultCurrency) {
-        updatedFormState.currency = defaultCurrency;
-        setFormState(updatedFormState);
-      }
-    }
-  };
-
-  // Helper function to get default currency for locale
-  const getCurrencyForLocale = (locale: string): string => {
-    switch (locale) {
-      case 'vi':
-        return 'VND';
-      case 'en':
-        return 'USD';
-      case 'fr':
-      case 'de':
-        return 'EUR';
-      case 'ja':
-        return 'JPY';
-      case 'ko':
-        return 'KRW';
-      default:
-        return 'USD';
-    }
-  };
-
-  // Helper function to get default currency for locale
-  const getDefaultCurrencyForLocale = (locale: string): string | undefined {
-    switch (locale) {
-      case 'vi':
-        return 'VND';
-      case 'en':
-        return 'USD';
-      case 'fr':
-      case 'de':
-        return 'EUR';
-      case 'ja':
-        return 'JPY';
-      case 'ko':
-        return 'KRW';
-      default:
-        return undefined;
-    }
-  };
-
   if (settingsQuery.isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -268,7 +219,7 @@ export default function SettingsPage() {
     return (
       <div className="text-danger p-4 text-center">
         <p>{t('settings.loadError')}</p>
-        <Button onClick={() => settingsQuery.refetch()} className="mt-2">
+        <Button onPress={() => settingsQuery.refetch()} className="mt-2">
           {t('common.retry')}
         </Button>
       </div>
@@ -286,7 +237,9 @@ export default function SettingsPage() {
       </Head>
 
       <div className="mx-auto max-w-7xl p-4 md:p-6">
-        <h1 className="text-primary-900 dark:text-primary-100 mb-6 text-2xl font-bold">{t('settings.pageTitle')}</h1>
+        <h1 className="text-primary-900 dark:text-primary-100 mb-6 text-2xl font-bold">
+          {t('settings.pageTitle')}
+        </h1>
 
         {settingsQuery.isLoading ? (
           <div className="flex h-64 items-center justify-center rounded-lg bg-gray-50/50 shadow-sm dark:bg-gray-900/20">
@@ -308,7 +261,7 @@ export default function SettingsPage() {
                         <div>
                           <Input
                             label={t('settings.company.name')}
-                            value={formState.companyName}
+                            value={formState.companyName ?? ''}
                             onChange={(e) => handleFormChange('companyName', e.target.value)}
                             isInvalid={!!getFieldError('companyName')}
                             errorMessage={getFieldError('companyName')}
@@ -320,7 +273,7 @@ export default function SettingsPage() {
                         <div>
                           <Input
                             label={t('settings.company.email')}
-                            value={formState.companyEmail}
+                            value={formState.companyEmail ?? ''}
                             onChange={(e) => handleFormChange('companyEmail', e.target.value)}
                             type="email"
                             isInvalid={!!getFieldError('companyEmail')}
@@ -336,7 +289,7 @@ export default function SettingsPage() {
                         <div>
                           <Input
                             label={t('settings.company.phone')}
-                            value={formState.companyPhone}
+                            value={formState.companyPhone ?? ''}
                             onChange={(e) => handleFormChange('companyPhone', e.target.value)}
                             type="tel"
                             isInvalid={!!getFieldError('companyPhone')}
@@ -349,7 +302,7 @@ export default function SettingsPage() {
                         <div>
                           <Textarea
                             label={t('settings.company.address')}
-                            value={formState.companyAddress}
+                            value={formState.companyAddress ?? ''}
                             onChange={(e) => handleFormChange('companyAddress', e.target.value)}
                             isInvalid={!!getFieldError('companyAddress')}
                             errorMessage={getFieldError('companyAddress')}
@@ -403,93 +356,16 @@ export default function SettingsPage() {
                   </Card>
                 )}
               </Tab>
-
-              <Tab key="localization" title={t('settings.localization.title')}>
-                {formState && (
-                  <Card className="mb-6 border border-gray-100 shadow-sm dark:border-gray-800">
-                    <CardHeader className="flex items-center justify-between">
-                      <h2 className="text-primary-800 dark:text-primary-200 text-xl font-semibold">
-                        {t('settings.localization.title')}
-                      </h2>
-                    </CardHeader>
-                    <CardBody className="gap-5 p-6">
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                          <Select
-                            label={t('settings.language')}
-                            selectedKeys={formState.locale ? [formState.locale] : [currentLocale || 'en']}
-                            onChange={(e) => handleLocaleChange(e.target.value as AppLocale)}
-                            isInvalid={!!getFieldError('locale')}
-                            errorMessage={getFieldError('locale')}
-                            className="w-full"
-                          >
-                            {Object.entries(locales).map(([code, { name, flag }]) => (
-                              <SelectItem key={code} textValue={code}>
-                                <div className="flex items-center">
-                                  <span className="mr-2 text-lg">{flag}</span>
-                                  <span>{name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </Select>
-                        </div>
-                        <div>
-                          <Select
-                            label={t('settings.defaults.currency')}
-                            selectedKeys={formState.currency ? [formState.currency] : ['USD']}
-                            onChange={(e) => handleFormChange('currency', e.target.value)}
-                            isInvalid={!!getFieldError('currency')}
-                            errorMessage={getFieldError('currency')}
-                            className="w-full"
-                          >
-                            <SelectItem key="USD" textValue="USD">
-                              <div className="flex items-center">
-                                <span className="mr-2">$</span>
-                                <span>USD - US Dollar</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem key="VND" textValue="VND">
-                              <div className="flex items-center">
-                                <span className="mr-2">₫</span>
-                                <span>VND - Vietnamese Dong</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem key="EUR" textValue="EUR">
-                              <div className="flex items-center">
-                                <span className="mr-2">€</span>
-                                <span>EUR - Euro</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem key="GBP" textValue="GBP">
-                              <div className="flex items-center">
-                                <span className="mr-2">£</span>
-                                <span>GBP - British Pound</span>
-                              </div>
-                            </SelectItem>
-                          </Select>
-                        </div>
-                      </div>
-                    </CardBody>
-                  </Card>
-                )}
-              </Tab>
             </Tabs>
 
-            <div className="space-x-2 mt-8 flex justify-end">
-              <ResponsiveButton
-                variant="flat"
-                color="default"
-                icon={<X size={18} />}
-                label={t('settings.actions.cancel')}
-                onClick={handleCancel}
-              />
+            <div className="mt-8 flex justify-end space-x-2">
               <ResponsiveButton
                 type="submit"
                 color="primary"
                 isLoading={updateSettingsMutation.isPending}
-                icon={<Check size={18} />}
+                icon={updateSettingsMutation.isPending ? null : <Check size={18} />}
                 label={t('settings.actions.save')}
-                onClick={handleSave}
+                onPress={handleSave}
               />
             </div>
           </>
@@ -501,10 +377,4 @@ export default function SettingsPage() {
 
 SettingsPage.getLayout = (page: React.ReactNode) => {
   return <MainLayout>{page}</MainLayout>;
-};
-
-const handleCancel = () => {
-  console.log('Cancel clicked');
-  // TODO: Implement logic to reset formState, possibly via refetching settingsQuery
-  // settingsQuery.refetch(); // Example
 };

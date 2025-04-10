@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure, publicProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
-import { createId } from '@paralleldrive/cuid2';
 import { ProductService } from '../../services/productService';
 import { db } from '../../db'; // Assuming db instance is exported from here
 

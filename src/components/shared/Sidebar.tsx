@@ -20,6 +20,7 @@ import {
 import { routes } from '~/config/routes';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useConfigStore } from '~/store';
+import { useAuthNavigation } from '~/utils/auth';
 
 interface SidebarProps {
   isOpen: boolean;

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useTranslation } from '~/hooks/useTranslation';
 import { Navigation } from '~/components/shared/Navigation';
 import { Sidebar } from '~/components/shared/Sidebar';
+import { useConfigStore } from '~/store';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -16,30 +16,29 @@ interface MainLayoutProps {
  */
 export function MainLayout({ children }: MainLayoutProps) {
   useSession();
-  const { t } = useTranslation();
-  const pathname = usePathname();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isNavOpen, toggleNav } = useConfigStore((state) => ({
+    isNavOpen: state.isNavOpen,
+    toggleNav: state.toggleNav,
+  }));
 
-  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+  const toggleSidebar = () => toggleNav();
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
-      <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar} />
+      <Sidebar isOpen={isNavOpen} onClose={toggleSidebar} />
 
-      {isSidebarOpen && (
+      {isNavOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden transition-opacity duration-300"
+          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden"
           onClick={toggleSidebar}
           aria-hidden="true"
         />
       )}
 
-      <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
+      <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
         <Navigation onMenuClick={toggleSidebar} />
 
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
-          {children}
-        </main>
+        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

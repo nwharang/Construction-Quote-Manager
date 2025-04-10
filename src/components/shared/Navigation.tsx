@@ -54,17 +54,13 @@ export function Navigation({ onMenuClick }: NavigationProps) {
   }
 
   return (
-    <Navbar 
-      maxWidth="full" 
-      position="sticky" 
-      className="border-b border-divider h-16 z-20"
-    >
+    <Navbar maxWidth="full" position="sticky" className="border-divider z-20 h-16 border-b">
       {/* Mobile menu button */}
       <NavbarContent className="md:hidden" justify="start">
-        <Button 
-          isIconOnly 
-          variant="light" 
-          onClick={onMenuClick} 
+        <Button
+          isIconOnly
+          variant="light"
+          onPress={onMenuClick}
           aria-label={t('common.openMenu')}
           className="text-default-600"
         >
@@ -116,7 +112,7 @@ export function Navigation({ onMenuClick }: NavigationProps) {
             <DropdownTrigger>
               <Avatar
                 as="button"
-                className="transition-transform rounded-full"
+                className="rounded-full transition-transform"
                 size="sm"
                 src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
                   session?.user?.name || t('common.user')

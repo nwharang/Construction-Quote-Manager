@@ -146,10 +146,6 @@ export class SettingsService extends BaseService {
       taskNotifications: true,
       theme: 'system',
       locale: DEFAULT_LOCALE,
-      currency: 'USD',
-      currencySymbol: '$',
-      dateFormat: 'MM/DD/YYYY',
-      timeFormat: '12h',
     };
 
     try {

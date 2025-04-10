@@ -38,10 +38,6 @@ const defaultSettingsData: Settings = {
   taskNotifications: true,
   theme: 'system', // Default theme
   locale: 'en', // Default locale
-  currency: 'USD',
-  currencySymbol: '$',
-  dateFormat: 'MM/DD/YYYY',
-  timeFormat: '12h',
   createdAt: new Date(), // Placeholder date
   updatedAt: new Date(), // Placeholder date
 };
@@ -55,7 +51,6 @@ export function ConfigLoader() {
   const { data: dbSettings, isLoading: isLoadingDbSettings } = api.settings.get.useQuery(
     undefined,
     {
-      enabled: status === 'authenticated',
       refetchOnWindowFocus: false,
       staleTime: Infinity, // Cache indefinitely until invalidated
     }
@@ -105,15 +100,11 @@ export function ConfigLoader() {
 
     // --- Hydrate if authenticated and settings loaded ---
     if (status === 'authenticated' && dbSettings) {
-      console.log('[ConfigLoader] Hydrating store with fetched DB settings.');
       setSettings({ ...dbSettings }); // Hydrate with DB settings
       initialized.current = true;
     }
     // --- For unauthenticated users, load from localStorage/cookies ---
     else if (status === 'unauthenticated') {
-      console.log(
-        '[ConfigLoader] User unauthenticated, loading settings from localStorage/cookies.'
-      );
       const localSettings = loadLocalSettings();
 
       if (localSettings) {

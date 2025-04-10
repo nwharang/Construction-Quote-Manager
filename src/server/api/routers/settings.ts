@@ -2,8 +2,6 @@ import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '~/server/api/trpc';
 import { TRPCError } from '@trpc/server';
 import { SettingsService } from '~/server/services/settingService';
-import { locales } from '~/i18n/locales';
-import type { AppLocale } from '~/i18n/locales';
 
 // Export the inferred type for client-side usage
 
@@ -36,13 +34,14 @@ export const settingsRouter = createTRPCRouter({
   update: protectedProcedure
     .input(
       z.object({
-        companyName: z.string().optional(),
-        companyEmail: z.string().email('Invalid email address').optional(),
-        companyPhone: z.string().optional(),
-        companyAddress: z.string().optional(),
+        companyName: z.string().nullish(),
+        companyEmail: z.string().email('Invalid email address').nullish(),
+        companyPhone: z.string().nullish(),
+        companyAddress: z.string().nullish(),
         emailNotifications: z.boolean(),
         quoteNotifications: z.boolean(),
         taskNotifications: z.boolean(),
+        currency: z.string().nullish(),
       })
     )
     .mutation(async ({ ctx, input }) => {
