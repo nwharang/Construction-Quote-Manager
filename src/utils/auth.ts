@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useI18n } from '~/hooks/useI18n';
+import { useI18n } from '~/components/providers/I18nProvider';
 
 /**
  * Custom hook for navigating between auth pages while preserving locale

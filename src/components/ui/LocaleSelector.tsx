@@ -1,9 +1,9 @@
 import React, { useCallback } from 'react';
-import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button } from '@heroui/react';
+import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Button, Select, SelectItem } from '@heroui/react';
 import { Globe } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useConfigStore } from '~/store';
-import { useI18n } from '~/hooks/useI18n';
+import { useI18n } from '~/components/providers/I18nProvider';
 import type { AppLocale } from '~/i18n/locales';
 
 interface LocaleSelectorProps {

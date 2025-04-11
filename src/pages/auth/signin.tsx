@@ -17,7 +17,7 @@ import {
 import { withAuthLayout } from '~/utils/withAuth';
 import { useTranslation } from '~/hooks/useTranslation';
 import { AlertTriangle } from 'lucide-react';
-import { useI18n } from '~/hooks/useI18n';
+import { useI18n } from '~/components/providers/I18nProvider';
 
 const SignIn: NextPage = () => {
   const { t } = useTranslation();

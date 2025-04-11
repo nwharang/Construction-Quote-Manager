@@ -41,7 +41,7 @@ import type { ZodIssue } from 'zod';
 import { z } from 'zod';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '~/server/api/root';
-import { useI18n } from '~/hooks/useI18n';
+import { useI18n } from '~/components/providers/I18nProvider';
 import type { AppLocale, LocaleInfo } from '~/i18n/locales';
 import { useLocaleCurrency } from '~/hooks/useLocaleCurrency';
 import { LocaleSelector } from '~/components/ui/LocaleSelector';
@@ -82,6 +82,7 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const toast = useAppToast();
   const { setSettings: setStoreSettings } = useConfigStore();
+  const { currentLocale } = useI18n();
 
   const [formState, setFormState] = useState<SettingUpdateInput | null>(null);
   const [validationErrors, setValidationErrors] = useState<ZodIssue[]>([]);

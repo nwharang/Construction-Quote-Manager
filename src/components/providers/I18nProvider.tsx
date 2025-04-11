@@ -19,7 +19,7 @@ interface I18nContextType {
   availableLocales: LocalesMap;
 }
 
-const I18nContext = createContext<I18nContextType | undefined>(undefined);
+const I18nContext = createContext<I18nContextType | null>(null);
 
 // --- Provider Component ---
 interface I18nProviderProps {
@@ -28,7 +28,7 @@ interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const router = useRouter();
-  const { settings, setSettings: setStoreSettings } = useConfigStore();
+  const { settings, setSettings: setStoreSettings, isLoading } = useConfigStore();
   const { data: session } = useSession();
 
   // Minimal render log if needed, removed the verbose one
@@ -96,24 +96,42 @@ export function I18nProvider({ children }: I18nProviderProps) {
     }
   }, [settings?.locale]);
 
-  const value = useMemo(
-    () => {
-      // Removed context recalculation log
+  // Defer context value calculation until settings are confirmed available
+  const value = useMemo(() => {
+      // Return a *default* context value if settings aren't ready
+      if (isLoading || !settings) {
+          return {
+            // Provide a dummy or no-op changeLocale if needed, or make it conditional
+            changeLocale: () => { console.warn("Attempted to change locale before I18n context fully loaded."); },
+            currentLocale: DEFAULT_LOCALE,
+            availableLocales: locales,
+          };
+      }
+      // Calculate the actual context value only when settings are loaded
       return {
-      changeLocale,
-      currentLocale: (settings?.locale as AppLocale) ?? DEFAULT_LOCALE,
-      availableLocales: locales,
+          changeLocale,
+          currentLocale: (settings?.locale as AppLocale) ?? DEFAULT_LOCALE,
+          availableLocales: locales,
       };
-    },
-    [settings?.locale, changeLocale]
-  );
+  }, [settings, isLoading, changeLocale]); // Add isLoading and settings to dependencies
 
+  // Render nothing or a loader if config is still loading OR settings aren't populated
+  // We still delay children rendering, but the context *value* exists sooner
+  if (isLoading || !settings) { 
+    // console.log('[I18nProvider] Rendering null (isLoading or !settings)');
+    return null; // Or <Spinner />;
+  }
+
+  // Only render provider and children when config is loaded and settings are available
+  // console.log('[I18nProvider] Rendering Provider with value:', value);
   return (
+    // Always render the provider now, but conditionally render children via the check above
+    // The value will be default initially, then update
     <I18nContext.Provider value={value}>
       <Head>
         <meta httpEquiv="content-language" content={value.currentLocale} />
       </Head>
-      {children}
+      {children} 
     </I18nContext.Provider>
   );
 }
@@ -121,7 +139,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
 // --- Hook ---
 export function useI18n(): I18nContextType {
   const context = useContext(I18nContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useI18n must be used within an I18nProvider');
   }
   return context;

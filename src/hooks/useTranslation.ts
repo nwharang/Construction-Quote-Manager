@@ -14,7 +14,7 @@ import type {
 import { translations } from '~/utils/translations'; // Keep this for runtime
 import { type AppLocale } from '~/i18n/locales'; // Keep for AppLocale type
 import { locales as sourceLocales } from '~/i18n/locales';
-import { useI18n } from './useI18n';
+import { useI18n } from '~/components/providers/I18nProvider';
 import { useConfigStore } from '~/store/configStore';
 
 // Remove old declarations

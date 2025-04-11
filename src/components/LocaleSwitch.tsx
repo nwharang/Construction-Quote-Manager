@@ -11,7 +11,7 @@ import {
   SelectItem,
 } from '@heroui/react';
 import { useTranslation } from '~/hooks/useTranslation';
-import { useI18n } from '~/hooks/useI18n';
+import { useI18n } from '~/components/providers/I18nProvider';
 import { Globe } from 'lucide-react';
 import type { AppLocale } from '~/i18n/locales';
 
