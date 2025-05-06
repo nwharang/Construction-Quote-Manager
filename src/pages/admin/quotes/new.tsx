@@ -72,7 +72,7 @@ function NewQuotePageContent() {
 
     const dataToSend = {
       ...restOfFormData,
-      markupPercentage: (formData.markupPercentage || 0) / 100, // Convert back to decimal (0-1)
+      markupPercentage: formData.markupPercentage, // Convert back to decimal (0-1)
       tasks: transformedTasks, // Use transformed tasks
     };
     createQuote(dataToSend);
