@@ -96,8 +96,8 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
     <div className="space-y-6">
       {/* Task Description */}
       <Input
-        label={t('quotes.taskDescriptionLabel')}
-        placeholder={t('quotes.taskDescriptionPlaceholder')}
+        label={t('quotes.taskDrawer.descriptionLabel')}
+        placeholder={t('quotes.taskDrawer.descriptionPlaceholder')}
         {...register(`tasks.${taskIndex}.description`)}
         errorMessage={taskErrors?.description?.message}
         isInvalid={!!taskErrors?.description}
@@ -108,21 +108,15 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
       <Controller
         name={`tasks.${taskIndex}.price`}
         control={control}
-        render={({ field: { onChange, value, ...fieldProps } }) => (
+        rules={{ required: t('errors.requiredFieldsMissing'), min: { value: 0, message: 'Price cannot be negative' } }}
+        render={({ field, fieldState: { error } }) => (
           <CurrencyInput
-            label={t('quotes.taskPriceLabel')}
-            value={value ?? 0}
-            onValueChange={(val) => {
-              // Handle value directly if it's a number
-              if (typeof val === 'number') {
-                onChange(val);
-                return;
-              }
-            }}
-            errorMessage={taskErrors?.price?.message}
-            isInvalid={!!taskErrors?.price}
+            label={t('quotes.taskDrawer.priceLabel')}
             isRequired
-            {...fieldProps}
+            errorMessage={error?.message}
+            isInvalid={!!error}
+            value={field.value}
+            onValueChange={field.onChange}
           />
         )}
       />
@@ -133,7 +127,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
         control={control}
         render={({ field }) => (
           <RadioGroup
-            label={t('quotes.materialTypeLabel')}
+            label={t('quotes.taskDrawer.materialTypeLabel')}
             orientation="horizontal"
             value={field.value}
             onValueChange={field.onChange}
@@ -145,13 +139,13 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
               value="ITEMIZED"
               className="data-[selected=true]:text-primary dark:text-foreground"
             >
-              {t('quotes.materialTypeItemized')}
+              {t('quotes.taskDrawer.materialTypeItemized')}
             </Radio>
             <Radio
               value="LUMPSUM"
               className="data-[selected=true]:text-primary dark:text-foreground"
             >
-              {t('quotes.materialTypeLumpSum')}
+              {t('quotes.taskDrawer.materialTypeLumpSum')}
             </Radio>
           </RadioGroup>
         )}
@@ -163,43 +157,37 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
         <Controller
           name={`tasks.${taskIndex}.estimatedMaterialsCostLumpSum`}
           control={control}
-          render={({ field: { onChange, value, ...fieldProps } }) => (
+          render={({ field, fieldState: { error } }) => (
             <CurrencyInput
-              label={t('quotes.estimatedMaterialCostLumpSumLabel')}
-              value={value ?? 0} // Ensure value is not null/undefined
-              onValueChange={(val) => {
-                // Handle value directly if it's a number
-                if (typeof val === 'number') {
-                  onChange(val);
-                  return;
-                }
-              }}
-              errorMessage={taskErrors?.estimatedMaterialsCostLumpSum?.message}
-              isInvalid={!!taskErrors?.estimatedMaterialsCostLumpSum}
-              // Not strictly required if it can be null
-              {...fieldProps}
+              label={t('quotes.taskDrawer.lumpSumCostLabel')}
+              errorMessage={error?.message}
+              isInvalid={!!error}
+              value={field.value === null ? undefined : field.value}
+              onValueChange={field.onChange}
             />
           )}
         />
       ) : (
         // Itemized Materials List
-        <div className="space-y-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-md font-semibold">{t('quotes.materialsSectionTitle')}</h4>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              {t('quotes.taskDrawer.materialsSectionTitle')}
+            </h3>
             <Button
+              size="sm"
               variant="flat"
               color="primary"
-              size="sm"
               startContent={<PlusCircle size={16} />}
               onPress={handleAddMaterial}
             >
-              {t('quotes.addMaterialButton')}
+              {t('quotes.taskDrawer.addMaterialButton')}
             </Button>
           </div>
 
           {materialFields.length === 0 && (
-            <p className="py-2 text-center text-gray-500 dark:text-gray-400">
-              {t('quotes.noMaterialsPlaceholder')}
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('quotes.taskDrawer.noMaterials')}
             </p>
           )}
 
@@ -212,7 +200,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
               >
                 <div className="mb-2 flex justify-between">
                   <h5 className="text-sm font-medium">
-                    {t('quotes.materialHeading', { index: materialIndex + 1 })}
+                    {t('quotes.taskDrawer.materialItemTitle', { index: materialIndex + 1 })}
                   </h5>
                   <Button
                     color="danger"
@@ -232,7 +220,8 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                     control={control}
                     render={({ field }) => (
                       <ProductSelector
-                        label={t('quotes.productMaterialLabel')}
+                        label={t('quotes.taskDrawer.productMaterialLabel')}
+                        placeholder={t('quotes.taskDrawer.selectProductPlaceholder')}
                         value={field.value}
                         onChange={(selectedProduct) =>
                           handleProductSelection(materialIndex, selectedProduct as Product | null)
@@ -249,22 +238,19 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                     <Controller
                       name={`tasks.${taskIndex}.materials.${materialIndex}.quantity`}
                       control={control}
-                      render={({ field: { onChange, value, ...fieldProps } }) => (
+                      rules={{
+                        required: t('errors.requiredFieldsMissing'),
+                        min: { value: 1, message: 'Quantity must be at least 1' },
+                      }}
+                      render={({ field, fieldState: { error } }) => (
                         <IntegerInput
-                          label={t('quotes.quantityLabel')}
-                          value={value}
-                          onValueChange={(val) => {
-                            // Handle value directly if it's a number
-                            if (typeof val === 'number') {
-                              onChange(val);
-                              return;
-                            }
-                          }}
-                          errorMessage={materialErrors?.quantity?.message}
-                          isInvalid={!!materialErrors?.quantity}
-                          min={1}
+                          label={t('quotes.taskDrawer.quantityLabel')}
                           isRequired
-                          {...fieldProps}
+                          errorMessage={error?.message}
+                          isInvalid={!!error}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          minValue={1}
                         />
                       )}
                     />
@@ -275,21 +261,15 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                     <Controller
                       name={`tasks.${taskIndex}.materials.${materialIndex}.unitPrice`}
                       control={control}
-                      render={({ field: { onChange, value, ...fieldProps } }) => (
+                      rules={{ required: t('errors.requiredFieldsMissing'), min: { value: 0, message: 'Price cannot be negative' } }}
+                      render={({ field, fieldState: { error } }) => (
                         <CurrencyInput
-                          label={t('quotes.unitPriceLabel')}
-                          value={value ?? 0}
-                          onValueChange={(val) => {
-                            // Handle value directly if it's a number
-                            if (typeof val === 'number') {
-                              onChange(val);
-                              return;
-                            }
-                          }}
-                          errorMessage={materialErrors?.unitPrice?.message}
-                          isInvalid={!!materialErrors?.unitPrice}
+                          label={t('quotes.taskDrawer.unitPriceLabel')}
                           isRequired
-                          {...fieldProps}
+                          errorMessage={error?.message}
+                          isInvalid={!!error}
+                          value={field.value}
+                          onValueChange={field.onChange}
                         />
                       )}
                     />
@@ -299,8 +279,8 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                 {/* Optional Notes Field */}
                 <div>
                   <Textarea
-                    label={t('quotes.notesLabel')}
-                    placeholder={t('quotes.notesPlaceholder')}
+                    label={t('quotes.taskDrawer.notesLabel')}
+                    placeholder={t('quotes.taskDrawer.notesPlaceholder')}
                     {...register(`tasks.${taskIndex}.materials.${materialIndex}.notes`)}
                     errorMessage={materialErrors?.notes?.message}
                     isInvalid={!!materialErrors?.notes}

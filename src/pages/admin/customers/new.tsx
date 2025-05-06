@@ -90,17 +90,6 @@ const CreateCustomerPage = () => {
         <Breadcrumb items={breadcrumbItems} />
 
         <div className="flex items-center justify-between">
-          <nav className="flex items-center">
-            <Link 
-              href="/admin/customers" 
-              className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-            >
-              Customers
-            </Link>
-            <ChevronRight size={16} className="mx-2 text-gray-400" />
-            <span className="text-sm font-medium text-gray-900">New Customer</span>
-          </nav>
-          
           <Button
             color="primary"
             variant="light"
@@ -113,7 +102,7 @@ const CreateCustomerPage = () => {
 
         <Card>
           <CardHeader>
-            <h2 className="text-2xl font-bold">New Customer</h2>
+            <h2 className="text-2xl font-bold">{t('customers.new.header')}</h2>
           </CardHeader>
           <CardBody>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -125,7 +114,8 @@ const CreateCustomerPage = () => {
                     render={({ field }) => (
                       <Input
                         {...field}
-                        label="Name"
+                        label={t('customers.form.nameLabel')}
+                        placeholder={t('customers.placeholders.name')}
                         isRequired
                         isInvalid={!!errors.name}
                         errorMessage={errors.name?.message}
@@ -142,7 +132,8 @@ const CreateCustomerPage = () => {
                     render={({ field }) => (
                       <Input
                         {...field}
-                        label="Email"
+                        label={t('customers.form.emailLabel')}
+                        placeholder={t('customers.placeholders.email')}
                         type="email"
                         isInvalid={!!errors.email}
                         errorMessage={errors.email?.message}
@@ -159,7 +150,8 @@ const CreateCustomerPage = () => {
                     render={({ field }) => (
                       <Input
                         {...field}
-                        label="Phone"
+                        label={t('customers.form.phoneLabel')}
+                        placeholder={t('customers.placeholders.phone')}
                         isInvalid={!!errors.phone}
                         errorMessage={errors.phone?.message}
                         value={field.value || ''}
@@ -175,7 +167,8 @@ const CreateCustomerPage = () => {
                     render={({ field }) => (
                       <Textarea
                         {...field}
-                        label="Address"
+                        label={t('customers.form.addressLabel')}
+                        placeholder={t('customers.placeholders.address')}
                         isInvalid={!!errors.address}
                         errorMessage={errors.address?.message}
                         value={field.value || ''}
@@ -191,7 +184,8 @@ const CreateCustomerPage = () => {
                     render={({ field }) => (
                       <Textarea
                         {...field}
-                        label="Notes"
+                        label={t('customers.form.notesLabel')}
+                        placeholder={t('customers.placeholders.notes')}
                         isInvalid={!!errors.notes}
                         errorMessage={errors.notes?.message}
                         value={field.value || ''}
@@ -201,14 +195,22 @@ const CreateCustomerPage = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Button
+                  color="default"
+                  variant="flat"
+                  onPress={() => router.back()}
+                  disabled={isSubmitting}
+                >
+                  {t('common.cancel')}
+                </Button>
                 <Button
                   type="submit"
                   color="primary"
                   isLoading={isSubmitting}
                   startContent={<Save size={16} />}
                 >
-                  Create Customer
+                  {t('customers.form.createButton')}
                 </Button>
               </div>
             </form>

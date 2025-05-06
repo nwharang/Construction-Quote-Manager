@@ -51,7 +51,7 @@ export function ListToolbar({
 
             {/* Right side of buttons: Filter + Create */}
             <div className="flex flex-shrink-0 items-center gap-2">
-              <Tooltip content="Filter" placement="bottom">
+              {/* <Tooltip content="Filter" placement="bottom">
                 <Button
                   size="sm"
                   variant="flat"
@@ -63,7 +63,7 @@ export function ListToolbar({
                 >
                   <SlidersHorizontal size={16} />
                 </Button>
-              </Tooltip>
+              </Tooltip> */}
               <Tooltip content={createButtonLabel} placement="bottom">
                 <Button
                   size="sm"

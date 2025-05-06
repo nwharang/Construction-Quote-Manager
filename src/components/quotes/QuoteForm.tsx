@@ -223,15 +223,6 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
             <Button variant="flat" color="default" onPress={handleTaskDrawerClose}>
               {t('common.close')}
             </Button>
-            <Button
-              type="button"
-              color="primary"
-              variant="solid"
-              startContent={<Save size={16} />}
-              onPress={handleSaveAndCloseTask}
-            >
-              {t('common.save')}
-            </Button>
           </div>
         </DrawerFooter>
       </>

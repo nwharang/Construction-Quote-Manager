@@ -88,6 +88,7 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
   return (
     <Select
       label={shortLabel}
+      labelPlacement="outside"
       placeholder={shortPlaceholder}
       selectedKeys={value ? new Set([value]) : new Set()}
       onSelectionChange={handleSelectionChange}
@@ -95,21 +96,6 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
       isLoading={isLoading}
       aria-label={label}
       className="product-selector z-[100] max-w-full will-change-transform"
-      classNames={{
-        trigger: 'h-14 text-base dark:bg-gray-800 dark:text-white',
-        label: 'text-base mb-1.5 dark:text-gray-300',
-        listbox: 'p-2 dark:bg-gray-800',
-        listboxWrapper: 'max-h-[50vh]', // Shorter on tiny screens
-        base: 'w-full',
-      }}
-      popoverProps={{
-        classNames: {
-          content: 'z-[999] select-popover dark:bg-gray-800 dark:border-gray-700',
-        },
-        shouldBlockScroll: true,
-        placement: 'bottom-start', // Better alignment for small screens
-        offset: 5, // Reduced offset for small screens
-      }}
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -129,9 +115,8 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
         <SelectItem key={value} textValue={`ID: ${value}`}>
           <div className="py-2 text-base">{`ID: ${value.substring(0, 8)}`}</div>
         </SelectItem>
-      ) : (
-        <SelectItem key="_placeholder" style={{ display: 'none' }} />
-      )}
+      ) : null
+      }
 
       {/* Direct rendering of items inside Select */}
       {isLoading && allProducts.length === 0 ? (
@@ -149,19 +134,21 @@ export const ProductSelector: React.FC<ProductSelectorProps> = ({
         <SelectSection showDivider={allProducts.length > 0}>
           {allProducts.map((product) => (
             <SelectItem key={product.id} textValue={product.name} className="h-auto p-0">
-              {/* Extra compact layout for tiny screens */}
-              <div className="border-b border-gray-100 p-3 dark:border-gray-700">
-                <div className="mb-1 text-base font-medium text-gray-900 dark:text-white">
-                  {window?.innerWidth <= 320 ? getTinyLabel(product.name, 20) : product.name}
-                </div>
+              {/* Compact layout for product item */}
+              <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <div className="text-default-500 text-sm dark:text-gray-400">
-                    {product.sku ? `${window?.innerWidth <= 320 ? '' : 'SKU: '}${product.sku}` : ''}
-                  </div>
-                  <div className="text-default-800 text-base font-medium dark:text-gray-300">
+                  <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                    {product.name}
+                  </span>
+                  <span className="ml-2 flex-shrink-0 text-sm font-medium text-gray-800 dark:text-gray-300">
                     {formatCurrency(product.unitPrice)}
-                  </div>
+                  </span>
                 </div>
+                {product.sku && (
+                  <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    SKU: {product.sku}
+                  </div>
+                )}
               </div>
             </SelectItem>
           ))}

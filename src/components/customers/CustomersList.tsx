@@ -241,7 +241,9 @@ export function CustomersList() {
           <CardHeader className="flex flex-col items-start p-4 pb-3">
             <h3 className="text-lg font-semibold">{customer.name}</h3>
             <p className="text-default-400 mt-1 text-[11px]">
-              {customer.createdAt ? formatDate(customer.createdAt, 'short') : '-'}
+              <p className="text-sm text-default-500">
+                {customer.createdAt ? formatDate(customer.createdAt, 'short') : '-'}
+              </p>
             </p>
           </CardHeader>
 

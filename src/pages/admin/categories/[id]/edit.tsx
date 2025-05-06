@@ -14,6 +14,7 @@ import { routes } from '~/config/routes';
 import { CategoryForm, type CategoryFormData } from '~/components/categories/CategoryForm';
 import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
+import { APP_NAME } from '~/config/constants';
 
 const EditCategoryPage: NextPageWithLayout = () => {
   const { t } = useTranslation();
@@ -76,6 +77,11 @@ const EditCategoryPage: NextPageWithLayout = () => {
       ]
     : null;
 
+  // Dynamic title
+  const pageTitle = category
+    ? `${t('categories.edit.pageTitle')} - ${category.name} | ${APP_NAME}`
+    : `Edit Category | ${APP_NAME}`;
+
   // Loading state
   if (isLoadingCategory) {
     return (
@@ -106,18 +112,16 @@ const EditCategoryPage: NextPageWithLayout = () => {
   return (
     <>
       <Head>
-        <title>{t('categories.edit.pageTitle', { name: category.name })}</title>
+        <title>{pageTitle}</title>
       </Head>
 
       <div className="space-y-6">
         {breadcrumbItems && <Breadcrumb items={breadcrumbItems} />}
 
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <h1 className="text-2xl font-bold">
-            {t('categories.edit')}: {category.name}
-          </h1>
           <Button
             variant="light"
+            color='primary'
             startContent={<ArrowLeft size={16} />}
             onPress={() => router.push(routes.admin.categories.detail(categoryId))}
           >

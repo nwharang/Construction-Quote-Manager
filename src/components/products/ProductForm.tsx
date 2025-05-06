@@ -1,6 +1,6 @@
 import React from 'react';
-import { 
-  Button, 
+import {
+  Button,
   Card,
   CardBody,
   CardHeader,
@@ -8,7 +8,7 @@ import {
   Textarea,
   Select,
   SelectItem,
-  Divider
+  Divider,
 } from '@heroui/react';
 import { Save } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
@@ -42,7 +42,12 @@ interface ProductFormProps {
   submitLabel?: string;
 }
 
-export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'Save' }: ProductFormProps) {
+export function ProductForm({
+  initialData,
+  onSubmit,
+  isLoading,
+  submitLabel = 'Save',
+}: ProductFormProps) {
   const { t } = useTranslation();
 
   // Fetch categories
@@ -71,8 +76,8 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
       <Divider />
       <CardBody>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-          <div className="space-y-4">
-            <div>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-6 md:grid-cols-2">
+            <div className="flex items-baseline md:col-span-2">
               <Controller
                 name="name"
                 control={control}
@@ -80,6 +85,8 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
                   <Input
                     {...field}
                     label={t('products.form.name')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.name')}
                     isRequired
                     isInvalid={!!errors.name}
                     errorMessage={errors.name?.message}
@@ -89,7 +96,7 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
               />
             </div>
 
-            <div>
+            <div className="flex items-baseline md:col-span-2">
               <Controller
                 name="description"
                 control={control}
@@ -97,125 +104,132 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
                   <Textarea
                     {...field}
                     label={t('products.form.description')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.description')}
                     isInvalid={!!errors.description}
                     errorMessage={errors.description?.message}
+                    value={field.value || ''}
+                    minRows={3}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="flex items-baseline">
+              <Controller
+                name="unitPrice"
+                control={control}
+                render={({ field, fieldState: { error } }) => (
+                  <CurrencyInput
+                    label={t('products.form.price')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.price')}
+                    isRequired
+                    value={field.value ?? 0}
+                    onValueChange={field.onChange}
+                    isInvalid={!!error}
+                    errorMessage={error?.message}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="flex items-baseline">
+              <Controller
+                name="unit"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label={t('products.form.unit')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.unit')}
+                    isInvalid={!!errors.unit}
+                    errorMessage={errors.unit?.message}
                     value={field.value || ''}
                   />
                 )}
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Controller
-                  name="unitPrice"
-                  control={control}
-                  render={({ field }) => (
-                    <CurrencyInput
-                      label={t('products.form.price')}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      isInvalid={!!errors.unitPrice}
-                      errorMessage={errors.unitPrice?.message}
-                    />
-                  )}
-                />
-              </div>
-
-              <div>
-                <Controller
-                  name="unit"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label={t('products.form.unit')}
-                      isInvalid={!!errors.unit}
-                      errorMessage={errors.unit?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
+            <div className="flex items-baseline">
+              <Controller
+                name="sku"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label={t('products.form.sku')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.sku')}
+                    isInvalid={!!errors.sku}
+                    errorMessage={errors.sku?.message}
+                    value={field.value || ''}
+                  />
+                )}
+              />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Controller
-                  name="sku"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label={t('products.form.sku')}
-                      isInvalid={!!errors.sku}
-                      errorMessage={errors.sku?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
-
-              <div>
-                <Controller
-                  name="categoryId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      label={t('products.form.category')}
-                      placeholder={t('products.form.selectCategory')}
-                      selectedKeys={field.value ? [field.value] : []}
-                      onSelectionChange={(keys) => field.onChange(Array.from(keys)[0] || null)}
-                      isLoading={!categories}
-                      isInvalid={!!errors.categoryId}
-                      errorMessage={errors.categoryId?.message}
-                    >
-                      {(categories || []).map((category) => (
-                        <SelectItem key={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  )}
-                />
-              </div>
+            <div className="flex items-baseline">
+              <Controller
+                name="categoryId"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label={t('products.form.category')}
+                    labelPlacement="outside"
+                    placeholder={t('products.form.selectCategory')}
+                    selectedKeys={field.value ? [field.value] : []}
+                    onSelectionChange={(keys) => field.onChange(Array.from(keys)[0] || null)}
+                    isLoading={!categories}
+                    isInvalid={!!errors.categoryId}
+                    errorMessage={errors.categoryId?.message}
+                  >
+                    {(categories || []).map((category) => (
+                      <SelectItem key={category.id}>{category.name}</SelectItem>
+                    ))}
+                  </Select>
+                )}
+              />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Controller
-                  name="manufacturer"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label={t('products.form.manufacturer')}
-                      isInvalid={!!errors.manufacturer}
-                      errorMessage={errors.manufacturer?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
-
-              <div>
-                <Controller
-                  name="supplier"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label={t('products.form.supplier')}
-                      isInvalid={!!errors.supplier}
-                      errorMessage={errors.supplier?.message}
-                      value={field.value || ''}
-                    />
-                  )}
-                />
-              </div>
+            <div className="flex items-baseline">
+              <Controller
+                name="manufacturer"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label={t('products.form.manufacturer')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.manufacturer')}
+                    isInvalid={!!errors.manufacturer}
+                    errorMessage={errors.manufacturer?.message}
+                    value={field.value || ''}
+                  />
+                )}
+              />
             </div>
 
-            <div>
+            <div className="flex items-baseline">
+              <Controller
+                name="supplier"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    label={t('products.form.supplier')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.supplier')}
+                    isInvalid={!!errors.supplier}
+                    errorMessage={errors.supplier?.message}
+                    value={field.value || ''}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="flex items-baseline md:col-span-2">
               <Controller
                 name="location"
                 control={control}
@@ -223,6 +237,8 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
                   <Input
                     {...field}
                     label={t('products.form.location')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.location')}
                     isInvalid={!!errors.location}
                     errorMessage={errors.location?.message}
                     value={field.value || ''}
@@ -231,7 +247,7 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
               />
             </div>
 
-            <div>
+            <div className="flex items-baseline md:col-span-2">
               <Controller
                 name="notes"
                 control={control}
@@ -239,9 +255,12 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
                   <Textarea
                     {...field}
                     label={t('products.form.notes')}
+                    labelPlacement="outside"
+                    placeholder={t('products.placeholders.notes')}
                     isInvalid={!!errors.notes}
                     errorMessage={errors.notes?.message}
                     value={field.value || ''}
+                    minRows={3}
                   />
                 )}
               />
@@ -262,4 +281,4 @@ export function ProductForm({ initialData, onSubmit, isLoading, submitLabel = 'S
       </CardBody>
     </Card>
   );
-} 
+}

@@ -13,6 +13,7 @@ import { routes } from '~/config/routes';
 import { CategoryForm, type CategoryFormData } from '~/components/categories/CategoryForm';
 import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
+import { APP_NAME } from '~/config/constants';
 
 const NewCategoryPage: NextPageWithLayout = () => {
   const { t } = useTranslation();
@@ -46,7 +47,7 @@ const NewCategoryPage: NextPageWithLayout = () => {
   return (
     <>
       <Head>
-        <title>{t('categories.new')}</title>
+        <title>{t('categories.new.pageTitle')} | {APP_NAME}</title>
       </Head>
 
       <div className="space-y-6">

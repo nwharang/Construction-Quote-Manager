@@ -17,7 +17,7 @@ import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
 
 const ViewCategoryPage: NextPageWithLayout = () => {
-  const { t } = useTranslation();
+  const { t, formatDate } = useTranslation();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const categoryId = params?.id as string;
@@ -165,14 +165,13 @@ const ViewCategoryPage: NextPageWithLayout = () => {
               </Chip>
             </div>
             
-            <div>
-              <p className="text-sm text-default-500">{t('common.createdAt')}</p>
-              <p>{formatDate(category.createdAt)}</p>
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.createdAt')}</dt>
+              <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{formatDate(category.createdAt)}</dd>
             </div>
-            
-            <div>
-              <p className="text-sm text-default-500">{t('common.updatedAt')}</p>
-              <p>{formatDate(category.updatedAt)}</p>
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.updatedAt')}</dt>
+              <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{formatDate(category.updatedAt)}</dd>
             </div>
           </CardBody>
         </Card>

@@ -15,6 +15,7 @@ import { formatDate } from '~/utils/date';
 import { DeleteEntityDialog } from '~/components/shared/DeleteEntityDialog';
 import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
+import { APP_NAME } from '~/config/constants';
 
 const ViewCustomerPage: NextPageWithLayout = () => {
   const { t } = useTranslation();
@@ -89,6 +90,11 @@ const ViewCustomerPage: NextPageWithLayout = () => {
     { label: customer.name, href: routes.admin.customers.detail(customerId), isCurrent: true },
   ] : null;
 
+  // Dynamic title based on customer data
+  const pageTitle = customer
+    ? `${t('customers.view.pageTitle')} - ${customer.name} | ${APP_NAME}`
+    : `Customer Details | ${APP_NAME}`;
+
   // Loading state
   if (isLoading) {
     return (
@@ -113,7 +119,7 @@ const ViewCustomerPage: NextPageWithLayout = () => {
   return (
     <>
       <Head>
-        <title>{customer.name}</title>
+        <title>{pageTitle}</title>
       </Head>
 
       <div className="space-y-6">
@@ -144,46 +150,46 @@ const ViewCustomerPage: NextPageWithLayout = () => {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold">{customer.name}</h2>
+            <h2 className="text-xl font-semibold">{t('customers.view.customerDetailsTitle')}</h2>
           </CardHeader>
           <Divider />
-          <CardBody className="space-y-4">
-            <div>
-              <p className="text-sm text-default-500">{t('customers.list.name')}</p>
-              <p className="text-lg font-medium">{customer.name}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm text-default-500">{t('customers.list.email')}</p>
-              <p>{customer.email || t('common.notSpecified')}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm text-default-500">{t('customers.list.phone')}</p>
-              <p>{customer.phone || t('common.notSpecified')}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm text-default-500">{t('customers.list.address')}</p>
-              <p className="whitespace-pre-wrap">{customer.address || t('common.notSpecified')}</p>
-            </div>
-            
-            {customer.notes && (
-              <div>
-                <p className="text-sm text-default-500">{t('customers.list.notes')}</p>
-                <p className="whitespace-pre-wrap">{customer.notes}</p>
+          <CardBody>
+            <dl className="space-y-4">
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customers.list.name')}</dt>
+                <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{customer.name}</dd>
               </div>
-            )}
 
-            <div>
-              <p className="text-sm text-default-500">{t('common.createdAt')}</p>
-              <p>{formatDate(customer.createdAt)}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm text-default-500">{t('common.updatedAt')}</p>
-              <p>{formatDate(customer.updatedAt)}</p>
-            </div>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customers.list.email')}</dt>
+                <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{customer.email || t('common.notSpecified')}</dd>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customers.list.phone')}</dt>
+                <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{customer.phone || t('common.notSpecified')}</dd>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customers.list.address')}</dt>
+                <dd className="whitespace-pre-wrap text-base text-gray-900 dark:text-white sm:col-span-2">{customer.address || t('common.notSpecified')}</dd>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('customers.list.notes')}</dt>
+                <dd className="whitespace-pre-wrap text-base text-gray-900 dark:text-white sm:col-span-2">{customer.notes || t('common.notSpecified')}</dd>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.createdAt')}</dt>
+                <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{formatDate(customer.createdAt)}</dd>
+              </div>
+
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.updatedAt')}</dt>
+                <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{formatDate(customer.updatedAt)}</dd>
+              </div>
+            </dl>
           </CardBody>
         </Card>
         

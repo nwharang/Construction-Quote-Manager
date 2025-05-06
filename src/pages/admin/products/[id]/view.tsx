@@ -17,7 +17,7 @@ import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
 
 const ViewProductPage: NextPageWithLayout = () => {
-  const { t, formatCurrency } = useTranslation();
+  const { t, formatCurrency, formatDate } = useTranslation();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const productId = params?.id as string;
@@ -190,14 +190,14 @@ const ViewProductPage: NextPageWithLayout = () => {
               <p>{product.location || t('common.notSpecified')}</p>
             </div>
 
-            <div>
-              <p className="text-sm text-default-500">{t('common.createdAt')}</p>
-              <p>{formatDate(product.createdAt)}</p>
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.createdAt')}</dt>
+              <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{formatDate(product.createdAt)}</dd>
             </div>
-            
-            <div>
-              <p className="text-sm text-default-500">{t('common.updatedAt')}</p>
-              <p>{formatDate(product.updatedAt)}</p>
+
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('common.updatedAt')}</dt>
+              <dd className="text-base text-gray-900 dark:text-white sm:col-span-2">{formatDate(product.updatedAt)}</dd>
             </div>
           </CardBody>
         </Card>

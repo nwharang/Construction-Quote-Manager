@@ -129,33 +129,20 @@ function EditQuotePageContent() {
     );
   }
 
+  // Dynamic title based on quote data
+  const pageTitle = quote
+    ? `${t('quotes.edit.pageTitle')} #${quote.sequentialId || quote.id.substring(0, 6)} | ${APP_NAME}`
+    : `Edit Quote | ${APP_NAME}`;
+
   return (
     <>
       <Head>
-        <title>Edit Quote | {APP_NAME}</title>
+        <title>{pageTitle}</title>
       </Head>
 
       <div className="space-y-6">
         {/* Breadcrumb and Actions */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <nav className="flex items-center">
-            <Link
-              href={routes.admin.quotes.list}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900"
-            >
-              Quotes
-            </Link>
-            <ChevronRight size={16} className="mx-2 text-gray-400" />
-            <Link
-              href={routes.admin.quotes.detail(id)}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900"
-            >
-              {quote.title || 'Quote Details'}
-            </Link>
-            <ChevronRight size={16} className="mx-2 text-gray-400" />
-            <span className="text-sm font-medium text-gray-900">Edit</span>
-          </nav>
-
           <div className="flex gap-2">
             <Button
               color="primary"

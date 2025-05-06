@@ -39,7 +39,7 @@ import { formatDate } from '~/utils/date';
 import { ListToolbar } from '~/components/shared/ListToolbar';
 
 export function CategoriesList() {
-  const { t } = useTranslation();
+  const { t, formatDate } = useTranslation();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -123,7 +123,10 @@ export function CategoriesList() {
 
             <div className="mt-2 flex items-center gap-2">
               <FileText size={14} className="text-default-400" />
-              <p className="text-sm">{formatDate(category.createdAt)}</p>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium">{category.name}</p>
+                <p className="text-xs text-default-400">{formatDate(category.createdAt)}</p>
+              </div>
             </div>
           </div>
         </CardBody>
@@ -162,7 +165,7 @@ export function CategoriesList() {
         </div>
       </Card>
     ),
-    [t, navigateToViewCategory, navigateToEditCategory, handleDeleteClick]
+    [t, navigateToViewCategory, navigateToEditCategory, handleDeleteClick, formatDate]
   );
 
   // Render loading state

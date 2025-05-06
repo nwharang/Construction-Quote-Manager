@@ -31,7 +31,8 @@ export type CountParams = Pick<AllPossibleParams, 'count'>;
 import type { QuoteStatusType } from '~/server/db/schema';
 
 // Combine all keys into a single type for use with useTranslation
-export type TranslationKey = 'appName'
+export type TranslationKey =
+  | 'appName'
   | 'auth.signIn.emailLabel'
   | 'auth.signIn.errorInvalidCredentials'
   | 'auth.signIn.errorRequiredFields'
@@ -74,6 +75,8 @@ export type TranslationKey = 'appName'
   | 'common.update'
   | 'common.user'
   | 'common.view'
+  | 'common.cancel'
+  | 'common.justNow'
   | 'customers.contact'
   | 'customers.createError'
   | 'customers.createSuccess'
@@ -188,6 +191,7 @@ export type TranslationKey = 'appName'
   | 'quotes.print.summary'
   | 'quotes.print.notes'
   | 'quotes.print.generatedMessage'
+  | 'quotes.print.printDateLabel'
   | 'quotes.summary.markupCalculated'
   | 'quotes.taskDescriptionLabel'
   | 'quotes.taskDescriptionPlaceholder'
@@ -354,6 +358,11 @@ export type TranslationKey = 'appName'
   | 'settings.localization.title'
   | 'settings.localization.description'
   | 'settings.language'
+  // Placeholders
+  | 'settings.placeholders.company.name'
+  | 'settings.placeholders.company.email'
+  | 'settings.placeholders.company.phone'
+  | 'settings.placeholders.company.address'
   // Quote view page translations
   | 'quotes.view.title'
   | 'quotes.view.backToQuotes'
@@ -456,23 +465,141 @@ export type TranslationKey = 'appName'
   | 'quotes.print.grandTotal'
   | 'quotes.print.summary'
   | 'quotes.print.notesSection'
+  | 'quotes.print.showingMarkupDetails'
+  | 'quotes.print.hidingMarkupDetails'
+  | 'quotes.print.printOptionsTitle'
+  // Signature section keys
+  | 'quotes.print.toggleSignatureSection'
+  | 'quotes.print.showingSignatureSection'
+  | 'quotes.print.hidingSignatureSection'
+  | 'quotes.print.signatureSectionTitle'
+  | 'quotes.print.customerSignatureLabel'
+  | 'quotes.print.companySignatureLabel'
+  | 'quotes.print.signatureDateLabel'
+  // Price display toggle keys
+  | 'quotes.print.toggleSeparatePrices'
+  | 'quotes.print.showingSeparatePrices'
+  | 'quotes.print.showingCombinedPrice'
+  | 'quotes.print.combinedPriceHeader'
+  // Print date toggle keys
+  | 'quotes.print.togglePrintDate'
+  | 'quotes.print.showingPrintDate'
+  | 'quotes.print.hidingPrintDate'
+  // New signature labels
+  | 'quotes.print.signatureAuthorizedLabel'
+  | 'quotes.print.signatureNamePrintedLabel'
+  // Signer Name Input
+  | 'quotes.print.signerNameLabel'
+  | 'quotes.print.signerNamePlaceholder'
+  // NEW Customer Form Keys
+  | 'customers.new.header'
+  | 'customers.form.nameLabel'
+  | 'customers.form.emailLabel'
+  | 'customers.form.phoneLabel'
+  | 'customers.form.addressLabel'
+  | 'customers.form.notesLabel'
+  | 'customers.form.createButton'
+  | 'customers.placeholders.name'
+  | 'customers.placeholders.email'
+  | 'customers.placeholders.phone'
+  | 'customers.placeholders.address'
+  | 'customers.placeholders.notes'
+  | 'customers.view.customerDetailsTitle'
+  // END NEW
+  // Page Title Keys
+  | 'dashboard.pageTitle'
+  | 'quotes.list.pageTitle'
+  | 'quotes.view.pageTitle'
+  | 'quotes.edit.pageTitle'
+  | 'quotes.print.pageTitle'
+  | 'customers.view.pageTitle'
+  | 'products.list.pageTitle'
+  | 'products.view.pageTitle'
+  | 'categories.list.pageTitle'
+  | 'categories.new.pageTitle'
+  // END Page Title Keys
+  | 'errors.requiredFieldsMissing'
+  | 'nav.customers'
+  // Task Detail Drawer Keys
+  | 'quotes.taskDrawer.editTitle'
+  | 'quotes.taskDrawer.newTitle'
+  | 'quotes.taskDrawer.descriptionLabel'
+  | 'quotes.taskDrawer.descriptionPlaceholder'
+  | 'quotes.taskDrawer.priceLabel'
+  | 'quotes.taskDrawer.materialTypeLabel'
+  | 'quotes.taskDrawer.materialTypeItemized'
+  | 'quotes.taskDrawer.materialTypeLumpSum'
+  | 'quotes.taskDrawer.lumpSumCostLabel'
+  | 'quotes.taskDrawer.materialsSectionTitle'
+  | 'quotes.taskDrawer.addMaterialButton'
+  | 'quotes.taskDrawer.materialItemTitle' // Needs { index: number } param
+  | 'quotes.taskDrawer.productMaterialLabel'
+  | 'quotes.taskDrawer.selectProductPlaceholder'
+  | 'quotes.taskDrawer.quantityLabel'
+  | 'quotes.taskDrawer.unitPriceLabel'
+  | 'quotes.taskDrawer.notesLabel'
+  | 'quotes.taskDrawer.notesPlaceholder'
+  | 'quotes.taskDrawer.noMaterials'
+  | 'quotes.taskDrawer.deleteMaterialTooltip'
+  // END Task Detail Drawer Keys
+
+  // Product Placeholders
+  | 'products.placeholders.name'
+  | 'products.placeholders.description'
+  | 'products.placeholders.price'
+  | 'products.placeholders.unit'
+  | 'products.placeholders.sku'
+  | 'products.placeholders.manufacturer'
+  | 'products.placeholders.supplier'
+  | 'products.placeholders.location'
+  | 'products.placeholders.notes'
+  // END Product Placeholders
+
+  // Category Placeholders
+  | 'categories.placeholders.name'
+  | 'categories.placeholders.description'
+  // END Category Placeholders
+
+  // Task Detail Placeholders (additional)
+  | 'quotes.taskDrawer.pricePlaceholder'
+  | 'quotes.taskDrawer.lumpSumCostPlaceholder'
+  | 'quotes.taskDrawer.quantityPlaceholder'
+  | 'quotes.taskDrawer.unitPricePlaceholder';
+// END Task Detail Placeholders (additional)
 
 // --- Conditional Mapping Type --- //
 
 // Maps a TranslationKey to its specific parameter type
-export type KeyToParams<K extends TranslationKey> = 
-  K extends 'errors.requiredFieldsMissing' ? FieldParams :
-  K extends 'auth.signUp.errorPasswordTooShort' | 'auth.signUp.passwordHint' ? MinParams :
-  K extends 'customers.createError' | 'customers.deleteError' | 'products.deleteError' | 
-           'quotes.deleteError' | 'settings.saveError' | 'settings.fetchError' | 
-           'categories.createError' | 'categories.updateError' ? MessageParams :
-  K extends 'quotes.placeholders.title' ? IdParams :
-  K extends 'settings.changeThemeTitle' ? ThemeParams :
-  K extends 'print.document' ? DateParams :
-  K extends 'quoteSummary.grandTotal' ? PercentParams :
-  K extends 'dashboard.recentQuotes.revenueInfo' ? CountParams :
-  K extends 'categories.edit.pageTitle' | 'customers.edit.pageTitle' | 'products.edit.pageTitle' ? { name: string } :
-  NoParams;
+export type KeyToParams<K extends TranslationKey> = K extends 'errors.requiredFieldsMissing'
+  ? FieldParams
+  : K extends 'auth.signUp.errorPasswordTooShort' | 'auth.signUp.passwordHint'
+    ? MinParams
+    : K extends
+          | 'customers.createError'
+          | 'customers.deleteError'
+          | 'products.deleteError'
+          | 'quotes.deleteError'
+          | 'settings.saveError'
+          | 'settings.fetchError'
+          | 'categories.createError'
+          | 'categories.updateError'
+      ? MessageParams
+      : K extends 'quotes.placeholders.title'
+        ? IdParams
+        : K extends 'settings.changeThemeTitle'
+          ? ThemeParams
+          : K extends 'print.document'
+            ? DateParams
+            : K extends 'quoteSummary.grandTotal'
+              ? PercentParams
+              : K extends 'dashboard.recentQuotes.revenueInfo'
+                ? CountParams
+                : K extends
+                      | 'categories.edit.pageTitle'
+                      | 'customers.edit.pageTitle'
+                      | 'products.edit.pageTitle'
+                  ? { name: string }
+                  : NoParams;
 
 // --- Helper Types for Overloading --- //
 

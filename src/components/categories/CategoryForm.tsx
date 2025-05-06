@@ -62,6 +62,7 @@ export function CategoryForm({ initialData, onSubmit, isSubmitting }: CategoryFo
               <Input
                 {...field}
                 label={t('categories.list.name')}
+                placeholder={t('categories.placeholders.name')}
                 isRequired
                 isInvalid={!!errors.name}
                 errorMessage={errors.name?.message}
@@ -77,6 +78,7 @@ export function CategoryForm({ initialData, onSubmit, isSubmitting }: CategoryFo
               <Textarea
                 {...field}
                 label={t('categories.list.description')}
+                placeholder={t('categories.placeholders.description')}
                 isInvalid={!!errors.description}
                 errorMessage={errors.description?.message}
                 minRows={3}

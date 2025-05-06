@@ -51,9 +51,6 @@ export function PrintLayout({ children, title }: PrintLayoutProps) {
 
       {/* Header - only visible on screen */}
       <Navbar className="print:hidden border-b">
-        <NavbarBrand>
-          <h1 className="text-xl font-semibold">{pageTitle}</h1>
-        </NavbarBrand>
         <NavbarContent justify="end">
           <Button 
             color="primary" 

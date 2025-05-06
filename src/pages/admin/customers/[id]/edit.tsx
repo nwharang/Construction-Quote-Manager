@@ -11,6 +11,7 @@ import { api } from '~/utils/api';
 import { routes } from '~/config/routes';
 import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
+import { APP_NAME } from '~/config/constants';
 
 const EditCustomerPage: NextPageWithLayout = () => {
   const { t } = useTranslation();
@@ -59,6 +60,11 @@ const EditCustomerPage: NextPageWithLayout = () => {
       ]
     : null;
 
+  // Dynamic title based on customer data
+  const pageTitle = customer
+    ? `${t('customers.edit.pageTitle')} - ${customer.name} | ${APP_NAME}`
+    : `Edit Customer | ${APP_NAME}`;
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -74,7 +80,7 @@ const EditCustomerPage: NextPageWithLayout = () => {
   return (
     <>
       <Head>
-        <title>{t('customers.edit.pageTitle', { name: customer.name })}</title>
+        <title>{pageTitle}</title>
       </Head>
 
       <div className="space-y-6">

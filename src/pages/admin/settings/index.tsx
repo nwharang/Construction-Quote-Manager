@@ -49,6 +49,7 @@ import { useRouter } from 'next/router';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { ResponsiveButton } from '~/components/ui/ResponsiveButton';
+import { APP_NAME } from '~/config/constants';
 
 // --- Type Definitions ---
 type RouterOutput = inferRouterOutputs<AppRouter>;
@@ -232,7 +233,7 @@ export default function SettingsPage() {
   return (
     <>
       <Head>
-        <title>{t('settings.pageTitle')}</title>
+        <title>{t('settings.pageTitle')} | {APP_NAME}</title>
       </Head>
 
       <div className="mx-auto max-w-7xl p-4 md:p-6">
@@ -260,6 +261,7 @@ export default function SettingsPage() {
                         <div>
                           <Input
                             label={t('settings.company.name')}
+                            placeholder={t('settings.placeholders.company.name')}
                             value={formState.companyName ?? ''}
                             onChange={(e) => handleFormChange('companyName', e.target.value)}
                             isInvalid={!!getFieldError('companyName')}
@@ -269,6 +271,7 @@ export default function SettingsPage() {
                         <div>
                           <Input
                             label={t('settings.company.email')}
+                            placeholder={t('settings.placeholders.company.email')}
                             value={formState.companyEmail ?? ''}
                             onChange={(e) => handleFormChange('companyEmail', e.target.value)}
                             type="email"
@@ -282,6 +285,7 @@ export default function SettingsPage() {
                         <div>
                           <Input
                             label={t('settings.company.phone')}
+                            placeholder={t('settings.placeholders.company.phone')}
                             value={formState.companyPhone ?? ''}
                             onChange={(e) => handleFormChange('companyPhone', e.target.value)}
                             type="tel"
@@ -290,8 +294,9 @@ export default function SettingsPage() {
                           />
                         </div>
                         <div>
-                          <Input
+                          <Textarea
                             label={t('settings.company.address')}
+                            placeholder={t('settings.placeholders.company.address')}
                             value={formState.companyAddress ?? ''}
                             onChange={(e) => handleFormChange('companyAddress', e.target.value)}
                             isInvalid={!!getFieldError('companyAddress')}

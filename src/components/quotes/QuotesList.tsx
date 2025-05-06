@@ -49,6 +49,7 @@ import { useUIStore } from '~/store/uiStore';
 import type { QuoteListItem } from '~/types/quote';
 import { routes } from '~/config/routes';
 import { ListToolbar } from '~/components/shared/ListToolbar';
+import { useI18n } from '~/components/providers/I18nProvider';
 
 // Map status to display settings
 const QuoteStatusSettings: Record<
@@ -63,6 +64,7 @@ const QuoteStatusSettings: Record<
 
 export function QuotesList() {
   const { t, formatDate, formatCurrency } = useTranslation();
+  const { currentLocale } = useI18n();
   const toast = useAppToast();
   const router = useRouter();
   const [search, setSearch] = useState('');
@@ -222,7 +224,9 @@ export function QuotesList() {
           );
         }
         case 'createdAt':
-          return quote.createdAt ? formatDate(new Date(quote.createdAt), 'short') : '-';
+          return quote.createdAt
+            ? formatDate(new Date(quote.createdAt), 'short')
+            : '-';
         case 'grandTotal':
           return formatCurrency(Number(quote.grandTotal));
         case 'actions':
@@ -266,7 +270,7 @@ export function QuotesList() {
           return String(quote[columnKey as keyof QuoteListItem] || '-');
       }
     },
-    [handleView, handleEdit, handleDeleteRequest, t, formatDate, formatCurrency]
+    [handleView, handleEdit, handleDeleteRequest, t, formatDate, formatCurrency, currentLocale]
   );
 
   // Render the card view for a quote
@@ -291,7 +295,9 @@ export function QuotesList() {
               <span className="text-foreground-500 text-sm font-mono">#{quote.sequentialId || ''}</span>
             </div>
             <p className="text-default-400 mt-1 text-[11px]">
-              {quote.createdAt ? formatDate(new Date(quote.createdAt), 'short') : '-'}
+              <p className="text-sm text-default-500">
+                {quote.createdAt ? formatDate(new Date(quote.createdAt), 'short') : '-'}
+              </p>
             </p>
           </CardHeader>
 
@@ -385,7 +391,7 @@ export function QuotesList() {
         </div>
       </Card>
     ),
-    [handleView, handleEdit, handleDeleteRequest, t, formatDate, formatCurrency]
+    [handleView, handleEdit, handleDeleteRequest, t, formatDate, formatCurrency, currentLocale]
   );
 
   // Render empty state

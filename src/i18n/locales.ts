@@ -29,7 +29,7 @@ export type LocalesMap = {
 /**
  * Default locale to use if none is specified
  */
-export const DEFAULT_LOCALE: AppLocale = 'en';
+export const DEFAULT_LOCALE: AppLocale = 'vi';
 
 /**
  * Utility function to check if a locale string is a supported AppLocale

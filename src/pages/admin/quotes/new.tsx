@@ -81,24 +81,15 @@ function NewQuotePageContent() {
   return (
     <>
       <Head>
-        <title>{t(pageTitleKey)}</title>
+        <title>
+          {t('quotes.new.pageTitle')} | {APP_NAME}
+        </title>
       </Head>
 
       <div className="space-y-6">
         <Breadcrumb items={breadcrumbItems} />
 
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <nav className="flex items-center">
-            <Link
-              href={routes.admin.quotes.list}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900"
-            >
-              Quotes
-            </Link>
-            <ChevronRight size={16} className="mx-2 text-gray-400" />
-            <span className="text-sm font-medium text-gray-900">Create New Quote</span>
-          </nav>
-
           <div className="flex gap-2">
             <Button
               color="primary"
@@ -112,9 +103,6 @@ function NewQuotePageContent() {
         </div>
 
         <Card>
-          <CardHeader>
-            <h2 className="text-xl font-bold">Create New Quote</h2>
-          </CardHeader>
           <CardBody>
             <QuoteForm onSubmit={handleSubmit} isSubmitting={isCreating} />
           </CardBody>

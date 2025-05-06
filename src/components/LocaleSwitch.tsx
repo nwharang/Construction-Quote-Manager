@@ -88,7 +88,6 @@ export function LocaleSwitch({
   const localeFlags: Record<string, string> = {
     en: '🇺🇸',
     vi: '🇻🇳',
-    es: '🇪🇸',
   };
 
   // Memoize the handler to avoid recreating it on each render

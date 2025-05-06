@@ -47,11 +47,13 @@ import { QuoteStatusBadge } from '~/components/quotes/QuoteStatusBadge';
 import Head from 'next/head';
 import { APP_NAME } from '~/config/constants';
 import { QuoteStatus } from '~/server/db/schema';
+import { useI18n } from '~/components/providers/I18nProvider';
 
 function QuoteDetailContent() {
   const router = useRouter();
   const { id } = router.query as { id: string };
   const { t, formatDate, formatCurrency } = useTranslation();
+  const { currentLocale } = useI18n();
   const toast = useAppToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -244,6 +246,11 @@ function QuoteDetailContent() {
     }
   };
 
+  // Dynamic title based on quote data
+  const pageTitle = quote
+    ? `${t('quotes.view.pageTitle')} #${quote.sequentialId || quote.id.substring(0, 6)} | ${APP_NAME}`
+    : `Quote | ${APP_NAME}`;
+
   // Loading state
   if (isLoading) {
     return (
@@ -276,9 +283,9 @@ function QuoteDetailContent() {
   return (
     <>
       <Head>
-        <title>
-          {t('quotes.view.title')} | {APP_NAME}
-        </title>
+        <title>{pageTitle}</title>
+        {/* Optionally add description meta tag */}
+        {/* <meta name="description" content={...} /> */}
       </Head>
 
       <div className="space-y-6">
@@ -408,11 +415,15 @@ function QuoteDetailContent() {
                     {/* Created/Updated Dates */}
                     <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                       <span>{t('quotes.view.createdOn')}</span>
-                      <span>{formatDate(quote.createdAt)}</span>
+                      <dd className="text-sm text-gray-900 dark:text-white">
+                        <span>{formatDate(quote.createdAt)}</span>
+                      </dd>
                     </div>
                     <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                       <span>{t('quotes.view.lastUpdated')}</span>
-                      <span>{formatDate(quote.updatedAt)}</span>
+                      <dd className="text-sm text-gray-900 dark:text-white">
+                        <span>{formatDate(quote.updatedAt)}</span>
+                      </dd>
                     </div>
                     <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                       <span>{t('quotes.view.markup')}</span>

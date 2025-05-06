@@ -47,6 +47,10 @@ import type { AppRouter } from '~/server/api/root';
 import { withMainLayout } from '~/utils/withAuth';
 import { routes } from '~/config/routes';
 import { useTranslation } from '~/hooks/useTranslation';
+import { APP_NAME } from '~/config/constants';
+import { Breadcrumb } from '~/components/shared/Breadcrumb';
+import Head from 'next/head';
+import { useSession } from 'next-auth/react';
 
 // Types
 interface StatCardProps {
@@ -84,6 +88,7 @@ const DashboardPage: NextPage = () => {
   const router = useRouter();
   const toast = useToastStore();
   const { t, formatCurrency } = useTranslation();
+  const { data: session } = useSession();
   // Use local state for view mode management
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // Default to grid view for mobile-friendliness
 
@@ -334,6 +339,11 @@ const DashboardPage: NextPage = () => {
 
   return (
     <>
+      <Head>
+        <title>{t('dashboard.pageTitle')} | {APP_NAME}</title>
+        <meta name="description" content={t('dashboard.welcome')} />
+      </Head>
+
       <div className="p-1 sm:p-2 md:p-4">
         <div className="mb-4 sm:mb-8">
           <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-50">

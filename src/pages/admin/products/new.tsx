@@ -10,6 +10,7 @@ import { api } from '~/utils/api';
 import { routes } from '~/config/routes';
 import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import type { BreadcrumbItem } from '~/components/shared/Breadcrumb';
+import { APP_NAME } from '~/config/constants';
 
 const CreateProductPage: NextPageWithLayout = () => {
   const { t } = useTranslation();
@@ -37,7 +38,7 @@ const CreateProductPage: NextPageWithLayout = () => {
   return (
     <>
       <Head>
-        <title>{t('products.new.pageTitle')}</title>
+        <title>{t('products.new.pageTitle')} | {APP_NAME}</title>
       </Head>
       
       <div className="space-y-6">

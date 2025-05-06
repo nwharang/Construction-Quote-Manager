@@ -4,14 +4,26 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import { Button, Spinner, Drawer } from '@heroui/react';
-import { X } from 'lucide-react';
+import { Button, Spinner, Switch, Input } from '@heroui/react';
+import { Settings, X } from 'lucide-react';
 import { api } from '~/utils/api';
 import { useTranslation } from '~/hooks/useTranslation';
 import type { NextPageWithLayout } from '~/types/next';
 import { PrintLayout } from '~/layouts/PrintLayout';
 import { routes } from '~/config/routes';
 import { useConfigStore } from '~/store/configStore';
+import { APP_NAME } from '~/config/constants';
+import { formatDate as formatDateUtil } from '~/utils/date';
+
+const PRINT_SETTINGS_STORAGE_KEY = 'quotePrintSettings';
+
+interface PrintSettings {
+  showMarkupLineItem: boolean;
+  showSignatureSection: boolean;
+  showSeparatePrices: boolean;
+  showPrintDate: boolean;
+  signerName: string;
+}
 
 // Task type definitions
 interface Material {
@@ -38,14 +50,48 @@ const PrintQuotePage: NextPageWithLayout = () => {
   const { status } = useSession();
   const { formatCurrency, formatDate, t } = useTranslation();
   const [mounted, setMounted] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [showMarkupLineItem, setShowMarkupLineItem] = useState(true);
+  const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
+  const [showSignatureSection, setShowSignatureSection] = useState(false);
+  const [showSeparatePrices, setShowSeparatePrices] = useState(false);
+  const [showPrintDate, setShowPrintDate] = useState(false);
+  const [signerName, setSignerName] = useState('');
   // Get company info from config store
   const { settings } = useConfigStore();
 
   useEffect(() => {
     setMounted(true);
+    // Load settings from localStorage
+    if (typeof window !== 'undefined') {
+      const savedSettings = localStorage.getItem(PRINT_SETTINGS_STORAGE_KEY);
+      if (savedSettings) {
+        try {
+          const parsedSettings: PrintSettings = JSON.parse(savedSettings);
+          setShowMarkupLineItem(parsedSettings.showMarkupLineItem);
+          setShowSignatureSection(parsedSettings.showSignatureSection);
+          setShowSeparatePrices(parsedSettings.showSeparatePrices);
+          setShowPrintDate(parsedSettings.showPrintDate);
+          setSignerName(parsedSettings.signerName || '');
+        } catch (error) {
+          console.error('Error parsing print settings from localStorage:', error);
+        }
+      }
+    }
   }, []);
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    if (mounted && typeof window !== 'undefined') {
+      const currentSettings: PrintSettings = {
+        showMarkupLineItem,
+        showSignatureSection,
+        showSeparatePrices,
+        showPrintDate,
+        signerName,
+      };
+      localStorage.setItem(PRINT_SETTINGS_STORAGE_KEY, JSON.stringify(currentSettings));
+    }
+  }, [mounted, showMarkupLineItem, showSignatureSection, showSeparatePrices, showPrintDate, signerName]);
 
   const { data: fetchedQuoteData, isLoading } = api.quote.getById.useQuery(
     { id: typeof quoteId === 'string' ? quoteId : '' },
@@ -104,15 +150,6 @@ const PrintQuotePage: NextPageWithLayout = () => {
     [settings]
   );
 
-  const handleTaskClick = useCallback((task: Task) => {
-    setSelectedTask(task);
-    setIsDrawerOpen(true);
-  }, []);
-
-  const handleCloseDrawer = useCallback(() => {
-    setIsDrawerOpen(false);
-  }, []);
-
   // Loading state
   if (!mounted || status === 'loading' || isLoading) {
     return (
@@ -154,14 +191,49 @@ const PrintQuotePage: NextPageWithLayout = () => {
   const markupAmount = subtotal * toNumber(quote?.markupPercentage || 0);
   const grandTotal = subtotal + markupAmount;
 
+  // Dynamic title based on quote data
+  const pageTitle = quote
+    ? `${t('quotes.print.pageTitle')} #${quote.sequentialId || quote.id.substring(0, 6)} | ${APP_NAME}`
+    : `Print Quote | ${APP_NAME}`;
+
+  const handleToggleMarkupDisplay = () => {
+    setShowMarkupLineItem(!showMarkupLineItem);
+  };
+
+  const toggleSettingsPanel = () => {
+    setIsSettingsPanelOpen(!isSettingsPanelOpen);
+  };
+
+  const handleToggleSignatureSection = () => {
+    setShowSignatureSection(!showSignatureSection);
+  };
+
+  const handleToggleSeparatePrices = () => {
+    setShowSeparatePrices(!showSeparatePrices);
+  };
+
+  const handleTogglePrintDate = () => {
+    setShowPrintDate(!showPrintDate);
+  };
+
+  const handleSignerNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSignerName(event.target.value);
+  };
+
   return (
     <>
       <Head>
-        <title>{quote?.title ? `${quote.title} - Print` : 'Quote Print'}</title>
+        <title>{pageTitle}</title>
         <style type="text/css" media="print">{`
           @page { 
-            size: letter portrait;
-            margin: 0.5in; 
+            margin: 0.5in;
+            /* Attempt to remove default browser header/footer */
+            @top-center { content: none; }
+            @bottom-center { content: none; }
+            @top-left { content: none; }
+            @top-right { content: none; }
+            @bottom-left { content: none; }
+            @bottom-right { content: none; }
           }
           body { 
             -webkit-print-color-adjust: exact !important;
@@ -194,6 +266,95 @@ const PrintQuotePage: NextPageWithLayout = () => {
         `}</style>
       </Head>
 
+      {/* Settings FAB - hidden on print */}
+      <Button
+        isIconOnly
+        color="primary"
+        variant="solid"
+        className="fixed right-6 bottom-6 z-20 h-14 w-14 rounded-full shadow-lg print:hidden"
+        onPress={toggleSettingsPanel}
+        aria-label={t('quotes.print.printOptionsTitle')}
+      >
+        <Settings size={24} />
+      </Button>
+
+      {/* Print Options Panel - Fixed position, conditional rendering, hidden on print */}
+      {isSettingsPanelOpen && (
+        <div className="fixed top-28 right-4 z-10 w-64 rounded-lg border bg-white p-4 shadow-lg print:hidden">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-semibold">{t('quotes.print.printOptionsTitle')}</h3>
+            <Button
+              isIconOnly
+              variant="light"
+              size="sm"
+              onPress={toggleSettingsPanel}
+              aria-label={t('common.close')}
+            >
+              <X size={18} />
+            </Button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              isSelected={showMarkupLineItem}
+              onChange={handleToggleMarkupDisplay}
+              aria-label={t('quotes.print.showingMarkupDetails')}
+            />
+            <span className="text-sm">
+              {showMarkupLineItem
+                ? t('quotes.print.showingMarkupDetails')
+                : t('quotes.print.hidingMarkupDetails')}
+            </span>
+          </div>
+          <div className="mt-3 flex items-center space-x-2">
+            <Switch
+              isSelected={showSignatureSection}
+              onChange={handleToggleSignatureSection}
+              aria-label={t('quotes.print.toggleSignatureSection')}
+            />
+            <span className="text-sm">
+              {showSignatureSection
+                ? t('quotes.print.showingSignatureSection')
+                : t('quotes.print.hidingSignatureSection')}
+            </span>
+          </div>
+          <div className="mt-3 flex items-center space-x-2">
+            <Switch
+              isSelected={showSeparatePrices}
+              onChange={handleToggleSeparatePrices}
+              aria-label={t('quotes.print.toggleSeparatePrices')}
+            />
+            <span className="text-sm">
+              {showSeparatePrices
+                ? t('quotes.print.showingSeparatePrices')
+                : t('quotes.print.showingCombinedPrice')}
+            </span>
+          </div>
+          <div className="mt-3 flex items-center space-x-2">
+            <Switch
+              isSelected={showPrintDate}
+              onChange={handleTogglePrintDate}
+              aria-label={t('quotes.print.togglePrintDate')}
+            />
+            <span className="text-sm">
+              {showPrintDate
+                ? t('quotes.print.showingPrintDate')
+                : t('quotes.print.hidingPrintDate')}
+            </span>
+          </div>
+          <div className="mt-3">
+            <Input
+              label={t('quotes.print.signerNameLabel')}
+              placeholder={t('quotes.print.signerNamePlaceholder')}
+              value={signerName}
+              onChange={handleSignerNameChange}
+              fullWidth
+              size="sm"
+              variant="bordered"
+            />
+          </div>
+        </div>
+      )}
+
       {quote && (
         <div className="print-page mx-auto max-w-full bg-white p-4 shadow sm:max-w-[8.5in] sm:p-6 print:max-w-none print:p-0 print:shadow-none">
           {/* Company Header */}
@@ -203,56 +364,39 @@ const PrintQuotePage: NextPageWithLayout = () => {
                 <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
                   {quote.title || `Quote #${quote.sequentialId}`}
                 </h1>
-                <p className="text-sm text-gray-600 sm:text-base">
-                  {formatDate(quote.createdAt, 'long')}
-                </p>
-              </div>
-              <div className="text-left sm:text-right">
-                <h2 className="text-base font-semibold text-gray-800 sm:text-lg">
-                  {settings?.companyName || 'Company Name'}
-                </h2>
-                {settings?.companyEmail && (
-                  <p className="text-sm text-gray-600 sm:text-base">{settings.companyEmail}</p>
-                )}
-                {settings?.companyPhone && (
-                  <p className="text-sm text-gray-600 sm:text-base">{settings.companyPhone}</p>
-                )}
-                {settings?.companyAddress && (
-                  <p className="text-sm whitespace-pre-line text-gray-600 sm:text-base">
-                    {settings.companyAddress}
+                {showPrintDate && (
+                  <p className="text-sm text-gray-600 sm:text-base">
+                    {t('quotes.print.printDateLabel')}: {formatDate(new Date(), 'long')}
                   </p>
                 )}
               </div>
+              {(settings?.companyName ||
+                settings?.companyEmail ||
+                settings?.companyPhone ||
+                settings?.companyAddress) && (
+                <div className="text-left sm:text-right">
+                  {settings?.companyName && (
+                    <h2 className="text-lg font-semibold text-gray-800">{settings.companyName}</h2>
+                  )}
+                  {settings?.companyEmail && (
+                    <p className="text-sm text-gray-600 sm:text-base">{settings.companyEmail}</p>
+                  )}
+                  {settings?.companyPhone && (
+                    <p className="text-sm text-gray-600 sm:text-base">{settings.companyPhone}</p>
+                  )}
+                  {settings?.companyAddress && (
+                    <p className="text-sm whitespace-pre-line text-gray-600 sm:text-base">
+                      {settings.companyAddress}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:mb-8 sm:gap-6 md:grid-cols-2">
-            <div className="order-1 md:order-1">
-              <h2 className="mb-2 border-b border-gray-200 pb-1 text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg">
-                {t('quotes.print.quoteInformation')}
-              </h2>
-              <div className="space-y-1 sm:space-y-2">
-                {quote.title && (
-                  <p className="text-sm sm:text-base">
-                    <span className="font-medium text-black">{t('quotes.print.title')}</span>{' '}
-                    <span className="text-black">{quote.title}</span>
-                  </p>
-                )}
-                {toNumber(quote.markupPercentage) > 0 && (
-                  <p className="text-sm sm:text-base">
-                    <span className="font-medium text-black">
-                      {t('quotes.print.markup', {
-                        percentage: toNumber(quote.markupPercentage) * 100,
-                      })}
-                    </span>{' '}
-                    <span className="text-black">
-                      {formatPercent(toNumber(quote.markupPercentage) * 100)}
-                    </span>
-                  </p>
-                )}
-              </div>
-            </div>
-
+          {/* Unified DL for consistent indentation */}
+          <dl className="mb-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm sm:mb-8 sm:gap-y-2 sm:text-base">
+            {/* Customer Information Items - This will now be the first section in the DL */}
             {quote.customer &&
               Object.keys(quote.customer).some(
                 (key) =>
@@ -261,45 +405,42 @@ const PrintQuotePage: NextPageWithLayout = () => {
                   quote.customer[key as keyof typeof quote.customer] !== undefined &&
                   quote.customer[key as keyof typeof quote.customer] !== ''
               ) && (
-                <div className="order-2 md:order-2">
-                  <h2 className="mb-2 border-b border-gray-200 pb-1 text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg">
+                <>
+                  {/* Separator/Header for Customer Info */}
+                  <dt className="col-span-2 mb-1 border-b border-gray-200 pt-1 pb-1 text-lg font-semibold text-black sm:mb-2 print:border-gray-400">
                     {t('quotes.print.customer')}
-                  </h2>
-                  <div className="space-y-1 sm:space-y-2">
-                    {quote.customer.name && (
-                      <p className="text-sm sm:text-base">
-                        <span className="font-medium text-black">{t('customers.list.name')}:</span>{' '}
-                        <span className="text-black">{quote.customer.name}</span>
-                      </p>
-                    )}
-                    {quote.customer.phone && (
-                      <p className="text-sm sm:text-base">
-                        <span className="font-medium text-black">{t('customers.list.phone')}:</span>{' '}
-                        <span className="text-black">{quote.customer.phone}</span>
-                      </p>
-                    )}
-                    {quote.customer.email && (
-                      <p className="text-sm sm:text-base">
-                        <span className="font-medium text-black">{t('customers.list.email')}:</span>{' '}
-                        <span className="text-black">{quote.customer.email}</span>
-                      </p>
-                    )}
-                    {quote.customer.address && (
-                      <p className="text-sm sm:text-base">
-                        <span className="font-medium text-black">
-                          {t('customers.list.address')}:
-                        </span>{' '}
-                        <span className="text-black">{quote.customer.address}</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
+                  </dt>
+                  {quote.customer.name && (
+                    <>
+                      <dt className="font-medium text-black">{t('customers.list.name')}</dt>
+                      <dd className="text-black">{quote.customer.name}</dd>
+                    </>
+                  )}
+                  {quote.customer.phone && (
+                    <>
+                      <dt className="font-medium text-black">{t('customers.list.phone')}</dt>
+                      <dd className="text-black">{quote.customer.phone}</dd>
+                    </>
+                  )}
+                  {quote.customer.email && (
+                    <>
+                      <dt className="font-medium text-black">{t('customers.list.email')}</dt>
+                      <dd className="text-black">{quote.customer.email}</dd>
+                    </>
+                  )}
+                  {quote.customer.address && (
+                    <>
+                      <dt className="font-medium text-black">{t('customers.list.address')}</dt>
+                      <dd className="whitespace-pre-line text-black">{quote.customer.address}</dd>
+                    </>
+                  )}
+                </>
               )}
-          </div>
+          </dl>
 
           {quote.notes && (
             <div className="mb-6 sm:mb-8">
-              <h2 className="mb-2 border-b border-gray-200 pb-1 text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg">
+              <h2 className="mb-2 border-b border-gray-200 pb-1 text-lg font-semibold text-gray-800 sm:mb-3 print:border-gray-400">
                 {t('quotes.print.notes')}
               </h2>
               <p className="text-sm whitespace-pre-wrap text-gray-700 sm:text-base">
@@ -309,31 +450,40 @@ const PrintQuotePage: NextPageWithLayout = () => {
           )}
 
           {quote.tasks && quote.tasks.length > 0 && (
-            <div className="mb-6 sm:mb-8">
-              <h2 className="mb-2 border-b border-gray-200 pb-1 text-base font-semibold text-gray-800 sm:mb-3 sm:text-lg">
+            <div className="">
+              <h2 className="mb-2 border-b border-gray-200 pb-1 text-lg font-semibold text-gray-800 sm:mb-3 print:border-gray-400">
                 {t('quotes.print.tasksAndMaterials')}
               </h2>
               <div className="-mx-4 overflow-x-auto sm:mx-0">
-                <table className="w-full min-w-full table-auto border-collapse">
+                <table className="w-full min-w-full table-fixed border-collapse">
                   <thead>
                     <tr className="border-b-2 border-gray-400 bg-gray-200 print:bg-gray-200">
-                      <th className="p-2 text-left text-sm font-semibold text-gray-700 sm:p-3 sm:text-base">
+                      <th className="p-2 text-left text-sm font-semibold whitespace-normal text-gray-700 sm:p-3 sm:text-base">
                         {t('quotes.print.description')}
                       </th>
-                      <th className="p-2 text-right text-sm font-semibold text-gray-700 sm:p-3 sm:text-base">
-                        {t('quotes.print.labor')}
-                      </th>
-                      <th className="p-2 text-right text-sm font-semibold text-gray-700 sm:p-3 sm:text-base">
-                        {t('quotes.print.materials')}
-                      </th>
-                      <th className="p-2 text-right text-sm font-semibold text-gray-700 sm:p-3 sm:text-base">
-                        {t('quotes.print.subtotal')}
-                      </th>
+                      {showSeparatePrices ? (
+                        <>
+                          <th className="p-2 text-right text-sm font-semibold whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                            {t('quotes.print.labor')}
+                          </th>
+                          <th className="p-2 text-right text-sm font-semibold whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                            {t('quotes.print.materials')}
+                          </th>
+                          <th className="p-2 text-right text-sm font-semibold whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                            {t('quotes.print.subtotal')}
+                          </th>
+                        </>
+                      ) : (
+                        <th className="p-2 text-right text-sm font-semibold whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                          {t('quotes.print.combinedPriceHeader')} {/* Combined total header */}
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {quote.tasks.map((task) => {
-                      const taskMaterialsTotal =
+                      const taskPriceRaw = toNumber(task.price);
+                      const taskMaterialsTotalRaw =
                         task.materialType === 'LUMPSUM'
                           ? toNumber(task.estimatedMaterialsCostLumpSum)
                           : task.materials?.reduce(
@@ -341,150 +491,133 @@ const PrintQuotePage: NextPageWithLayout = () => {
                               0
                             ) || 0;
 
-                      const taskTotal = toNumber(task.price) + taskMaterialsTotal;
+                      // Determine if markup should be displayed transparently or distributed
+                      // Based on the showMarkupLineItem state
+                      const displayMarkupTransparently = showMarkupLineItem;
+                      const markupRate = 1 + toNumber(quote?.markupPercentage || 0); // e.g., 1.05 for 5% markup
+
+                      let priceForDisplay = taskPriceRaw;
+                      let materialsTotalForDisplay = taskMaterialsTotalRaw;
+
+                      if (!displayMarkupTransparently && toNumber(quote.markupPercentage) > 0) {
+                        // Distribute markup into item prices
+                        priceForDisplay = taskPriceRaw * markupRate;
+                        materialsTotalForDisplay = taskMaterialsTotalRaw * markupRate;
+                      }
+
+                      const taskSubtotalForDisplay = priceForDisplay + materialsTotalForDisplay;
 
                       return (
                         <tr
                           key={task.id}
-                          className="cursor-pointer border-b border-gray-200 hover:bg-gray-50 print:cursor-default print:hover:bg-transparent"
-                          onClick={() => handleTaskClick(task as Task)}
+                          className="border-b border-gray-200 hover:bg-gray-50 print:cursor-default print:border-gray-400 print:hover:bg-transparent"
                         >
-                          <td className="p-2 text-sm text-gray-700 sm:p-3 sm:text-base">
+                          <td className="p-2 text-sm whitespace-normal text-gray-700 sm:p-3 sm:text-base">
                             {task.description}
                           </td>
-                          <td className="p-2 text-right text-sm text-gray-700 sm:p-3 sm:text-base">
-                            <span className="currency-value">
-                              {formatCurrency(toNumber(task.price))}
-                            </span>
-                          </td>
-                          <td className="p-2 text-right text-sm text-gray-700 sm:p-3 sm:text-base">
-                            <span className="currency-value">
-                              {formatCurrency(taskMaterialsTotal)}
-                            </span>
-                          </td>
-                          <td className="p-2 text-right text-sm font-medium text-gray-700 sm:p-3 sm:text-base">
-                            <span className="currency-value">{formatCurrency(taskTotal)}</span>
-                          </td>
+                          {showSeparatePrices ? (
+                            <>
+                              <td className="p-2 text-right text-sm whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                                <span className="currency-value">
+                                  {formatCurrency(priceForDisplay)}
+                                </span>
+                              </td>
+                              <td className="p-2 text-right text-sm whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                                <span className="currency-value">
+                                  {formatCurrency(materialsTotalForDisplay)}
+                                </span>
+                              </td>
+                              <td className="p-2 text-right text-sm font-medium whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                                <span className="currency-value">
+                                  {formatCurrency(taskSubtotalForDisplay)}
+                                </span>
+                              </td>
+                            </>
+                          ) : (
+                            <td className="p-2 text-right text-sm font-medium whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                              <span className="currency-value">
+                                {formatCurrency(taskSubtotalForDisplay)}
+                              </span>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="border-t border-gray-300 bg-gray-50 font-semibold text-black">
-                    <tr>
-                      <td className="px-4 py-2 text-right sm:px-6 sm:py-3">
-                        {t('quotes.print.subtotal')}
-                      </td>
-                      <td className="currency-value px-4 py-2 text-right sm:px-6 sm:py-3">
-                        {formatCurrency(subtotal)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 text-right sm:px-6 sm:py-3">
-                        {t('quotes.print.markupAmount')}
-                      </td>
-                      <td className="currency-value px-4 py-2 text-right sm:px-6 sm:py-3">
-                        {formatCurrency(markupAmount)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 text-right text-base font-bold sm:px-6 sm:py-3 sm:text-lg">
-                        {t('quotes.print.grandTotal')}
-                      </td>
-                      <td className="currency-value px-4 py-2 text-right text-base font-bold sm:px-6 sm:py-3 sm:text-lg">
-                        {formatCurrency(grandTotal)}
-                      </td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
             </div>
           )}
 
-          <div className="mt-8 text-center text-xs text-gray-500 sm:mt-12 print:hidden">
-            <p>{t('quotes.print.generatedMessage', { date: formatDate(new Date(), 'long') })}</p>
-          </div>
+          {/* New Dedicated Summary Section - Wrapped for right alignment */}
+          {quote.tasks && quote.tasks.length > 0 && (
+            <div className="flex justify-end border-t border-gray-300 pt-4 print:border-gray-400">
+              <dl className="space-y-1 text-sm text-gray-700 sm:space-y-2">
+                {/* Conditionally display subtotal and markup amount based on showMarkupLineItem state */}
+                {showMarkupLineItem && toNumber(quote.markupPercentage) > 0 && (
+                  <div className="flex justify-between">
+                    <dt>{t('quotes.print.subtotal')}</dt>
+                    <dd className="currency-value font-medium">{formatCurrency(subtotal)}</dd>
+                  </div>
+                )}
+                {showMarkupLineItem && toNumber(quote.markupPercentage) > 0 && (
+                  <div className="flex justify-between">
+                    <dt>{t('quotes.markupPercentageLabel')}</dt>
+                    <dd className="currency-value font-medium">
+                      {formatPercent(toNumber(quote.markupPercentage) * 100)}
+                    </dd>
+                  </div>
+                )}
+                {showMarkupLineItem && toNumber(quote.markupPercentage) > 0 && (
+                  <div className="flex justify-between">
+                    <dt>{t('quotes.print.markupAmount')}</dt>
+                    <dd className="currency-value font-medium">{formatCurrency(markupAmount)}</dd>
+                  </div>
+                )}
+
+                <div className="flex justify-between border-t border-gray-200 pt-1 text-base font-bold text-black sm:pt-2 print:border-gray-400">
+                  <dt>{t('quotes.print.grandTotal')}</dt>
+                  <dd className="currency-value ml-8">{formatCurrency(grandTotal)}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
+
+          {/* Signature Section - Conditionally Rendered */}
+          {showSignatureSection && (
+            <div className="mt-4 print:border-gray-400">
+              <div className="grid grid-cols-1 gap-x-8 text-center md:grid-cols-3">
+                <div></div>
+                <div></div>
+                <div className="flex flex-col">
+                  <p className="text-base font-semibold">
+                    {/* full date month year in current locale */}
+                    {formatDateUtil(new Date(), 'full')}
+                  </p>
+                  <p className="text-base font-semibold">
+                    {t('quotes.print.signatureAuthorizedLabel')}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    ({signerName || t('quotes.print.signatureNamePrintedLabel')})
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <footer className="mt-8 pt-4 text-center text-xs text-gray-500">
+            {/* 
+            <p>
+              {t('quotes.print.generatedMessage', {
+                date: formatDate(new Date(), 'long'),
+              })}
+            </p>
+            */}
+          </footer>
         </div>
       )}
 
       {/* Task Detail Drawer - Only visible on screen */}
-      <Drawer
-        isOpen={isDrawerOpen}
-        onClose={handleCloseDrawer}
-        placement="right"
-        size="sm"
-        className="print:hidden"
-      >
-        <div className="p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold">{t('quotes.print.description')}</h3>
-            <Button
-              variant="light"
-              isIconOnly
-              onPress={handleCloseDrawer}
-              aria-label={t('common.close')}
-            >
-              <X size={20} />
-            </Button>
-          </div>
-
-          {selectedTask && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="mb-1 font-medium">{t('quotes.taskDescriptionLabel')}</h4>
-                <p>{selectedTask.description}</p>
-              </div>
-
-              <div>
-                <h4 className="mb-1 font-medium">{t('quotes.taskPriceLabel')}</h4>
-                <p className="currency-value">{formatCurrency(toNumber(selectedTask.price))}</p>
-              </div>
-
-              {selectedTask.materialType === 'LUMPSUM' ? (
-                <div>
-                  <h4 className="mb-1 font-medium">
-                    {t('quotes.materialTypeLabel')} ({t('quotes.materialTypeLumpSum')})
-                  </h4>
-                  <p className="currency-value">
-                    {formatCurrency(toNumber(selectedTask.estimatedMaterialsCostLumpSum))}
-                  </p>
-                </div>
-              ) : selectedTask.materials && selectedTask.materials.length > 0 ? (
-                <div>
-                  <h4 className="mb-2 font-medium">
-                    {t('quotes.materialTypeLabel')} ({t('quotes.materialTypeItemized')})
-                  </h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-2 text-left">{t('productFields.name')}</th>
-                          <th className="py-2 text-right">{t('productFields.unitPrice')}</th>
-                          <th className="py-2 text-right">{t('quotes.print.subtotal')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedTask.materials.map((material, index) => (
-                          <tr key={material.id || index} className="border-b">
-                            <td className="py-2 text-left">{material.productName || '-'}</td>
-                            <td className="py-2 text-right">
-                              {formatCurrency(toNumber(material.unitPrice))} × {material.quantity}
-                            </td>
-                            <td className="py-2 text-right">
-                              {formatCurrency(
-                                toNumber(material.quantity) * toNumber(material.unitPrice)
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </Drawer>
     </>
   );
 };

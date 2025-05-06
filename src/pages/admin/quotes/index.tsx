@@ -21,7 +21,8 @@ const QuotesPage: NextPageWithLayout = () => {
   return (
     <>
       <Head>
-        <title>{t('quotes.list.header')} | {APP_NAME}</title>
+        <title>{t('quotes.list.pageTitle')} | {APP_NAME}</title>
+        <meta name="description" content="Manage quotes for your customers." />
       </Head>
       <div className="mb-6">
         <Breadcrumb items={breadcrumbItems} />
