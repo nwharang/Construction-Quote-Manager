@@ -19,6 +19,7 @@ function EditQuotePageContent() {
   const { id } = router.query as { id: string };
   const { t } = useTranslation();
   const toast = useAppToast();
+  const utils = api.useUtils(); // Get tRPC utils
 
   // Fetch the quote for editing
   const { data: quote, isLoading } = api.quote.getById.useQuery(
@@ -31,9 +32,16 @@ function EditQuotePageContent() {
 
   // Update mutation
   const { mutate: updateQuote, isPending: isSaving } = api.quote.update.useMutation({
-    onSuccess: (updatedQuote) => {
+    onSuccess: async (updatedQuote) => {
       toast.success('Quote updated successfully');
-      // Navigate to the view page after successful update
+
+      // Prefetch data before navigating to reduce flicker
+      await utils.quote.getById.prefetch({ id: updatedQuote.id });
+      // Optionally keep invalidate if prefetch alone isn't enough, but usually prefetch implies needing fresh data
+      // await utils.quote.getById.invalidate({ id: updatedQuote.id });
+      await utils.quote.getAll.invalidate(); // Still invalidate the list query
+
+      // Navigate to the view page after successful update and prefetch/invalidation
       router.push(routes.admin.quotes.detail(updatedQuote.id));
     },
     onError: (error) => {
@@ -83,7 +91,7 @@ function EditQuotePageContent() {
       const dataToSend = {
         ...restOfFormData,
         customerId: customerId, // Use validated customerId (guaranteed string here)
-        markupPercentage: formData.markupPercentage / 100, // Convert back to decimal (0-1)
+        markupPercentage: formData.markupPercentage, // Convert back to decimal (0-1)
         tasks: transformedTasks, // Use the transformed tasks array
         // Status is intentionally NOT included here
       };
@@ -171,7 +179,7 @@ function EditQuotePageContent() {
               initialValues={{
                 title: quote.title,
                 customerId: quote.customerId,
-                markupPercentage: quote.markupPercentage * 100, // Convert from decimal to percentage for the form
+                markupPercentage: quote.markupPercentage, // Convert from decimal to percentage for the form
                 notes: quote.notes || '',
                 tasks:
                   quote.tasks?.map((task) => ({
