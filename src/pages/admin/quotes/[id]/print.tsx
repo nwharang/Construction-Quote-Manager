@@ -369,19 +369,29 @@ const PrintQuotePage: NextPageWithLayout = () => {
                       );
                     })}
                   </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-gray-400 bg-gray-200 print:bg-gray-200">
-                      <td className="p-2 text-left text-sm font-medium text-gray-800 sm:p-3 sm:text-base">
-                        {t('quotes.print.summary')}
+                  <tfoot className="border-t border-gray-300 bg-gray-50 font-semibold text-black">
+                    <tr>
+                      <td className="px-4 py-2 text-right sm:px-6 sm:py-3">
+                        {t('quotes.print.subtotal')}
                       </td>
-                      <td className="p-2 text-right text-sm font-medium text-gray-800 sm:p-3 sm:text-base">
-                        <span className="currency-value">{formatCurrency(laborTotal)}</span>
+                      <td className="currency-value px-4 py-2 text-right sm:px-6 sm:py-3">
+                        {formatCurrency(subtotal)}
                       </td>
-                      <td className="p-2 text-right text-sm font-medium text-gray-800 sm:p-3 sm:text-base">
-                        <span className="currency-value">{formatCurrency(materialsTotal)}</span>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-2 text-right sm:px-6 sm:py-3">
+                        {t('quotes.print.markupAmount')}
                       </td>
-                      <td className="p-2 text-right text-sm font-bold text-black sm:p-3 sm:text-base">
-                        <span className="currency-value">{formatCurrency(grandTotal)}</span>
+                      <td className="currency-value px-4 py-2 text-right sm:px-6 sm:py-3">
+                        {formatCurrency(markupAmount)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-2 text-right text-base font-bold sm:px-6 sm:py-3 sm:text-lg">
+                        {t('quotes.print.grandTotal')}
+                      </td>
+                      <td className="currency-value px-4 py-2 text-right text-base font-bold sm:px-6 sm:py-3 sm:text-lg">
+                        {formatCurrency(grandTotal)}
                       </td>
                     </tr>
                   </tfoot>
