@@ -65,6 +65,9 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
       setValue(`tasks.${taskIndex}.materials.${materialIndex}.productId`, product.id, {
         shouldValidate: true,
       });
+      setValue(`tasks.${taskIndex}.materials.${materialIndex}.productName`, product.name, {
+        shouldValidate: true,
+      });
       // Product price is a string, parse it to number for the form field
       const unitPrice = parseFloat(product.unitPrice); // Directly parse the string price
       setValue(
@@ -208,7 +211,9 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                 className="rounded-md border border-gray-200 p-3 dark:border-gray-600"
               >
                 <div className="mb-2 flex justify-between">
-                  <h5 className="text-sm font-medium">{t('quotes.materialHeading', { index: materialIndex + 1 })}</h5>
+                  <h5 className="text-sm font-medium">
+                    {t('quotes.materialHeading', { index: materialIndex + 1 })}
+                  </h5>
                   <Button
                     color="danger"
                     variant="light"

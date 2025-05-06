@@ -115,7 +115,7 @@ function EditQuotePageContent() {
   if (!quote) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
-        <h2 className="text-xl font-semibold">Quote not found</h2>
+        <h2 className="text-xl font-semibold">Không tìm thấy báo giá</h2>
         <Button
           color="primary"
           variant="ghost"
@@ -123,7 +123,7 @@ function EditQuotePageContent() {
           startContent={<ArrowLeft size={16} />}
           onPress={() => router.push(routes.admin.quotes.list)}
         >
-          Back to Quotes
+          Trở lại báo giá
         </Button>
       </div>
     );

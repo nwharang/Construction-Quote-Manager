@@ -148,7 +148,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.print.laborTotal': 'Tổng Nhân công',
   'quotes.print.materialsTotal': 'Tổng Vật liệu',
   'quotes.print.subtotal': 'Tổng phụ',
-  'quotes.print.markup': 'Tăng giá ({percentage}%)',
+  'quotes.print.markup': 'Phần trăm phụ phí: ',
   'quotes.print.grandTotal': 'Tổng cộng',
   'quotes.print.footerNote':
     'Tài liệu này được tạo vào ngày {date} và chỉ dành cho mục đích ước tính.',
@@ -331,7 +331,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.view.quoteInfo': 'Chi tiết Báo giá',
   'quotes.view.createdOn': 'Ngày tạo:',
   'quotes.view.lastUpdated': 'Cập nhật lần cuối:',
-  'quotes.view.markup': 'Tăng giá:',
+  'quotes.view.markup': 'Phụ phí: ',
   'quotes.view.subtotal': 'Tổng phụ:',
   'quotes.view.grandTotal': 'Tổng cộng:',
   'quotes.view.costBreakdown': 'Phân tích Chi phí',
@@ -383,10 +383,21 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.subtotalTasksLabel': 'Tổng phụ Công việc',
   'quotes.subtotalMaterialsLabel': 'Tổng phụ Vật liệu',
   'quotes.complexityChargeLabel': 'Phụ phí Độ phức tạp',
-  'quotes.markupChargeLabel': 'Phụ phí Tăng giá',
-  'quotes.markupPercentageLabel': 'Phần trăm Tăng giá',
+  'quotes.markupChargeLabel': 'Phụ phí',
+  'quotes.markupPercentageLabel': 'Phần trăm phụ phí',
   'quotes.addTaskButton': 'Thêm Công việc',
-  'quotes.noTasksPlaceholder': 'Không có công việc nào được thêm vào',
+  'quotes.noTasksPlaceholder': 'Chưa có công việc nào được thêm',
+
+  // --- New keys for Quote View Page --- //
+  'quotes.view.customerNotAvailable': 'Thông tin khách hàng không có sẵn',
+  'quotes.view.quoteSummary': 'Tóm tắt báo giá',
+  'quotes.summary.markupApplied': 'Phụ phí đã áp dụng',
+  'quotes.view.totalsNotCalculated': 'Không thể tính tổng.',
+  // Labels for Customer Info Card on Quote View
+  'quotes.view.customerNameLabel': 'Tên:',
+  'quotes.view.customerEmailLabel': 'Email:',
+  'quotes.view.customerPhoneLabel': 'Điện thoại:',
+  'quotes.view.customerAddressLabel': 'Địa chỉ:',
 };
 
 export default viTranslations;

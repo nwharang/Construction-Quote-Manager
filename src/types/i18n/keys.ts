@@ -428,6 +428,15 @@ export type TranslationKey = 'appName'
   | 'quotes.addMaterialButton'
   | 'quotes.noMaterialsPlaceholder'
   | 'quotes.materialHeading'
+  | 'quotes.view.customerNotAvailable'
+  | 'quotes.view.quoteSummary'
+  | 'quotes.summary.markupApplied' // Using "Applied" for clarity vs "Calculated"
+  | 'quotes.view.totalsNotCalculated'
+  // Labels for Customer Info Card on Quote View
+  | 'quotes.view.customerNameLabel'
+  | 'quotes.view.customerEmailLabel'
+  | 'quotes.view.customerPhoneLabel'
+  | 'quotes.view.customerAddressLabel'
 
 // --- Conditional Mapping Type --- //
 

@@ -1,8 +1,8 @@
 import { useRouter } from 'next/router';
-import { 
-  Card, 
-  CardHeader, 
-  CardBody, 
+import {
+  Card,
+  CardHeader,
+  CardBody,
   Button,
   Spinner,
   Divider,
@@ -17,9 +17,24 @@ import {
   ModalBody,
   ModalFooter,
   Select,
-  SelectItem
+  SelectItem,
 } from '@heroui/react';
-import { ArrowLeft, Edit, Trash, Printer, ChevronDown, DollarSign, Clock, Calendar, CheckCircle, AlertCircle, Hammer, Package, RefreshCw } from 'lucide-react';
+import {
+  ArrowLeft,
+  Edit,
+  Trash,
+  Printer,
+  ChevronDown,
+  DollarSign,
+  Clock,
+  Calendar,
+  CheckCircle,
+  AlertCircle,
+  Hammer,
+  Package,
+  RefreshCw,
+  FileText,
+} from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { api } from '~/utils/api';
 import { withMainLayout } from '~/utils/withAuth';
@@ -44,7 +59,11 @@ function QuoteDetailContent() {
   const [isStatusChangeModalOpen, setIsStatusChangeModalOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<string | null>(null);
 
-  const { data: quote, isLoading, refetch } = api.quote.getById.useQuery(
+  const {
+    data: quote,
+    isLoading,
+    refetch,
+  } = api.quote.getById.useQuery(
     { id },
     {
       enabled: !!id,
@@ -54,15 +73,15 @@ function QuoteDetailContent() {
 
   const { mutate: deleteQuote } = api.quote.delete.useMutation({
     onSuccess: () => {
-      toast.success("Quote deleted successfully");
+      toast.success('Quote deleted successfully');
       router.push(routes.admin.quotes.list);
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to delete quote");
+      toast.error(error.message || 'Failed to delete quote');
     },
     onSettled: () => {
       setIsDeleting(false);
-    }
+    },
   });
 
   const { mutate: updateStatus, isPending: isStatusUpdating } = api.quote.updateStatus.useMutation({
@@ -123,7 +142,8 @@ function QuoteDetailContent() {
 
   // Calculate task totals for display
   const getTaskTotal = (task: any): number => {
-    const laborCost = typeof task.price === 'number' ? task.price : parseFloat(String(task.price) || '0');
+    const laborCost =
+      typeof task.price === 'number' ? task.price : parseFloat(String(task.price) || '0');
 
     let materialsCost = 0;
     if (task.materialType === 'LUMPSUM' && task.estimatedMaterialsCostLumpSum) {
@@ -152,21 +172,26 @@ function QuoteDetailContent() {
   const calculateTotals = () => {
     if (!quote || !quote.tasks) return null;
 
-    const laborTotal = quote.tasks.reduce((total, task) => total + parseFloat(String(task.price) || '0'), 0);
-    
+    const laborTotal = quote.tasks.reduce(
+      (total, task) => total + parseFloat(String(task.price) || '0'),
+      0
+    );
+
     let materialsTotal = 0;
-    quote.tasks.forEach(task => {
+    quote.tasks.forEach((task) => {
       if (task.materialType === 'LUMPSUM' && task.estimatedMaterialsCostLumpSum) {
         materialsTotal += parseFloat(String(task.estimatedMaterialsCostLumpSum) || '0');
       } else if (task.materialType === 'ITEMIZED' && task.materials && task.materials.length > 0) {
-        task.materials.forEach(material => {
-          materialsTotal += parseFloat(String(material.quantity) || '0') * parseFloat(String(material.unitPrice) || '0');
+        task.materials.forEach((material) => {
+          materialsTotal +=
+            parseFloat(String(material.quantity) || '0') *
+            parseFloat(String(material.unitPrice) || '0');
         });
       }
     });
 
     const subtotal = laborTotal + materialsTotal;
-    const markupAmount = subtotal * (quote.markupPercentage / 100);
+    const markupAmount = subtotal * quote.markupPercentage;
     const grandTotal = subtotal + markupAmount;
 
     const laborPercentage = (laborTotal / grandTotal) * 100;
@@ -181,38 +206,40 @@ function QuoteDetailContent() {
       grandTotal,
       laborPercentage,
       materialsPercentage,
-      markupPercentage
+      markupPercentage,
     };
   };
 
   const totals = calculateTotals();
 
   const getStatusDetails = (status: string) => {
-    switch(status.toLowerCase()) {
+    switch (status.toLowerCase()) {
       case 'draft':
-        return { 
+        return {
           icon: <Clock className="mr-2" size={16} />,
-          description: 'This quote is still in draft mode and hasn\'t been sent to the customer yet.'
+          description:
+            "This quote is still in draft mode and hasn't been sent to the customer yet.",
         };
       case 'sent':
-        return { 
+        return {
           icon: <Calendar className="mr-2" size={16} />,
-          description: 'This quote has been sent to the customer and is awaiting their response.'
+          description: 'This quote has been sent to the customer and is awaiting their response.',
         };
       case 'accepted':
-        return { 
+        return {
           icon: <CheckCircle className="mr-2" size={16} />,
-          description: 'Great news! The customer has accepted this quote.'
+          description: 'Great news! The customer has accepted this quote.',
         };
       case 'rejected':
-        return { 
+        return {
           icon: <AlertCircle className="mr-2" size={16} />,
-          description: 'The customer has rejected this quote. Consider following up to understand why.'
+          description:
+            'The customer has rejected this quote. Consider following up to understand why.',
         };
       default:
-        return { 
+        return {
           icon: <Clock className="mr-2" size={16} />,
-          description: 'Current status of this quote.'
+          description: 'Current status of this quote.',
         };
     }
   };
@@ -249,9 +276,11 @@ function QuoteDetailContent() {
   return (
     <>
       <Head>
-        <title>{t('quotes.view.title')} | {APP_NAME}</title>
+        <title>
+          {t('quotes.view.title')} | {APP_NAME}
+        </title>
       </Head>
-      
+
       <div className="space-y-6">
         {/* Breadcrumb and Actions */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -265,7 +294,7 @@ function QuoteDetailContent() {
               {t('quotes.view.backToQuotes')}
             </Button>
           </div>
-          <div className="flex gap-2 ml-auto">
+          <div className="ml-auto flex gap-2">
             <ResponsiveButton
               color="primary"
               variant="flat"
@@ -298,14 +327,16 @@ function QuoteDetailContent() {
         </div>
 
         {/* Quote Details Card */}
-        <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">
+        <Card className="shadow-md transition-shadow duration-300 hover:shadow-lg">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-2xl font-bold">{quote.title || `Quote #${quote.sequentialId || quote.id.substring(0, 8)}`}</h2>
+              <h2 className="text-2xl font-bold">
+                {quote.title || `Quote #${quote.sequentialId || quote.id.substring(0, 8)}`}
+              </h2>
               <div className="flex items-center gap-2">
                 <QuoteStatusBadge status={quote.status} size="md" />
                 <Tooltip content={statusDetails.description}>
-                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 border-l pl-2 ml-2">
+                  <div className="ml-2 flex items-center border-l pl-2 text-sm text-gray-600 dark:text-gray-300">
                     {statusDetails.icon}
                     <span>{quote.status}</span>
                   </div>
@@ -316,78 +347,97 @@ function QuoteDetailContent() {
           <CardBody>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Customer Information */}
-              <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <Card className="border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
                 <CardBody>
-                  <h3 className="mb-3 text-lg font-semibold flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <h3 className="mb-3 flex items-center text-lg font-semibold">
+                    <svg
+                      className="mr-2 h-5 w-5 text-blue-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
                     </svg>
                     {t('quotes.view.customerInfo')}
                   </h3>
                   {quote.customer ? (
-                    <div className="space-y-2">
-                      <p className="font-medium text-lg">{quote.customer.name}</p>
-                      {quote.customer.email && (
-                        <p className="flex items-center text-gray-600 dark:text-gray-300">
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                          {quote.customer.email}
-                        </p>
-                      )}
-                      {quote.customer.phone && (
-                        <p className="flex items-center text-gray-600 dark:text-gray-300">
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                          {quote.customer.phone}
-                        </p>
-                      )}
-                      {quote.customer.address && (
-                        <p className="flex items-start text-gray-600 dark:text-gray-300">
-                          <svg className="w-4 h-4 mr-2 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span className="whitespace-pre-line">{quote.customer.address}</span>
-                        </p>
-                      )}
-                    </div>
+                    <dl className="space-y-3 text-sm">
+                      {/* Name */}
+                      <div className="grid grid-cols-3 gap-1">
+                        <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerNameLabel')}</dt>
+                        <dd className="col-span-2 font-medium">{quote.customer.name || '-'}</dd>
+                      </div>
+                      {/* Email */}
+                      <div className="grid grid-cols-3 gap-1">
+                         <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerEmailLabel')}</dt>
+                         <dd className="col-span-2">{quote.customer.email || '-'}</dd>
+                      </div>
+                      {/* Phone */}
+                      <div className="grid grid-cols-3 gap-1">
+                         <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerPhoneLabel')}</dt>
+                         <dd className="col-span-2">{quote.customer.phone || '-'}</dd>
+                      </div>
+                      {/* Address */}
+                      <div className="grid grid-cols-3 gap-1">
+                         <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerAddressLabel')}</dt>
+                         <dd className="col-span-2 whitespace-pre-line">{quote.customer.address || '-'}</dd>
+                      </div>
+                    </dl>
                   ) : (
-                    <p className="text-gray-500">Customer information not available</p>
+                    <p className="text-gray-500">{t('quotes.view.customerNotAvailable')}</p>
                   )}
                 </CardBody>
               </Card>
 
               {/* Quote Information */}
-              <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <CardBody>
-                  <h3 className="mb-3 text-lg font-semibold flex items-center">
-                    <DollarSign className="mr-2 text-green-500" size={20} />
-                    {t('quotes.view.quoteInfo')}
+              <Card className="border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                <CardHeader>
+                  <h3 className="flex items-center text-lg font-semibold">
+                    <FileText className="mr-2 text-green-500" size={20} />
+                    {t('quotes.view.quoteSummary')}
                   </h3>
-                  <div className="space-y-2">
-                    <p className="flex items-center"><span className="font-medium min-w-24">{t('quotes.view.createdOn')}</span> {formatDate(quote.createdAt)}</p>
-                    <p className="flex items-center"><span className="font-medium min-w-24">{t('quotes.view.lastUpdated')}</span> {formatDate(quote.updatedAt)}</p>
-                    <p className="flex items-center"><span className="font-medium min-w-24">{t('quotes.view.markup')}</span> {quote.markupPercentage}%</p>
-                    
+                </CardHeader>
+                <CardBody>
+                  <dl className="space-y-3">
+                    {/* Created/Updated Dates */}
+                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                      <span>{t('quotes.view.createdOn')}</span>
+                      <span>{formatDate(quote.createdAt)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                      <span>{t('quotes.view.lastUpdated')}</span>
+                      <span>{formatDate(quote.updatedAt)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                      <span>{t('quotes.view.markup')}</span>
+                      <span>{quote.markupPercentage * 100}%</span>
+                    </div>
+
                     {totals && (
-                      <div className="mt-4 pt-4 border-t">
+                      <div className="mt-4 border-t pt-4">
                         <div className="flex justify-between py-1 text-gray-700 dark:text-gray-300">
                           <span>{t('quotes.view.subtotal')}:</span>
                           <span>{formatCurrency(totals.subtotal)}</span>
                         </div>
                         <div className="flex justify-between py-1 text-gray-700 dark:text-gray-300">
-                          <span>{t('quotes.summary.markupCalculated')} ({quote.markupPercentage}%):</span>
+                          <span>
+                            {t('quotes.summary.markupCalculated')} ({quote.markupPercentage}%)
+                          </span>
                           <span>{formatCurrency(totals.markupAmount)}</span>
                         </div>
-                        <div className="flex justify-between py-1 font-bold text-lg mt-2">
-                          <span>{t('quotes.view.grandTotal')}:</span>
+                        <div className="mt-2 flex justify-between py-1 text-lg font-bold">
+                          <span>{t('quotes.view.grandTotal')}</span>
                           <span>{formatCurrency(totals.grandTotal)}</span>
                         </div>
                       </div>
                     )}
-                  </div>
+                  </dl>
                 </CardBody>
               </Card>
             </div>
@@ -397,22 +447,38 @@ function QuoteDetailContent() {
               <>
                 <Divider className="my-6" />
                 <div>
-                  <h3 className="mb-4 text-lg font-semibold flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  <h3 className="mb-4 flex items-center text-lg font-semibold">
+                    <svg
+                      className="mr-2 h-5 w-5 text-purple-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                      />
                     </svg>
                     {t('quotes.view.costBreakdown')}
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <Card className="border border-blue-100 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20">
                       <CardBody>
-                        <h4 className="text-sm text-blue-700 dark:text-blue-300 mb-1">{t('quotes.view.labor')}</h4>
+                        <h4 className="mb-1 text-sm text-blue-700 dark:text-blue-300">
+                          {t('quotes.view.labor')}
+                        </h4>
                         <p className="text-lg font-bold">{formatCurrency(totals.laborTotal)}</p>
                         <div className="mt-2">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span>{Math.round(totals.laborPercentage)}% {t('quotes.view.percentOfTotal')}</span>
+                          <div className="mb-1 flex justify-between text-xs">
+                            <span>
+                              {Math.round(totals.laborPercentage)}%{' '}
+                              {t('quotes.view.percentOfTotal')}
+                            </span>
                           </div>
-                          <Progress 
+                          <Progress
                             value={totals.laborPercentage}
                             color="primary"
                             aria-label="Labor percentage"
@@ -421,16 +487,21 @@ function QuoteDetailContent() {
                         </div>
                       </CardBody>
                     </Card>
-                    
-                    <Card className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800">
+
+                    <Card className="border border-green-100 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
                       <CardBody>
-                        <h4 className="text-sm text-green-700 dark:text-green-300 mb-1">{t('quotes.view.materials')}</h4>
+                        <h4 className="mb-1 text-sm text-green-700 dark:text-green-300">
+                          {t('quotes.view.materials')}
+                        </h4>
                         <p className="text-lg font-bold">{formatCurrency(totals.materialsTotal)}</p>
                         <div className="mt-2">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span>{Math.round(totals.materialsPercentage)}% {t('quotes.view.percentOfTotal')}</span>
+                          <div className="mb-1 flex justify-between text-xs">
+                            <span>
+                              {Math.round(totals.materialsPercentage)}%{' '}
+                              {t('quotes.view.percentOfTotal')}
+                            </span>
                           </div>
-                          <Progress 
+                          <Progress
                             value={totals.materialsPercentage}
                             color="success"
                             aria-label="Materials percentage"
@@ -439,16 +510,21 @@ function QuoteDetailContent() {
                         </div>
                       </CardBody>
                     </Card>
-                    
-                    <Card className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800">
+
+                    <Card className="border border-amber-100 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
                       <CardBody>
-                        <h4 className="text-sm text-amber-700 dark:text-amber-300 mb-1">{t('quotes.summary.markupCalculated')}</h4>
+                        <h4 className="mb-1 text-sm text-amber-700 dark:text-amber-300">
+                          {t('quotes.summary.markupCalculated')}
+                        </h4>
                         <p className="text-lg font-bold">{formatCurrency(totals.markupAmount)}</p>
                         <div className="mt-2">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span>{Math.round(totals.markupPercentage)}% {t('quotes.view.percentOfTotal')}</span>
+                          <div className="mb-1 flex justify-between text-xs">
+                            <span>
+                              {Math.round(totals.markupPercentage)}%{' '}
+                              {t('quotes.view.percentOfTotal')}
+                            </span>
                           </div>
-                          <Progress 
+                          <Progress
                             value={totals.markupPercentage}
                             color="warning"
                             aria-label="Markup percentage"
@@ -467,13 +543,24 @@ function QuoteDetailContent() {
               <>
                 <Divider className="my-6" />
                 <div>
-                  <h3 className="mb-2 text-lg font-semibold flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  <h3 className="mb-2 flex items-center text-lg font-semibold">
+                    <svg
+                      className="mr-2 h-5 w-5 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
                     </svg>
                     {t('quotes.view.notes')}
                   </h3>
-                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
                     <p className="whitespace-pre-wrap">{quote.notes}</p>
                   </div>
                 </div>
@@ -483,7 +570,7 @@ function QuoteDetailContent() {
             {/* Tasks Section */}
             <Divider className="my-6" />
             <div>
-              <h3 className="mb-4 text-lg font-semibold flex items-center">
+              <h3 className="mb-4 flex items-center text-lg font-semibold">
                 <Hammer className="mr-2 text-orange-500" size={20} />
                 {t('quotes.view.tasks')}
               </h3>
@@ -492,62 +579,72 @@ function QuoteDetailContent() {
                   {quote.tasks.map((task) => {
                     const taskTotal = getTaskTotal(task);
                     const isExpanded = expandedTask === task.id;
-                    
+
                     // Calculate labor and materials percentage for this task
                     const laborCost = parseFloat(String(task.price) || '0');
                     let materialsCost = 0;
-                    
+
                     if (task.materialType === 'LUMPSUM' && task.estimatedMaterialsCostLumpSum) {
                       materialsCost = parseFloat(String(task.estimatedMaterialsCostLumpSum) || '0');
-                    } else if (task.materialType === 'ITEMIZED' && task.materials && task.materials.length > 0) {
+                    } else if (
+                      task.materialType === 'ITEMIZED' &&
+                      task.materials &&
+                      task.materials.length > 0
+                    ) {
                       materialsCost = task.materials.reduce((sum, material) => {
-                        return sum + 
-                          parseFloat(String(material.quantity) || '0') * 
-                          parseFloat(String(material.unitPrice) || '0');
+                        return (
+                          sum +
+                          parseFloat(String(material.quantity) || '0') *
+                            parseFloat(String(material.unitPrice) || '0')
+                        );
                       }, 0);
                     }
-                    
+
                     const laborPercent = (laborCost / taskTotal) * 100;
                     const materialsPercent = (materialsCost / taskTotal) * 100;
-                    
+
                     return (
-                      <Card 
-                        key={task.id} 
-                        className={`border border-gray-200 dark:border-gray-700 transition-all duration-300 ${
+                      <Card
+                        key={task.id}
+                        className={`border border-gray-200 transition-all duration-300 dark:border-gray-700 ${
                           isExpanded ? 'shadow-md' : 'hover:shadow-sm'
                         }`}
                       >
                         <CardBody className="p-4">
-                          <div 
-                            className="flex justify-between cursor-pointer" 
+                          <div
+                            className="flex cursor-pointer justify-between"
                             onClick={() => toggleTaskExpand(task.id)}
                           >
                             <div className="flex-1">
                               <div className="flex items-center">
-                                <ChevronDown 
-                                  size={16} 
+                                <ChevronDown
+                                  size={16}
                                   className={`mr-2 transition-transform duration-300 ${
                                     isExpanded ? 'rotate-180' : ''
-                                  }`} 
+                                  }`}
                                 />
                                 <h4 className="font-medium">{task.description}</h4>
                               </div>
                             </div>
                             <div className="flex items-center space-x-4">
                               <Badge color="default" variant="flat" className="hidden md:flex">
-                                {task.materialType === 'LUMPSUM' ? t('quotes.view.lumpSum') : t('quotes.view.itemized')}
+                                {task.materialType === 'LUMPSUM'
+                                  ? t('quotes.view.lumpSum')
+                                  : t('quotes.view.itemized')}
                               </Badge>
                               <div className="text-right">
                                 <span className="font-semibold">{formatCurrency(taskTotal)}</span>
                               </div>
                             </div>
                           </div>
-                          
+
                           {isExpanded && (
-                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div>
-                                  <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('quotes.view.taskDetails')}</h5>
+                                  <h5 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {t('quotes.view.taskDetails')}
+                                  </h5>
                                   <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
                                       <span>{t('quotes.view.labor')}:</span>
@@ -563,28 +660,30 @@ function QuoteDetailContent() {
                                     </div>
                                   </div>
                                 </div>
-                                
+
                                 <div>
-                                  <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('quotes.view.costDistribution')}</h5>
+                                  <h5 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {t('quotes.view.costDistribution')}
+                                  </h5>
                                   <div className="space-y-3">
                                     <div>
-                                      <div className="flex justify-between text-xs mb-1">
+                                      <div className="mb-1 flex justify-between text-xs">
                                         <span>{t('quotes.view.labor')}</span>
                                         <span>{Math.round(laborPercent)}%</span>
                                       </div>
-                                      <Progress 
-                                        value={laborPercent} 
-                                        color="primary" 
+                                      <Progress
+                                        value={laborPercent}
+                                        color="primary"
                                         className="h-2"
                                       />
                                     </div>
                                     <div>
-                                      <div className="flex justify-between text-xs mb-1">
+                                      <div className="mb-1 flex justify-between text-xs">
                                         <span>{t('quotes.view.materials')}</span>
                                         <span>{Math.round(materialsPercent)}%</span>
                                       </div>
-                                      <Progress 
-                                        value={materialsPercent} 
+                                      <Progress
+                                        value={materialsPercent}
                                         color="success"
                                         className="h-2"
                                       />
@@ -592,51 +691,79 @@ function QuoteDetailContent() {
                                   </div>
                                 </div>
                               </div>
-                              
-                              {task.materialType === 'ITEMIZED' && task.materials && task.materials.length > 0 && (
-                                <div className="mt-4">
-                                  <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('quotes.view.materials')}</h5>
-                                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                                    <div className="overflow-x-auto">
-                                      <table className="min-w-full">
-                                        <thead>
-                                          <tr className="text-xs text-gray-500 dark:text-gray-400 border-b">
-                                            <th className="pb-2 text-left">{t('quotes.view.item')}</th>
-                                            <th className="pb-2 text-right">{t('quotes.view.quantity')}</th>
-                                            <th className="pb-2 text-right">{t('quotes.view.unitPrice')}</th>
-                                            <th className="pb-2 text-right">{t('quotes.view.total')}</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {task.materials.map((material, idx) => {
-                                            const quantity = parseFloat(String(material.quantity) || '0');
-                                            const unitPrice = parseFloat(String(material.unitPrice) || '0');
-                                            const total = quantity * unitPrice;
-                                            
-                                            return (
-                                              <tr key={idx} className="text-sm border-b border-gray-100 dark:border-gray-700 last:border-0">
-                                                <td className="py-2">{material.productName || 'Unknown Product'}</td>
-                                                <td className="py-2 text-right">{quantity}</td>
-                                                <td className="py-2 text-right">{formatCurrency(unitPrice)}</td>
-                                                <td className="py-2 text-right font-medium">{formatCurrency(total)}</td>
-                                              </tr>
-                                            );
-                                          })}
-                                        </tbody>
-                                      </table>
+
+                              {task.materialType === 'ITEMIZED' &&
+                                task.materials &&
+                                task.materials.length > 0 && (
+                                  <div className="mt-4">
+                                    <h5 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                      {t('quotes.view.materials')}
+                                    </h5>
+                                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+                                      <div className="overflow-x-auto">
+                                        <table className="min-w-full">
+                                          <thead>
+                                            <tr className="border-b text-xs text-gray-500 dark:text-gray-400">
+                                              <th className="pb-2 text-left">
+                                                {t('quotes.view.item')}
+                                              </th>
+                                              <th className="pb-2 text-right">
+                                                {t('quotes.view.quantity')}
+                                              </th>
+                                              <th className="pb-2 text-right">
+                                                {t('quotes.view.unitPrice')}
+                                              </th>
+                                              <th className="pb-2 text-right">
+                                                {t('quotes.view.total')}
+                                              </th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {task.materials.map((material, idx) => {
+                                              const quantity = parseFloat(
+                                                String(material.quantity) || '0'
+                                              );
+                                              const unitPrice = parseFloat(
+                                                String(material.unitPrice) || '0'
+                                              );
+                                              const total = quantity * unitPrice;
+
+                                              return (
+                                                <tr
+                                                  key={idx}
+                                                  className="border-b border-gray-100 text-sm last:border-0 dark:border-gray-700"
+                                                >
+                                                  <td className="py-2">
+                                                    {material.productName || 'Unknown Product'}
+                                                  </td>
+                                                  <td className="py-2 text-right">{quantity}</td>
+                                                  <td className="py-2 text-right">
+                                                    {formatCurrency(unitPrice)}
+                                                  </td>
+                                                  <td className="py-2 text-right font-medium">
+                                                    {formatCurrency(total)}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              )}
-                              
-                              {task.materialType === 'LUMPSUM' && task.estimatedMaterialsCostLumpSum && (
-                                <div className="mt-4">
-                                  <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('quotes.view.materialsLumpSum')}</h5>
-                                  <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                                    <p className="font-medium">{formatCurrency(materialsCost)}</p>
+                                )}
+
+                              {task.materialType === 'LUMPSUM' &&
+                                task.estimatedMaterialsCostLumpSum && (
+                                  <div className="mt-4">
+                                    <h5 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                      {t('quotes.view.materialsLumpSum')}
+                                    </h5>
+                                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+                                      <p className="font-medium">{formatCurrency(materialsCost)}</p>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
                             </div>
                           )}
                         </CardBody>
@@ -662,11 +789,13 @@ function QuoteDetailContent() {
                 <ModalBody>
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500 mb-1">{t('quotes.statusChange.current')}</p>
+                      <p className="mb-1 text-sm text-gray-500">
+                        {t('quotes.statusChange.current')}
+                      </p>
                       <QuoteStatusBadge status={quote.status} size="md" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 mb-1">{t('quotes.statusChange.new')}</p>
+                      <p className="mb-1 text-sm text-gray-500">{t('quotes.statusChange.new')}</p>
                       <Select
                         aria-label="Status"
                         value={newStatus || quote.status}
@@ -690,18 +819,10 @@ function QuoteDetailContent() {
                   </div>
                 </ModalBody>
                 <ModalFooter>
-                  <Button
-                    color="default"
-                    variant="flat"
-                    onPress={onClose}
-                  >
+                  <Button color="default" variant="flat" onPress={onClose}>
                     {t('quotes.statusChange.cancel')}
                   </Button>
-                  <Button
-                    color="primary"
-                    onPress={handleStatusChange}
-                    isLoading={isStatusUpdating}
-                  >
+                  <Button color="primary" onPress={handleStatusChange} isLoading={isStatusUpdating}>
                     {t('quotes.statusChange.submit')}
                   </Button>
                 </ModalFooter>
@@ -724,4 +845,4 @@ function QuoteDetailContent() {
   );
 }
 
-export default withMainLayout(QuoteDetailContent); 
+export default withMainLayout(QuoteDetailContent);

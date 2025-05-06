@@ -48,11 +48,11 @@ export const api = createTRPCNext<AppRouter>({
       queryClientConfig: {
         defaultOptions: {
           queries: {
-            staleTime: Infinity, // 30 seconds by default for more frequent refresh
-            refetchOnWindowFocus: false, // Refresh data when window regains focus
-            refetchOnReconnect: false, // Refresh when reconnecting
-            refetchOnMount: false, // Refresh when component mounts
-            // Set up retry behavior
+            staleTime: 0, // Mark data as stale immediately
+            gcTime: 0,    // Remove inactive queries immediately
+            refetchOnWindowFocus: false, // Keep this disabled
+            refetchOnReconnect: false, // Keep this disabled
+            refetchOnMount: true, // Refetch when component mounts
             retry: false,
           },
           mutations: {

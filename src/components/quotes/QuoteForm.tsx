@@ -165,7 +165,7 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
 
   // Reset form if initialValues change (e.g., navigating between new/edit)
   useEffect(() => {
-    if (initialValues) {
+    if (quoteId) {
       // Deep compare or use a version/timestamp if needed for complex scenarios
       // For simplicity, resetting based on quoteId presence change
       reset({
@@ -179,7 +179,7 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
       setSelectedTaskIndex(null); // Reset selection on form reset
       setIsDrawerOpen(false);
     }
-  }, [initialValues, reset]);
+  }, [quoteId, reset]);
 
   // Map taskFields from RHF to TaskItem array expected by TaskMasterList
   const watchedTasksData = watch('tasks'); // Watch the whole tasks array for rendering the list

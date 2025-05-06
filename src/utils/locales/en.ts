@@ -366,7 +366,18 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.markupChargeLabel': 'Markup Charge',
   'quotes.markupPercentageLabel': 'Markup Percentage',
   'quotes.addTaskButton': 'Add Task',
-  'quotes.noTasksPlaceholder': 'No tasks added yet'
+  'quotes.noTasksPlaceholder': 'No tasks added yet',
+
+  // --- New keys for Quote View Page --- //
+  'quotes.view.customerNotAvailable': 'Customer information not available',
+  'quotes.view.quoteSummary': 'Quote Summary',
+  'quotes.summary.markupApplied': 'Markup Applied',
+  'quotes.view.totalsNotCalculated': 'Totals could not be calculated.',
+  // Labels for Customer Info Card on Quote View
+  'quotes.view.customerNameLabel': 'Name:',
+  'quotes.view.customerEmailLabel': 'Email:',
+  'quotes.view.customerPhoneLabel': 'Phone:',
+  'quotes.view.customerAddressLabel': 'Address:',
 };
 
 export default enTranslations;

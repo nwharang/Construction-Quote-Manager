@@ -264,14 +264,12 @@ export class QuoteService extends BaseService {
     let calculatedSubtotalMaterials = 0;
 
     quoteTasks.forEach((task) => {
-      // Add task price (labor)
-      calculatedSubtotalTasks += this.toNumber(task.price);
-
-      // Add material cost for the task
-      calculatedSubtotalMaterials += this.calculateTaskMaterialsTotalInternal(task);
+      const taskPrice = this.toNumber(task.price);
+      const taskMaterialCost = this.calculateTaskMaterialsTotalInternal(task);
+      calculatedSubtotalTasks += taskPrice;
+      calculatedSubtotalMaterials += taskMaterialCost;
     });
 
-    // Round the basic subtotals
     const subtotalTasks = this.roundCurrency(calculatedSubtotalTasks);
     const subtotalMaterials = this.roundCurrency(calculatedSubtotalMaterials);
     const subtotalCombined = this.roundCurrency(subtotalTasks + subtotalMaterials);
@@ -294,27 +292,22 @@ export class QuoteService extends BaseService {
       });
     }
 
-    const markupPercentageInput = this.toNumber(quote.markupPercentage) / 100; // As decimal
+    const markupPercentageInput = this.toNumber(quote.markupPercentage);
     const complexityChargeValue = this.toNumber(quote.complexityCharge); // Fixed value
-    const existingMarkupChargeValue = this.toNumber(quote.markupCharge); // Fixed value
 
     // Calculate charges based on combined subtotal
     const calculatedComplexityCharge = this.roundCurrency(
-      subtotalCombined * (complexityChargeValue / 100)
-    ); // Assuming complexityCharge is also a percentage stored as number
+      subtotalCombined * (complexityChargeValue / 100) // Assuming complexityCharge is a % stored as number needing conversion
+    );
 
     const markupBase = this.roundCurrency(subtotalCombined + calculatedComplexityCharge);
 
-    // Use existing fixed markup if > 0, otherwise calculate based on percentage
-    const calculatedMarkupCharge =
-      existingMarkupChargeValue > 0
-        ? existingMarkupChargeValue
-        : this.roundCurrency(markupBase * markupPercentageInput);
+    // ALWAYS recalculate markup based on percentage during recalculation
+    const calculatedMarkupCharge = this.roundCurrency(markupBase * markupPercentageInput); // Use direct decimal
 
     // Calculate grand total
-    const grandTotal = this.roundCurrency(
-      subtotalCombined + calculatedComplexityCharge + calculatedMarkupCharge
-    );
+    const rawGrandTotal = subtotalCombined + calculatedComplexityCharge + calculatedMarkupCharge;
+    const grandTotal = this.roundCurrency(rawGrandTotal); // Use roundCurrency helper
 
     // --- End Refactored Calculation Logic ---
 
@@ -324,14 +317,13 @@ export class QuoteService extends BaseService {
       .set({
         subtotalTasks: subtotalTasks.toString(),
         subtotalMaterials: subtotalMaterials.toString(),
-        // Only update markupCharge if it wasn't a fixed value override
-        ...(existingMarkupChargeValue <= 0 && { markupCharge: calculatedMarkupCharge.toString() }),
-        // Keep existing complexity charge value as it's likely fixed input, not calculated % for storage
-        // complexityCharge: calculatedComplexityCharge.toString(), // Usually complexity charge is fixed, not recalculated percentage stored
+        markupCharge: calculatedMarkupCharge.toString(), // Store the calculated markup amount
         grandTotal: grandTotal.toString(),
         updatedAt: new Date(),
       })
       .where(eq(quotes.id, quoteId));
+
+    return { success: true };
   }
 
   /**
