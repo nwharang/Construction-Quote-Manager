@@ -162,7 +162,6 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
 
   // Watch tasks array for summary calculation
   const watchedTasks = watch('tasks');
-  const watchedMarkup = watch('markupPercentage');
 
   // Reset form if initialValues change (e.g., navigating between new/edit)
   useEffect(() => {
@@ -221,14 +220,11 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
         </DrawerBody>
         <DrawerFooter>
           <div className="flex justify-end space-x-3">
-            <Button
-              variant="flat"
-              color="default"
-              onPress={handleTaskDrawerClose}
-            >
+            <Button variant="flat" color="default" onPress={handleTaskDrawerClose}>
               {t('common.close')}
             </Button>
             <Button
+              type="button"
               color="primary"
               variant="solid"
               startContent={<Save size={16} />}
@@ -288,23 +284,13 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
                   label={t('quoteSummary.markupInputLabel')}
                   value={value ?? 0}
                   onValueChange={(val) => {
-                    // Handle value directly if it's a number
                     if (typeof val === 'number') {
                       onChange(val);
                       return;
                     }
 
-                    // Handle event objects
-                    const targetValue =
-                      typeof val === 'object' && val !== null && 'target' in val
-                        ? (val as { target: { value: string } }).target.value
-                        : val;
+                    const numValue = parseFloat(val || '0');
 
-                    // Clean the value (remove % symbols if present)
-                    const strValue = String(targetValue).replace(/%/g, '');
-                    const numValue = parseFloat(strValue || '0');
-
-                    // Update with the numeric value - 50 means 50%, not 0.5
                     onChange(isNaN(numValue) ? 0 : numValue);
                   }}
                   disabled={isSubmitting}
@@ -384,7 +370,7 @@ export function QuoteForm({ initialValues, onSubmit, isSubmitting, quoteId }: Qu
       </Drawer>
 
       {/* --- Quote Summary --- */}
-      <QuoteSummary tasks={watchedTasks} markupPercentage={watchedMarkup ?? 0} />
+      <QuoteSummary tasks={watchedTasks} markupPercentage={watch('markupPercentage')} />
 
       {/* --- Form Actions --- */}
       <div className="mt-8 flex justify-end space-x-4">

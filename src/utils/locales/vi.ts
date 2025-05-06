@@ -150,7 +150,8 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.print.subtotal': 'Tổng phụ',
   'quotes.print.markup': 'Tăng giá ({percentage}%)',
   'quotes.print.grandTotal': 'Tổng cộng',
-  'quotes.print.footerNote': 'Tài liệu này được tạo vào ngày {date} và chỉ dành cho mục đích ước tính.',
+  'quotes.print.footerNote':
+    'Tài liệu này được tạo vào ngày {date} và chỉ dành cho mục đích ước tính.',
   'quotes.print.quoteInformation': 'Thông tin Báo giá',
   'quotes.print.title': 'Tiêu đề:',
   'quotes.print.tasksAndMaterials': 'Công việc & Vật liệu',
@@ -159,7 +160,8 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.print.materials': 'Vật liệu',
   'quotes.print.summary': 'Tổng kết',
   'quotes.print.notes': 'Ghi chú',
-  'quotes.print.generatedMessage': 'Tài liệu này được tạo vào ngày {date} và chỉ dành cho mục đích ước tính.',
+  'quotes.print.generatedMessage':
+    'Tài liệu này được tạo vào ngày {date} và chỉ dành cho mục đích ước tính.',
   'quotes.taskDescriptionLabel': 'Mô tả Công việc',
   'quotes.taskDescriptionPlaceholder': 'Nhập mô tả công việc...',
   'quotes.taskPriceLabel': 'Giá Công việc',
@@ -262,7 +264,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.title': 'Báo giá',
   'settings.pageTitle': 'Cài đặt',
   'categories.edit.pageTitle': 'Sửa Danh Mục',
-  
+
   // Company settings
   'settings.company.title': 'Thông tin công ty',
   'settings.company.name': 'Tên công ty',
@@ -272,7 +274,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'settings.company.taxId': 'Mã số thuế',
   'settings.company.logo': 'Logo công ty',
   'settings.company.website': 'Trang web',
-  
+
   // Profile settings
   'settings.profile.title': 'Hồ sơ',
   'settings.profile.name': 'Tên',
@@ -280,46 +282,46 @@ const viTranslations: Record<TranslationKey, string> = {
   'settings.profile.phone': 'Điện thoại',
   'settings.profile.position': 'Chức vụ',
   'settings.profile.language': 'Ngôn ngữ ưa thích',
-  
+
   // Appearance settings
   'settings.appearance.title': 'Giao diện',
   'settings.appearance.theme': 'Chủ đề',
   'settings.appearance.density': 'Mật độ hiển thị',
   'settings.appearance.density.compact': 'Gọn gàng',
   'settings.appearance.density.comfortable': 'Thoải mái',
-  
+
   // Notification settings
   'settings.notifications.title': 'Thông báo',
   'settings.notifications.email': 'Thông báo qua Email',
   'settings.notifications.app': 'Thông báo ứng dụng',
   'settings.notifications.quotes': 'Cập nhật Báo giá',
   'settings.notifications.customers': 'Cập nhật Khách hàng',
-  
+
   // Default settings
   'settings.defaults.title': 'Mặc định',
   'settings.defaults.currency': 'Tiền tệ',
   'settings.defaults.taxRate': 'Thuế suất',
   'settings.defaults.quoteExpiry': 'Thời hạn Báo giá (ngày)',
   'settings.defaults.terms': 'Điều khoản & Điều kiện mặc định',
-  
+
   // Security settings
   'settings.security.title': 'Bảo mật',
   'settings.security.changePassword': 'Đổi Mật khẩu',
   'settings.security.twoFactor': 'Xác thực Hai yếu tố',
   'settings.security.sessions': 'Phiên đang hoạt động',
   'settings.security.apiKeys': 'Khóa API',
-  
+
   // Action buttons
   'settings.actions.save': 'Lưu thay đổi',
   'settings.actions.cancel': 'Hủy',
   'settings.actions.reset': 'Đặt lại về mặc định',
   'settings.actions.upload': 'Tải lên',
   'settings.actions.remove': 'Xóa',
-  
+
   // Localization settings
   'settings.localization.title': 'Bản địa hóa',
   'settings.localization.description': 'Cấu hình ngôn ngữ và cài đặt khu vực',
-  
+
   // Quote view page translations
   'quotes.view.title': 'Chi tiết Báo giá',
   'quotes.view.backToQuotes': 'Quay lại Báo giá',
@@ -334,7 +336,6 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.view.grandTotal': 'Tổng cộng:',
   'quotes.view.costBreakdown': 'Phân tích Chi phí',
   'quotes.view.labor': 'Nhân công',
-  'quotes.view.materials': 'Vật liệu',
   'quotes.view.percentOfTotal': '% của tổng',
   'quotes.view.notes': 'Ghi chú',
   'quotes.view.tasks': 'Công việc',
@@ -348,7 +349,44 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.view.lumpSum': 'Tổng gộp',
   'quotes.view.itemized': 'Chi tiết',
   'quotes.view.materialsLumpSum': 'Vật liệu (Tổng gộp)',
+  'quotes.view.description': 'Mô tả',
+  'quotes.view.laborCost': 'Chi phí Nhân công',
+  'quotes.view.materials': 'Vật liệu',
+  'quotes.view.actions': 'Hành động',
   'quotes.summary.markupCalculated': 'Tính toán tăng giá',
+  'quotes.materialNameLabel': 'Tên Vật liệu',
+  'quotes.materialDescriptionLabel': 'Mô tả Vật liệu',
+  'quotes.materialQuantityLabel': 'Số lượng',
+  'quotes.materialUnitPriceLabel': 'Đơn giá',
+  'quotes.materialNotesLabel': 'Ghi chú',
+  'quotes.unitPriceLabel': 'Đơn giá',
+  'quotes.quantityLabel': 'Số lượng',
+  'quotes.notesPlaceholder': 'Nhập bất kỳ ghi chú nào...',
+  'quotes.productMaterialLabel': 'Sản phẩm/Vật liệu',
+  'quotes.addMaterialButton': 'Thêm Vật liệu',
+  'quotes.noMaterialsPlaceholder': 'Không có vật liệu nào được thêm vào',
+  'quotes.materialHeading': 'Vật liệu #{{index}}',
+  'quotes.createdAtLabel': 'Ngày tạo:',
+  'quotes.updatedAtLabel': 'Cập nhật lần cuối:',
+  'quotes.actionsLabel': 'Hành động',
+  'quotes.viewAction': 'Xem',
+  'quotes.editAction': 'Sửa',
+  'quotes.printAction': 'In',
+  'quotes.deleteAction': 'Xóa',
+  'quotes.deleteConfirmationTitle': 'Xóa Báo giá',
+  'quotes.deleteConfirmationMessage': 'Bạn có chắc chắn muốn xóa báo giá này không?',
+  'quotes.quoteDetailsTitle': 'Chi tiết Báo giá',
+  'quotes.customerDetailsTitle': 'Thông tin Khách hàng',
+  'quotes.quoteItemsTitle': 'Mục Báo giá',
+  'quotes.totalLabel': 'Tổng',
+  'quotes.grandTotalLabel': 'Tổng cộng',
+  'quotes.subtotalTasksLabel': 'Tổng phụ Công việc',
+  'quotes.subtotalMaterialsLabel': 'Tổng phụ Vật liệu',
+  'quotes.complexityChargeLabel': 'Phụ phí Độ phức tạp',
+  'quotes.markupChargeLabel': 'Phụ phí Tăng giá',
+  'quotes.markupPercentageLabel': 'Phần trăm Tăng giá',
+  'quotes.addTaskButton': 'Thêm Công việc',
+  'quotes.noTasksPlaceholder': 'Không có công việc nào được thêm vào',
 };
 
 export default viTranslations;

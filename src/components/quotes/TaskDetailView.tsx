@@ -66,7 +66,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
         shouldValidate: true,
       });
       // Product price is a string, parse it to number for the form field
-      const unitPrice = parseFloat(product.price); // Directly parse the string price
+      const unitPrice = parseFloat(product.unitPrice); // Directly parse the string price
       setValue(
         `tasks.${taskIndex}.materials.${materialIndex}.unitPrice`,
         isNaN(unitPrice) ? 0 : unitPrice,
@@ -190,13 +190,13 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
               startContent={<PlusCircle size={16} />}
               onPress={handleAddMaterial}
             >
-              Add Material
+              {t('quotes.addMaterialButton')}
             </Button>
           </div>
 
           {materialFields.length === 0 && (
             <p className="py-2 text-center text-gray-500 dark:text-gray-400">
-              No materials added yet
+              {t('quotes.noMaterialsPlaceholder')}
             </p>
           )}
 
@@ -208,7 +208,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                 className="rounded-md border border-gray-200 p-3 dark:border-gray-600"
               >
                 <div className="mb-2 flex justify-between">
-                  <h5 className="text-sm font-medium">Material #{materialIndex + 1}</h5>
+                  <h5 className="text-sm font-medium">{t('quotes.materialHeading', { index: materialIndex + 1 })}</h5>
                   <Button
                     color="danger"
                     variant="light"
@@ -227,7 +227,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                     control={control}
                     render={({ field }) => (
                       <ProductSelector
-                        label="Product/Material"
+                        label={t('quotes.productMaterialLabel')}
                         value={field.value}
                         onChange={(selectedProduct) =>
                           handleProductSelection(materialIndex, selectedProduct as Product | null)
@@ -246,7 +246,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                       control={control}
                       render={({ field: { onChange, value, ...fieldProps } }) => (
                         <IntegerInput
-                          label="Quantity"
+                          label={t('quotes.quantityLabel')}
                           value={value}
                           onValueChange={(val) => {
                             // Handle value directly if it's a number
@@ -272,7 +272,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                       control={control}
                       render={({ field: { onChange, value, ...fieldProps } }) => (
                         <CurrencyInput
-                          label="Unit Price"
+                          label={t('quotes.unitPriceLabel')}
                           value={value ?? 0}
                           onValueChange={(val) => {
                             // Handle value directly if it's a number
@@ -294,8 +294,8 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                 {/* Optional Notes Field */}
                 <div>
                   <Textarea
-                    label="Notes"
-                    placeholder="Enter any notes..."
+                    label={t('quotes.notesLabel')}
+                    placeholder={t('quotes.notesPlaceholder')}
                     {...register(`tasks.${taskIndex}.materials.${materialIndex}.notes`)}
                     errorMessage={materialErrors?.notes?.message}
                     isInvalid={!!materialErrors?.notes}

@@ -94,11 +94,11 @@ export const TaskMasterList: React.FC<TaskMasterListProps> = ({
           }}
         >
           <TableHeader>
-            <TableColumn>DESCRIPTION</TableColumn>
-            <TableColumn>LABOR COST</TableColumn>
-            <TableColumn>MATERIALS</TableColumn>
-            <TableColumn>TOTAL</TableColumn>
-            <TableColumn width={120}>ACTIONS</TableColumn>
+            <TableColumn>{t('quotes.view.description')}</TableColumn>
+            <TableColumn>{t('quotes.view.laborCost')}</TableColumn>
+            <TableColumn>{t('quotes.view.materials')}</TableColumn>
+            <TableColumn>{t('quotes.view.total')}</TableColumn>
+            <TableColumn width={120}>{t('quotes.view.actions')}</TableColumn>
           </TableHeader>
           <TableBody>
             {tasks.map((task, index) => {

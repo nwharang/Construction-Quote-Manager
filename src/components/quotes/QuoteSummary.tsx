@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Card, CardBody, Divider } from '@heroui/react';
 import { useTranslation } from '~/hooks/useTranslation';
 // Assuming formatCurrency is available via useTranslation or a separate util
@@ -33,7 +33,7 @@ export const QuoteSummary: React.FC<QuoteSummaryProps> = ({ tasks, markupPercent
     });
 
     const subtotalCombined = subtotalTasks + subtotalMaterials;
-    const markupAmount = (subtotalCombined * Number(markupPercentage || 0)) / 100;
+    const markupAmount = subtotalCombined * Number(markupPercentage || 0);
     const grandTotal = subtotalCombined + markupAmount;
 
     return {

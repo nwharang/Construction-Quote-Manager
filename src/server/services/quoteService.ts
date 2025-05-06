@@ -392,7 +392,8 @@ export class QuoteService extends BaseService {
       }[];
     };
   }) {
-    return this.db.transaction(async (tx) => {
+    // Capture the result of the transaction
+    const transactionResult = await this.db.transaction(async (tx) => {
       // 1. Fetch existing quote ... (no change here)
       const [existingQuote] = await tx.select().from(quotes).where(eq(quotes.id, id)).limit(1);
 
@@ -415,135 +416,143 @@ export class QuoteService extends BaseService {
       }
 
       // 3. Handle Task Updates/Creations/Deletions
-      if (data.tasks) {
-        const taskIds = data.tasks.map((task) => task.id).filter(Boolean) as string[];
-        const existingTaskIds = (
-          await tx.select({ id: tasks.id }).from(tasks).where(eq(tasks.quoteId, id))
-        ).map((t) => t.id);
+      if (data.tasks !== undefined) { // Check if tasks array is provided, even if empty
+        const incomingTasks = data.tasks;
+        const quoteId = id;
 
-        // Delete tasks not present in the input
-        const tasksToDelete = existingTaskIds.filter((tid) => !taskIds.includes(tid));
-        if (tasksToDelete.length > 0) {
-          // First delete associated materials
-          await tx.delete(materials).where(inArray(materials.taskId, tasksToDelete));
-          // Then delete the tasks
-          await tx.delete(tasks).where(inArray(tasks.id, tasksToDelete));
+        // --- Task Handling Refactor ---
+
+        // 1. Delete all existing tasks and their materials for this quote
+        // Get existing task IDs first to delete their materials
+        const existingTaskIdsQuery = tx
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(eq(tasks.quoteId, quoteId));
+
+        const existingTaskIds = (await existingTaskIdsQuery).map(t => t.id);
+
+        if (existingTaskIds.length > 0) {
+          // Delete associated materials first
+          await tx.delete(materials).where(inArray(materials.taskId, existingTaskIds));
+          // Then delete the tasks themselves
+          await tx.delete(tasks).where(eq(tasks.quoteId, quoteId));
         }
 
-        // Update or Insert tasks
-        for (const [index, taskData] of data.tasks.entries()) {
-          const taskPayload = {
-            quoteId: id,
-            description: taskData.description ?? '', // Ensure default
-            price: taskData.price?.toString() ?? '0', // Ensure default
+        // 2. Prepare and Bulk Insert all incoming tasks
+        const newTasksToInsert: (typeof tasks.$inferInsert)[] = [];
+        const materialsToInsert: (typeof materials.$inferInsert)[] = [];
+        const taskMaterialMap: Record<number, { taskId: string; materials: any[] }> = {}; // Map task index to its materials
+
+
+        for (const [index, taskData] of incomingTasks.entries()) {
+           // Generate a new UUID for each task *before* inserting
+           // Drizzle doesn't auto-generate UUIDs on bulk insert if the column allows null/undefined
+           // We need the ID immediately to link materials
+          const newTaskId = crypto.randomUUID();
+
+          newTasksToInsert.push({
+            id: newTaskId, // Assign the generated ID
+            quoteId: quoteId,
+            description: taskData.description ?? '',
+            price: taskData.price?.toString() ?? '0',
             estimatedMaterialsCostLumpSum:
-              taskData.estimatedMaterialsCostLumpSum?.toString() ?? null, // Corrected field name
-            materialType: taskData.materialType?.toUpperCase() as
-              | 'LUMPSUM'
-              | 'ITEMIZED'
-              | undefined, // Convert to UPPERCASE
+              taskData.estimatedMaterialsCostLumpSum?.toString() ?? null,
+            materialType: taskData.materialType?.toUpperCase() as 'LUMPSUM' | 'ITEMIZED' ?? 'LUMPSUM',
             order: index,
+            createdAt: new Date(),
             updatedAt: new Date(),
-          };
+          });
 
-          if (taskData.id && existingTaskIds.includes(taskData.id)) {
-            // Update existing task
-            await tx.update(tasks).set(taskPayload).where(eq(tasks.id, taskData.id));
-          } else {
-            // Insert new task
-            const [newTask] = await tx
-              .insert(tasks)
-              .values({
-                ...taskPayload,
-                createdAt: new Date(),
-                id: undefined,
-              })
-              .returning({ id: tasks.id });
-            if (!newTask?.id) {
-              console.error('Failed to insert task or retrieve ID for task:', taskData.description);
-              continue; // Prevent material processing
-            }
-          }
+          // Store materials temporarily, linked to the new task ID and original index
+           if (taskData.materialType === 'itemized' && taskData.materials) {
+             taskMaterialMap[index] = { taskId: newTaskId, materials: taskData.materials };
+           }
+        }
 
-          // Handle Materials for the current task
-          if (taskData.materialType === 'itemized' && taskData.id) {
-            const materialIds =
-              (taskData.materials?.map((mat) => mat.id).filter(Boolean) as string[]) || [];
-            const existingMaterialIds = (
-              await tx
-                .select({ id: materials.id })
-                .from(materials)
-                .where(eq(materials.taskId, taskData.id))
-            ).map((m) => m.id);
-
-            // Delete materials not present in the input
-            const materialsToDelete = existingMaterialIds.filter(
-              (mid) => !materialIds.includes(mid)
-            );
-            if (materialsToDelete.length > 0) {
-              await tx.delete(materials).where(inArray(materials.id, materialsToDelete));
-            }
-
-            // Update or Insert materials
-            if (taskData.materials) {
-              for (const materialData of taskData.materials) {
-                if (!materialData.productId) {
-                  console.warn(
-                    `Skipping material '${materialData.name}' due to missing productId for task ${taskData.id}`
-                  );
-                  continue;
-                }
-
-                // Prepare payload - REMOVE name entirely
-                const materialPayload = {
-                  taskId: taskData.id,
-                  productId: materialData.productId,
-                  quantity: materialData.quantity ?? 1,
-                  unitPrice: materialData.unitPrice?.toString() ?? '0',
-                  notes: materialData.notes || undefined,
-                  updatedAt: new Date(),
-                };
-
-                // Use this payload directly for insert/update
-                const validMaterialPayload = materialPayload;
-
-                if (materialData.id && existingMaterialIds.includes(materialData.id)) {
-                  // Update existing material - payload has no name
-                  await tx
-                    .update(materials)
-                    .set(validMaterialPayload)
-                    .where(eq(materials.id, materialData.id));
-                } else {
-                  // Insert new material - payload has no name
-                  await tx.insert(materials).values({
-                    ...validMaterialPayload,
-                    createdAt: new Date(),
-                    id: undefined,
-                  });
-                }
-              }
-            }
+        // Bulk insert tasks if any exist
+        let insertedTaskIds: { id: string }[] = [];
+        if (newTasksToInsert.length > 0) {
+          insertedTaskIds = await tx.insert(tasks).values(newTasksToInsert).returning({ id: tasks.id });
+          if (insertedTaskIds.length !== newTasksToInsert.length) {
+             console.error("Mismatch between tasks to insert and returned IDs");
+             // Consider throwing an error or more robust handling
+             throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Failed to insert all tasks correctly.',
+             });
           }
         }
-      }
 
-      // 4. Recalculate Totals using the transaction connection
-      if (tx != null) {
-        await this.recalculateQuoteTotals({ quoteId: id });
-      }
 
-      // 5. Fetch and return the updated quote ... (no change here)
-      const updatedQuote = await this.getQuoteById({ id: id, includeRelated: true });
+        // --- Material Handling Refactor ---
+        // All old materials were deleted with their tasks. Now, bulk insert new ones.
 
-      if (!updatedQuote) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to retrieve updated quote after update.',
-        });
-      }
+        for (const [originalIndex, taskInfo] of Object.entries(taskMaterialMap)) {
+            const { taskId, materials: taskMaterialsData } = taskInfo;
+            for (const materialData of taskMaterialsData) {
+                 // Skip materials without a productId
+                 if (!materialData.productId) {
+                   console.warn(
+                     `Skipping material '${materialData.name}' due to missing productId for task ${taskId}`
+                   );
+                   continue;
+                 }
 
-      return updatedQuote;
-    });
+                 // Prepare material payload for bulk insert
+                 materialsToInsert.push({
+                     // id: undefined, // Let DB generate or use default if needed
+                     taskId: taskId, // Link to the newly inserted task
+                     productId: materialData.productId,
+                     quantity: materialData.quantity ?? 1,
+                     unitPrice: materialData.unitPrice?.toString() ?? '0',
+                     notes: materialData.notes || undefined,
+                     createdAt: new Date(),
+                     updatedAt: new Date(),
+                 });
+            }
+        }
+
+
+        // Bulk insert materials if any exist
+        if (materialsToInsert.length > 0) {
+          await tx.insert(materials).values(materialsToInsert);
+        }
+
+      } // End of task handling block
+
+      // --- Transaction Ends Here ---
+      // The main insert/delete/update operations are committed at this point.
+
+      // Return the quote ID so we can recalculate outside the main transaction
+      return { updatedQuoteId: id };
+    }); // End of db.transaction
+
+    // --- Recalculation Outside Transaction ---
+    // Use the quote ID returned from the transaction
+    if (transactionResult?.updatedQuoteId) {
+       try {
+          // Use the main db instance (this.db), not the transaction (tx)
+          await this.recalculateQuoteTotals({ quoteId: transactionResult.updatedQuoteId });
+        } catch (recalcError) {
+           // Log the recalculation error but don't necessarily fail the whole update
+           // The quote was updated, just the totals might be stale.
+           console.error(`Recalculation failed for quote ${transactionResult.updatedQuoteId} after update:`, recalcError);
+           // Depending on requirements, you might want to throw a specific error or handle this differently.
+        }
+    }
+
+    // 5. Fetch and return the updated quote ... (no change here)
+    // Fetch using the original ID, after recalculation (if successful)
+    const updatedQuote = await this.getQuoteById({ id: id, includeRelated: true });
+
+    if (!updatedQuote) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to retrieve updated quote after update and recalculation.', // Updated message
+      });
+    }
+
+    return updatedQuote;
   }
 
   /**

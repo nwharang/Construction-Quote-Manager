@@ -167,7 +167,9 @@ export const tasks = pgTable('tasks', {
   order: integer('order').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  quoteIdIdx: index('tasks_quote_id_idx').on(table.quoteId),
+}));
 
 export const materials = pgTable('materials', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -181,7 +183,9 @@ export const materials = pgTable('materials', {
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  taskIdIdx: index('materials_task_id_idx').on(table.taskId),
+}));
 
 export const transactions = pgTable(
   'transactions',
