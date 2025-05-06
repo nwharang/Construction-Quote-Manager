@@ -398,6 +398,14 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.view.customerEmailLabel': 'Email:',
   'quotes.view.customerPhoneLabel': 'Điện thoại:',
   'quotes.view.customerAddressLabel': 'Địa chỉ:',
+  'quotes.print.quoteItems': 'Mục Báo giá',
+  'quotes.print.tasks': 'Công việc',
+  'quotes.print.price': 'Giá',
+  'quotes.print.quantity': 'SL',
+  'quotes.print.unitPrice': 'Đơn giá',
+  'quotes.print.total': 'Tổng',
+  'quotes.print.markupAmount': 'Phụ phí',
+  'quotes.print.notesSection': 'Ghi chú',
 };
 
 export default viTranslations;

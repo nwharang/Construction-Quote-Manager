@@ -35,16 +35,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { settings } = useConfigStore();
   const [isMounted, setIsMounted] = useState(false);
 
-  // Only run client-side
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted) {
-    return null; // Return nothing during SSR
-  }
-
-  // Navigation tabs config (href is now used directly by Tab)
+  // Navigation tabs config (moved before getActiveKey)
   const mainNavItems = [
     {
       key: 'dashboard',
@@ -78,6 +69,32 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: <Folder size={18} />,
     },
   ];
+
+  // Find the active key based on the current pathname (now accesses initialized mainNavItems)
+  const getActiveKey = () => {
+    // Check for exact match first (e.g., /admin/dashboard)
+    let active = mainNavItems.find((item) => item.href === pathname)?.key;
+    if (active) return active;
+
+    // If no exact match, check for starting path (e.g., /admin/quotes/xyz should match /admin/quotes)
+    // Sort items by href length descending to match more specific paths first
+    const sortedItems = [...mainNavItems].sort((a, b) => b.href.length - a.href.length);
+    active = sortedItems.find(
+      (item) => pathname.startsWith(item.href) && item.href !== routes.admin.dashboard // Avoid matching dashboard for all /admin routes
+    )?.key;
+
+    return active || 'dashboard'; // Default to dashboard if nothing matches
+  };
+  const activeKey = getActiveKey();
+
+  // Only run client-side
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null; // Return nothing during SSR
+  }
 
   // Handle signout
   const handleSignOut = async () => {
@@ -148,6 +165,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           variant="light"
           aria-label="Main Navigation"
           isVertical={true}
+          selectedKey={activeKey}
           onSelectionChange={(key) => {
             if (window.innerWidth < 768) {
               onClose();

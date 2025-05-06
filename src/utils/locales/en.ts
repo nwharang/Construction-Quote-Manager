@@ -16,8 +16,10 @@ const enTranslations: Record<TranslationKey, string> = {
   'auth.signUp.emailLabel': 'Email',
   'auth.signUp.errorPasswordTooShort': 'Password must be at least {min} characters long.',
   'auth.signUp.errorPasswordsDoNotMatch': 'Passwords do not match.',
-  'auth.signUp.errorSignInFailed': 'Registration successful, but failed to sign you in automatically. Please try signing in manually.',
-  'auth.signUp.errorUnexpected': 'An unexpected error occurred during registration. Please try again.',
+  'auth.signUp.errorSignInFailed':
+    'Registration successful, but failed to sign you in automatically. Please try signing in manually.',
+  'auth.signUp.errorUnexpected':
+    'An unexpected error occurred during registration. Please try again.',
   'auth.signUp.nameLabel': 'Name',
   'auth.signUp.passwordHint': 'Minimum {min} characters',
   'auth.signUp.passwordLabel': 'Password',
@@ -148,7 +150,8 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.print.subtotal': 'Subtotal',
   'quotes.print.markup': 'Markup ({percentage}%)',
   'quotes.print.grandTotal': 'Grand Total',
-  'quotes.print.footerNote': 'This document was generated on {date} and is for estimation purposes only.',
+  'quotes.print.footerNote':
+    'This document was generated on {date} and is for estimation purposes only.',
   'quotes.print.quoteInformation': 'Quote Information',
   'quotes.print.title': 'Title:',
   'quotes.print.tasksAndMaterials': 'Tasks & Materials',
@@ -157,7 +160,8 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.print.materials': 'Materials',
   'quotes.print.summary': 'Summary',
   'quotes.print.notes': 'Notes',
-  'quotes.print.generatedMessage': 'This document was generated on {date} and is for estimation purposes only.',
+  'quotes.print.generatedMessage':
+    'This document was generated on {date} and is for estimation purposes only.',
   'quotes.taskDescriptionLabel': 'Task Description',
   'quotes.taskDescriptionPlaceholder': 'Enter task description...',
   'quotes.taskPriceLabel': 'Task Price',
@@ -380,22 +384,13 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.view.customerAddressLabel': 'Address:',
 
   // --- Keys for Print Page ---
-  'quotes.print.quoteInformation': 'Quote Information',
-  'quotes.print.title': 'Title:',
-  'quotes.print.markup': 'Markup ({{percentage}}%):',
-  'quotes.print.customer': 'Customer Information',
   'quotes.print.quoteItems': 'Quote Items',
   'quotes.print.tasks': 'Tasks / Labor',
-  'quotes.print.materials': 'Materials',
-  'quotes.print.description': 'Description',
   'quotes.print.price': 'Price',
   'quotes.print.quantity': 'Qty',
   'quotes.print.unitPrice': 'Unit Price',
   'quotes.print.total': 'Total',
-  'quotes.print.subtotal': 'Subtotal',
   'quotes.print.markupAmount': 'Markup Amount',
-  'quotes.print.grandTotal': 'Grand Total',
-  'quotes.print.summary': 'Summary',
   'quotes.print.notesSection': 'Notes',
 };
 
