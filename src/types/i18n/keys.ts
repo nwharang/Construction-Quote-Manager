@@ -438,6 +438,25 @@ export type TranslationKey = 'appName'
   | 'quotes.view.customerPhoneLabel'
   | 'quotes.view.customerAddressLabel'
 
+  // --- Keys for Print Page ---
+  | 'quotes.print.quoteInformation'
+  | 'quotes.print.title'
+  | 'quotes.print.markup'
+  | 'quotes.print.customer'
+  | 'quotes.print.quoteItems'
+  | 'quotes.print.tasks'
+  | 'quotes.print.materials'
+  | 'quotes.print.description'
+  | 'quotes.print.price'
+  | 'quotes.print.quantity'
+  | 'quotes.print.unitPrice'
+  | 'quotes.print.total'
+  | 'quotes.print.subtotal'
+  | 'quotes.print.markupAmount'
+  | 'quotes.print.grandTotal'
+  | 'quotes.print.summary'
+  | 'quotes.print.notesSection'
+
 // --- Conditional Mapping Type --- //
 
 // Maps a TranslationKey to its specific parameter type

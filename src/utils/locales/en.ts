@@ -378,6 +378,25 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.view.customerEmailLabel': 'Email:',
   'quotes.view.customerPhoneLabel': 'Phone:',
   'quotes.view.customerAddressLabel': 'Address:',
+
+  // --- Keys for Print Page ---
+  'quotes.print.quoteInformation': 'Quote Information',
+  'quotes.print.title': 'Title:',
+  'quotes.print.markup': 'Markup ({{percentage}}%):',
+  'quotes.print.customer': 'Customer Information',
+  'quotes.print.quoteItems': 'Quote Items',
+  'quotes.print.tasks': 'Tasks / Labor',
+  'quotes.print.materials': 'Materials',
+  'quotes.print.description': 'Description',
+  'quotes.print.price': 'Price',
+  'quotes.print.quantity': 'Qty',
+  'quotes.print.unitPrice': 'Unit Price',
+  'quotes.print.total': 'Total',
+  'quotes.print.subtotal': 'Subtotal',
+  'quotes.print.markupAmount': 'Markup Amount',
+  'quotes.print.grandTotal': 'Grand Total',
+  'quotes.print.summary': 'Summary',
+  'quotes.print.notesSection': 'Notes',
 };
 
 export default enTranslations;
