@@ -132,7 +132,7 @@ const SignIn: NextPage = () => {
           </Button>
         </form>
       </CardBody>
-      <CardFooter>
+      {/* <CardFooter>
         <div className="relative z-10">
           <p className="text-sm opacity-80">
             {t('auth.signIn.signUpPrompt')}{' '}
@@ -146,7 +146,7 @@ const SignIn: NextPage = () => {
             </a>
           </p>
         </div>
-      </CardFooter>
+      </CardFooter> */}
     </Card>
   );
 };

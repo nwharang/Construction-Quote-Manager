@@ -16,6 +16,11 @@ type UserRole = 'contractor' | 'subcontractor' | 'supplier' | 'other';
 const SignUp: NextPage = () => {
   const { t } = useTranslation();
   const router = useRouter();
+  // Disable Registration
+
+  router.push(routes.auth.signIn);
+  return null;
+
   const { currentLocale } = useI18n();
   const [formData, setFormData] = useState({
     name: '',
