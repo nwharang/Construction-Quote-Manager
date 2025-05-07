@@ -24,7 +24,7 @@ const nextConfig = {
     // These are all the locales supported in the application
     locales: ['en', 'vi'],
     // Default locale used when a non-locale path is visited
-    defaultLocale: 'en',
+    defaultLocale: 'vi',
     // Set to false to let our custom middleware handle detection
     localeDetection: false,
   },

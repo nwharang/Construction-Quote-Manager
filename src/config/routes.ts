@@ -125,6 +125,7 @@ export const routes = {
       edit: (id: string) => `/admin/customers/${id}/edit`,
     },
     settings: '/admin/settings',
+    account: '/admin/account',
   },
   instruction: {
     list: '/instructions',

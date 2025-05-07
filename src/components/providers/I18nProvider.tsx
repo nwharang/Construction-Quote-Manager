@@ -12,6 +12,7 @@ import {
   isSupportedLocale,
   localeDetailsMap,
 } from '~/i18n/locales';
+import { LOCALE_COOKIE_KEY } from '~/config/constants';
 
 // --- Context Definition ---
 interface I18nContextType {
@@ -32,107 +33,107 @@ export function I18nProvider({ children }: I18nProviderProps) {
   const { settings, setSettings: setStoreSettings, isLoading } = useConfigStore();
   const { data: session } = useSession();
 
-  // Minimal render log if needed, removed the verbose one
+  // Determine the authoritative current locale for the context
+  const authoritativeLocale = useMemo(() => {
+    if (router.locale && isSupportedLocale(router.locale)) {
+      return router.locale as AppLocale;
+    }
+    if (settings?.locale && isSupportedLocale(settings.locale)) {
+      return settings.locale as AppLocale;
+    }
+    return DEFAULT_LOCALE;
+  }, [router.locale, settings?.locale]);
+
+  // Effect to synchronize store and cookie if router.locale is valid and differs from store
+  useEffect(() => {
+    if (router.locale && isSupportedLocale(router.locale)) {
+      const urlLocale = router.locale as AppLocale;
+      if (settings?.locale !== urlLocale) {
+        setStoreSettings({ locale: urlLocale });
+        if (typeof window !== 'undefined') {
+          Cookies.set(LOCALE_COOKIE_KEY, urlLocale, { expires: 365 });
+          localStorage.setItem('locale', urlLocale); 
+        }
+      }
+    }
+  }, [router.locale, settings?.locale, setStoreSettings]);
 
   const changeLocale = useCallback(
     (newLocale: AppLocale) => {
-      // Removed internal changeLocale logs
-      const currentStoreLocale = settings?.locale;
-      if (currentStoreLocale === newLocale) {
+      if (authoritativeLocale === newLocale) {
         return;
       }
-
       setStoreSettings({ locale: newLocale });
-
+      if (typeof window !== 'undefined') {
+        Cookies.set(LOCALE_COOKIE_KEY, newLocale, { expires: 365 });
+        localStorage.setItem('locale', newLocale);
+      }
       if (router.locale !== newLocale) {
         router
           .push(router.pathname, router.asPath, { locale: newLocale, scroll: false })
           .catch((error) => {
-            console.error(`[I18nProvider] router.push failed:`, error); // Keep error log
+            console.error(`[I18nProvider] router.push failed:`, error);
           });
-      } // Removed else block with log
-
-      if (typeof window !== 'undefined') {
-        const localeCookieKey = 'app-locale';
-        // Removed persistence log
-        localStorage.setItem('locale', newLocale);
-        Cookies.set(localeCookieKey, newLocale, { expires: 365 });
       }
-      // Removed finished log
     },
-    [setStoreSettings, settings?.locale, router]
+    [setStoreSettings, router, authoritativeLocale]
   );
 
-  // Removed Storage Sync Effect logs
+  // Storage Sync Effect for unauthenticated users on auth pages (Can be reviewed for redundancy)
   useEffect(() => {
     if (!session && !useConfigStore.getState().isLoading && router.pathname.includes('/auth/')) {
-      const localeCookieKey = 'app-locale';
-      const storedLocale = Cookies.get(localeCookieKey) || localStorage.getItem('locale');
+      const storedCookieLocale = Cookies.get(LOCALE_COOKIE_KEY);
+      const storedLsLocale = localStorage.getItem('locale');
+      let preferredStoredLocale: string | undefined = undefined;
 
-      if (storedLocale && isSupportedLocale(storedLocale)) {
-        const appLocale = storedLocale as AppLocale;
-        const currentStoreLocale = settings?.locale;
+      if (storedCookieLocale && isSupportedLocale(storedCookieLocale)) {
+        preferredStoredLocale = storedCookieLocale;
+      } else if (storedLsLocale && isSupportedLocale(storedLsLocale)) {
+        preferredStoredLocale = storedLsLocale;
+      }
 
-        if (!currentStoreLocale || currentStoreLocale !== appLocale) {
-          setStoreSettings({ locale: appLocale });
-        }
-
-        if (router.locale !== appLocale) {
-          router
-            .replace(router.pathname, router.asPath, { locale: appLocale, scroll: false })
-            .catch((err) =>
-              console.error(
-                '[I18nProvider Storage Sync Effect] Router sync from storage failed:',
-                err
-              )
-            ); // Keep error log
+      if (preferredStoredLocale) {
+        const appLocale = preferredStoredLocale as AppLocale;
+        // Only update store and router if it's different from the current authoritative (URL-driven) locale
+        if (authoritativeLocale !== appLocale) {
+            setStoreSettings({ locale: appLocale });
+            // Only push to router if router.locale itself is not already this appLocale
+            // This check avoids loops if authoritativeLocale is already reflecting router.locale
+            if(router.locale !== appLocale) {
+                 router
+                .replace(router.pathname, router.asPath, { locale: appLocale, scroll: false })
+                .catch((err) => console.error('[I18nProvider Storage Sync Effect] Router sync failed:', err));
+            }
         }
       }
     }
-  }, [router.pathname, router.asPath, session, settings?.locale, setStoreSettings]);
+  }, [router.pathname, router.asPath, router.locale, session, setStoreSettings, authoritativeLocale]);
 
-  // Removed Lang Attr Effect logs
   useEffect(() => {
-    const currentLocale = settings?.locale || DEFAULT_LOCALE;
+    const langToSet = authoritativeLocale;
     if (typeof document !== 'undefined') {
-      if (document.documentElement.lang !== currentLocale) {
-        document.documentElement.lang = currentLocale;
+      if (document.documentElement.lang !== langToSet) {
+        document.documentElement.lang = langToSet;
       }
       document.documentElement.setAttribute('dir', 'ltr');
     }
-  }, [settings?.locale]);
+  }, [authoritativeLocale]);
 
-  // Defer context value calculation until settings are confirmed available
   const value = useMemo((): I18nContextType => {
-    // Return a *default* context value if settings aren't ready
-    if (isLoading || !settings) {
-      return {
-        // Provide a dummy or no-op changeLocale if needed, or make it conditional
-        changeLocale: () => {
-          console.warn('Attempted to change locale before I18n context fully loaded.');
-        },
-        currentLocale: DEFAULT_LOCALE as AppLocale,
-        availableLocales: localeDetailsMap,
-      };
-    }
-    // Calculate the actual context value only when settings are loaded
+    // The guard for isLoading or !settings is for when settings are essential for other parts of the context
+    // or to prevent rendering with incomplete data. Here, authoritativeLocale is already calculated.
     return {
       changeLocale,
-      currentLocale: (settings?.locale as AppLocale) ?? DEFAULT_LOCALE,
+      currentLocale: authoritativeLocale,
       availableLocales: localeDetailsMap,
     };
-  }, [settings, isLoading, changeLocale]); // Add isLoading and settings to dependencies
+  }, [changeLocale, authoritativeLocale]);
 
-  // Render nothing or a loader if config is still loading OR settings aren't populated
-  // We still delay children rendering, but the context *value* exists sooner
-  if (isLoading || !settings) {
-    return null; // Or <Spinner />;
+  if (isLoading && !settings) { // Adjusted condition: perhaps only block if critical settings are loading
+    return null; 
   }
 
-  // Only render provider and children when config is loaded and settings are available
   return (
-    // Always render the provider now, but conditionally render children via the check above
-    // The value will be default initially, then update
     <I18nContext.Provider value={value}>
       <Head>
         <meta httpEquiv="content-language" content={value.currentLocale} />

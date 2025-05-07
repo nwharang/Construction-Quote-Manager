@@ -7,3 +7,5 @@
 export const APP_NAME = 'Easy Construction Quotes';
 export const APP_SHORT_NAME = 'ECQ';
 export const APP_VERSION = '0.0.1';
+export const THEME_COOKIE_KEY = 'app-theme';
+export const LOCALE_COOKIE_KEY = 'app-locale';

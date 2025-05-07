@@ -31,6 +31,8 @@ import {
   FileImage,
   Upload,
   Trash2,
+  UserCircle,
+  Lock,
 } from 'lucide-react';
 import { api } from '~/trpc/react';
 import { MainLayout } from '~/layouts';
@@ -41,37 +43,51 @@ import type { ZodIssue } from 'zod';
 import { z } from 'zod';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { AppRouter } from '~/server/api/root';
-import { useI18n } from '~/components/providers/I18nProvider';
-import type { AppLocale, LocaleInfo } from '~/i18n/locales';
-import { useLocaleCurrency } from '~/hooks/useLocaleCurrency';
-import { LocaleSelector } from '~/components/ui/LocaleSelector';
-import { useRouter } from 'next/router';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { ResponsiveButton } from '~/components/ui/ResponsiveButton';
 import { APP_NAME } from '~/config/constants';
+import { TRPCError } from '@trpc/server';
 
 // --- Type Definitions ---
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type SettingsData = RouterOutput['settings']['get'];
-type SettingUpdateInput = inferRouterInputs<AppRouter>['settings']['update'] & {
-  locale?: string;
-  currency?: string;
+type SettingUpdateInput = {
+  companyName?: string | null;
+  companyEmail?: string | null;
+  companyPhone?: string | null;
+  companyAddress?: string | null;
 };
+
+// Zod schema for settings (company information only)
+// This schema should align with what the backend expects for these fields.
+// For simplicity, we'll assume basic string validations. More specific ones can be added.
+const companySettingsSchema = z.object({
+  companyName: z
+    .string()
+    .min(1, 'Company name is required')
+    .max(255, 'Company name too long')
+    .nullable()
+    .optional(),
+  companyEmail: z
+    .string()
+    .email('Invalid email address')
+    .max(255, 'Email too long')
+    .nullable()
+    .optional(),
+  companyPhone: z.string().max(50, 'Phone number too long').nullable().optional(),
+  companyAddress: z.string().max(500, 'Address too long').nullable().optional(),
+});
 
 // --- Helper Functions ---
 
 // Helper function to process fetched data for the form state
-// Ensures numeric fields are numbers and handles nulls/undefined
+// Ensures only company settings are handled
 const processSettingsForForm = (data: SettingsData): SettingUpdateInput => {
   return {
     companyName: data.companyName,
     companyEmail: data.companyEmail,
     companyPhone: data.companyPhone,
     companyAddress: data.companyAddress,
-    emailNotifications: data.emailNotifications,
-    quoteNotifications: data.quoteNotifications,
-    taskNotifications: data.taskNotifications,
+    // Removed notification fields
   };
 };
 
@@ -83,12 +99,11 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const toast = useAppToast();
   const { setSettings: setStoreSettings } = useConfigStore();
-  const { currentLocale } = useI18n();
 
   const [formState, setFormState] = useState<SettingUpdateInput | null>(null);
   const [validationErrors, setValidationErrors] = useState<ZodIssue[]>([]);
 
-  // Fetch settings - remove onSuccess/onError from options
+  // Fetch settings
   const settingsQuery = api.settings.get.useQuery(undefined, {
     enabled: !!session,
     refetchOnWindowFocus: false,
@@ -99,48 +114,39 @@ export default function SettingsPage() {
   const utils = api.useUtils(); // Ensure utils is defined
   const updateSettingsMutation = api.settings.update.useMutation({
     onSuccess: (updatedSettings) => {
-      // 1. Update Zustand store with exactly what was saved
-      // Use processSettingsForForm to ensure types align if needed,
-      // or ideally, ensure updatedSettings matches Settings type directly.
-      // Assuming updatedSettings directly matches the structure needed by the store:
-      setStoreSettings(updatedSettings as SettingsData); // Cast if necessary or ensure type match
+      // 1. Update Zustand store with what was saved
+      setStoreSettings(updatedSettings as SettingsData);
 
       // 2. Invalidate relevant queries
       utils.settings.get.invalidate();
 
-      // 3. Show success toast (making it unique with a timestamp for testing)
-      const uniqueMessage = `${t('settings.saveSuccess')} (${new Date().toLocaleTimeString()})`;
-      toast.success(uniqueMessage);
+      // 3. Show success toast
+      toast.success(t('settings.saveSuccess')); // Removed unique timestamp for simplicity
 
       // 4. Clear validation errors on successful save
       setValidationErrors([]);
     },
     onError: (error) => {
-      // Revert to reconstructing Zod issues from flattened error structure
-      if (error.data?.zodError?.fieldErrors || error.data?.zodError?.formErrors) {
-        const fieldErrors = error.data.zodError.fieldErrors ?? {};
-        const formErrors = error.data.zodError.formErrors ?? [];
-        const zodIssues: ZodIssue[] = [];
-
-        Object.entries(fieldErrors).forEach(([path, messages]) => {
-          (messages ?? []).forEach((message) => {
-            zodIssues.push({
-              code: z.ZodIssueCode.custom,
-              path: [path],
-              message: message,
-            });
+      // Try to parse Zod errors from the backend response
+      const zodError = error.data?.zodError;
+      if (zodError?.fieldErrors || zodError?.formErrors) {
+        const issues: ZodIssue[] = [];
+        if (zodError.fieldErrors) {
+          for (const field in zodError.fieldErrors) {
+            const fieldMessages = zodError.fieldErrors[field];
+            if (fieldMessages) {
+              fieldMessages.forEach((message) => {
+                issues.push({ code: z.ZodIssueCode.custom, path: [field], message });
+              });
+            }
+          }
+        }
+        if (zodError.formErrors) {
+          zodError.formErrors.forEach((message) => {
+            issues.push({ code: z.ZodIssueCode.custom, path: [], message });
           });
-        });
-
-        formErrors.forEach((message) => {
-          zodIssues.push({
-            code: z.ZodIssueCode.custom,
-            path: [],
-            message: message,
-          });
-        });
-
-        setValidationErrors(zodIssues);
+        }
+        setValidationErrors(issues);
         toast.error(t('settings.validationError'));
       } else {
         toast.error(t('settings.saveError', { message: error.message }));
@@ -167,30 +173,44 @@ export default function SettingsPage() {
   useEffect(() => {
     if (settingsQuery.error) {
       toast.error(t('settings.fetchError', { message: settingsQuery.error.message }));
+      // Initialize formState with empty strings if fetch fails, to allow input
+      setFormState({
+        companyName: '',
+        companyEmail: '',
+        companyPhone: '',
+        companyAddress: '',
+      });
     }
   }, [settingsQuery.error, toast, t]);
 
   const handleFormChange = (
     field: keyof SettingUpdateInput,
-    value: string | number | boolean | undefined
+    value: string | undefined // All company fields are strings or null
   ) => {
-    if (!formState) {
+    if (formState === null && !settingsQuery.isLoading && !settingsQuery.error) {
+      // If formState is null and we are not loading and there's no error,
+      // it means initial data hasn't arrived or was null. Initialize it.
+      setFormState((prevState) => ({
+        ...prevState, // spread an empty object if prevState is null initially
+        companyName: '',
+        companyEmail: '',
+        companyPhone: '',
+        companyAddress: '',
+        [field]: value,
+      }));
       return;
     }
 
-    let processedValue: string | number | boolean | undefined = value;
-
-    const booleanFields: (keyof SettingUpdateInput)[] = [
-      'emailNotifications',
-      'quoteNotifications',
-      'taskNotifications',
-    ];
-    if (booleanFields.includes(field)) {
-      processedValue = !!value;
+    if (formState === null && (settingsQuery.isLoading || settingsQuery.error)) {
+      // Still loading or error already handled (which initializes formState)
+      // Prevent updates until formState is initialized.
+      return;
     }
 
-    const newState = { ...formState, [field]: processedValue };
-    setFormState(newState);
+    setFormState((prevState) => ({
+      ...(prevState ?? {}), // Ensure prevState is not null
+      [field]: value,
+    }));
   };
 
   const handleSave = async () => {
@@ -199,31 +219,56 @@ export default function SettingsPage() {
       return;
     }
 
-    updateSettingsMutation.mutate(formState);
+    // Client-side validation before submitting
+    const validationResult = companySettingsSchema.safeParse(formState);
+    if (!validationResult.success) {
+      setValidationErrors(validationResult.error.issues);
+      toast.error(t('settings.validationError'));
+      return;
+    }
+    // Clear previous errors if validation passes
+    setValidationErrors([]);
+    updateSettingsMutation.mutate(validationResult.data);
   };
 
-  if (settingsQuery.isLoading) {
+  const getFieldError = (field: keyof SettingUpdateInput): string | undefined => {
+    return validationErrors.find((err) => err.path.includes(field))?.message;
+  };
+
+  if (settingsQuery.isLoading && formState === null) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex h-screen items-center justify-center">
         <Spinner label={t('common.loading')} />
       </div>
     );
   }
 
-  if (settingsQuery.isError || !formState) {
+  if (!session) {
+    // This case might already be handled by MainLayout or a higher-order component
+    // If not, and session is strictly required, this is a good place for it.
+    // For now, assuming MainLayout handles auth redirection if session is null.
     return (
-      <div className="text-danger p-4 text-center">
-        <p>{t('settings.loadError')}</p>
-        <Button onPress={() => settingsQuery.refetch()} className="mt-2">
+      <div className="flex h-screen items-center justify-center">
+        <Spinner label={t('common.loading')} />
+      </div>
+    );
+  }
+
+  if (settingsQuery.isError && !formState) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center p-4">
+        <p className="text-danger-500 mb-4 text-lg">{t('settings.fetchErrorTitle')}</p>
+        <p className="mb-6 text-center text-gray-600 dark:text-gray-400">
+          {t('settings.fetchErrorDetail', {
+            message: settingsQuery.error?.message || 'Unknown error',
+          })}
+        </p>
+        <Button color="primary" onClick={() => settingsQuery.refetch()}>
           {t('common.retry')}
         </Button>
       </div>
     );
   }
-
-  const getFieldError = (field: keyof SettingUpdateInput): string | undefined => {
-    return validationErrors.find((err) => err.path[0] === field)?.message;
-  };
 
   return (
     <>
@@ -232,138 +277,80 @@ export default function SettingsPage() {
           {t('settings.pageTitle')} | {APP_NAME}
         </title>
       </Head>
+      <div className="mx-auto">
+        <h1 className="mb-6 text-2xl font-bold">{t('settings.pageTitle')}</h1>
 
-      <div className="mx-auto max-w-7xl p-4 md:p-6">
-        <h1 className="text-primary-900 dark:text-primary-100 mb-6 text-2xl font-bold">
-          {t('settings.pageTitle')}
-        </h1>
-
-        {settingsQuery.isLoading ? (
-          <div className="flex h-64 items-center justify-center rounded-lg bg-gray-50/50 shadow-sm dark:bg-gray-900/20">
-            <Spinner size="lg" color="primary" />
-          </div>
-        ) : (
-          <>
-            <Tabs aria-label="Settings Options" size="lg" className="mb-6">
-              <Tab key="general" title={t('settings.company.title')}>
-                {formState && (
-                  <Card className="mb-6 border border-gray-100 shadow-sm dark:border-gray-800">
-                    <CardHeader className="flex items-center justify-between">
-                      <h2 className="text-primary-800 dark:text-primary-200 text-xl font-semibold">
-                        {t('settings.company.title')}
-                      </h2>
-                    </CardHeader>
-                    <CardBody className="gap-5 p-6">
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                          <Input
-                            label={t('settings.company.name')}
-                            placeholder={t('settings.placeholders.company.name')}
-                            value={formState.companyName ?? ''}
-                            onChange={(e) => handleFormChange('companyName', e.target.value)}
-                            isInvalid={!!getFieldError('companyName')}
-                            errorMessage={getFieldError('companyName')}
-                          />
-                        </div>
-                        <div>
-                          <Input
-                            label={t('settings.company.email')}
-                            placeholder={t('settings.placeholders.company.email')}
-                            value={formState.companyEmail ?? ''}
-                            onChange={(e) => handleFormChange('companyEmail', e.target.value)}
-                            type="email"
-                            isInvalid={!!getFieldError('companyEmail')}
-                            errorMessage={getFieldError('companyEmail')}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                          <Input
-                            label={t('settings.company.phone')}
-                            placeholder={t('settings.placeholders.company.phone')}
-                            value={formState.companyPhone ?? ''}
-                            onChange={(e) => handleFormChange('companyPhone', e.target.value)}
-                            type="tel"
-                            isInvalid={!!getFieldError('companyPhone')}
-                            errorMessage={getFieldError('companyPhone')}
-                          />
-                        </div>
-                        <div>
-                          <Textarea
-                            label={t('settings.company.address')}
-                            placeholder={t('settings.placeholders.company.address')}
-                            value={formState.companyAddress ?? ''}
-                            onChange={(e) => handleFormChange('companyAddress', e.target.value)}
-                            isInvalid={!!getFieldError('companyAddress')}
-                            errorMessage={getFieldError('companyAddress')}
-                          />
-                        </div>
-                      </div>
-                    </CardBody>
-                  </Card>
-                )}
-              </Tab>
-
-              <Tab key="notifications" title={t('settings.notifications.title')}>
-                {formState && (
-                  <Card className="mb-6 border border-gray-100 shadow-sm dark:border-gray-800">
-                    <CardHeader className="flex items-center justify-between">
-                      <h2 className="text-primary-800 dark:text-primary-200 text-xl font-semibold">
-                        {t('settings.notifications.title')}
-                      </h2>
-                    </CardHeader>
-                    <CardBody className="gap-5 p-6">
-                      <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between rounded-lg bg-gray-50/50 p-4 dark:bg-gray-800/20">
-                          <span className="font-medium">{t('settings.notifications.email')}</span>
-                          <Switch
-                            isSelected={formState.emailNotifications}
-                            onValueChange={(value) => handleFormChange('emailNotifications', value)}
-                            color="primary"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between rounded-lg bg-gray-50/50 p-4 dark:bg-gray-800/20">
-                          <span className="font-medium">{t('settings.notifications.quotes')}</span>
-                          <Switch
-                            isSelected={formState.quoteNotifications}
-                            onValueChange={(value) => handleFormChange('quoteNotifications', value)}
-                            color="primary"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between rounded-lg bg-gray-50/50 p-4 dark:bg-gray-800/20">
-                          <span className="font-medium">{t('settings.notifications.app')}</span>
-                          <Switch
-                            isSelected={formState.taskNotifications}
-                            onValueChange={(value) => handleFormChange('taskNotifications', value)}
-                            color="primary"
-                          />
-                        </div>
-                      </div>
-                    </CardBody>
-                  </Card>
-                )}
-              </Tab>
-            </Tabs>
-
-            <div className="mt-8 flex justify-end space-x-2">
+        <Card>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSave();
+            }}
+          >
+            <CardHeader>
+              <h2 className="pl-2 text-lg font-semibold text-gray-800 dark:text-gray-200">
+                {t('settings.company.title')}
+              </h2>
+            </CardHeader>
+            <CardBody className="space-y-6 p-6">
+              <Input
+                label={t('settings.company.nameLabel')}
+                placeholder={t('settings.company.namePlaceholder')}
+                value={formState?.companyName ?? ''}
+                onValueChange={(val) => handleFormChange('companyName', val)}
+                errorMessage={getFieldError('companyName')}
+                isInvalid={!!getFieldError('companyName')}
+                maxLength={255}
+              />
+              <Input
+                label={t('settings.company.emailLabel')}
+                type="email"
+                placeholder={t('settings.company.emailPlaceholder')}
+                value={formState?.companyEmail ?? ''}
+                onValueChange={(val) => handleFormChange('companyEmail', val)}
+                errorMessage={getFieldError('companyEmail')}
+                isInvalid={!!getFieldError('companyEmail')}
+                maxLength={255}
+              />
+              <Input
+                label={t('settings.company.phoneLabel')}
+                placeholder={t('settings.company.phonePlaceholder')}
+                value={formState?.companyPhone ?? ''}
+                onValueChange={(val) => handleFormChange('companyPhone', val)}
+                errorMessage={getFieldError('companyPhone')}
+                isInvalid={!!getFieldError('companyPhone')}
+                maxLength={50}
+              />
+              <Textarea
+                label={t('settings.company.addressLabel')}
+                placeholder={t('settings.company.addressPlaceholder')}
+                value={formState?.companyAddress ?? ''}
+                onValueChange={(val) => handleFormChange('companyAddress', val)}
+                errorMessage={getFieldError('companyAddress')}
+                isInvalid={!!getFieldError('companyAddress')}
+                maxLength={500}
+                minRows={3}
+              />
+              <Divider />
+            </CardBody>
+            <CardFooter className="flex justify-end border-t border-gray-100 bg-gray-50/50 px-6 py-4 dark:border-gray-800 dark:bg-gray-900/20">
               <ResponsiveButton
                 type="submit"
                 color="primary"
                 isLoading={updateSettingsMutation.isPending}
-                icon={updateSettingsMutation.isPending ? null : <Check size={18} />}
+                icon={<Save size={18} />}
                 label={t('settings.actions.save')}
-                onPress={handleSave}
-              />
-            </div>
-          </>
-        )}
+              >
+                {t('settings.actions.save')}
+              </ResponsiveButton>
+            </CardFooter>
+          </form>
+        </Card>
       </div>
     </>
   );
 }
 
-SettingsPage.getLayout = (page: React.ReactNode) => {
+SettingsPage.getLayout = function getLayout(page: React.ReactElement) {
   return <MainLayout>{page}</MainLayout>;
 };

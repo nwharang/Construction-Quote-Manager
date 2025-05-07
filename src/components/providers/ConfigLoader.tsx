@@ -4,6 +4,7 @@ import { api } from '~/utils/api';
 import { useConfigStore, type Settings } from '~/store/configStore'; // Import Settings type
 import Cookies from 'js-cookie';
 import { type AppLocale, isSupportedLocale, DEFAULT_LOCALE } from '~/i18n/locales';
+import { LOCALE_COOKIE_KEY, THEME_COOKIE_KEY } from '~/config/constants';
 
 /**
  * ConfigLoader Component
@@ -19,8 +20,8 @@ import { type AppLocale, isSupportedLocale, DEFAULT_LOCALE } from '~/i18n/locale
 type Theme = 'light' | 'dark' | 'system';
 
 // Cookie keys
-const themeCookieKey = 'app-theme';
-const localeCookieKey = 'app-locale';
+const themeCookieKey = THEME_COOKIE_KEY;
+const localeCookieKey = LOCALE_COOKIE_KEY;
 
 // Allowed themes
 const VALID_THEMES: Theme[] = ['light', 'dark', 'system'];
@@ -105,7 +106,6 @@ export function ConfigLoader() {
 
     setSettings(finalSettings);
     initialized.current = true;
-
   }, [status, dbSettings, isLoadingDbSettings, setSettings, loadLocalSettings]);
 
   // This component doesn't render anything visible

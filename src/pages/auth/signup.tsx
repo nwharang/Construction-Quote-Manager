@@ -19,6 +19,7 @@ const SignUp: NextPage = () => {
   const { currentLocale } = useI18n();
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -83,6 +84,7 @@ const SignUp: NextPage = () => {
       // Call tRPC register mutation
       register({
         name: formData.name,
+        username: formData.username,
         email: formData.email,
         password: formData.password,
       });
@@ -128,6 +130,16 @@ const SignUp: NextPage = () => {
             isRequired
             disabled={isLoading}
             data-testid="name-input"
+          />
+          <Input
+            label={t('auth.signUp.usernameLabel')}
+            type="text"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            isRequired
+            disabled={isLoading}
+            data-testid="username-input"
           />
           <Input
             label={t('auth.signUp.emailLabel')}

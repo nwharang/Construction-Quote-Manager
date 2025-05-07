@@ -3,13 +3,14 @@ import { BaseService } from './baseService';
 import type { DB } from './types';
 import { TRPCError } from '@trpc/server';
 import { users } from '../db/schema'; // Import users schema
-import { eq } from 'drizzle-orm'; // Import eq operator
+import { eq, or } from 'drizzle-orm'; // Import eq operator
 import { compare, hash } from 'bcryptjs'; // Import compare and hash functions
 import { z } from 'zod'; // Import zod for input type inference
 
 // Define registration input schema type based on the one in authRouter
 const registerUserSchema = z.object({
   name: z.string().min(1),
+  username: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
 });
@@ -19,9 +20,27 @@ type RegisterUserInput = z.infer<typeof registerUserSchema>;
 const updateProfileSchema = z.object({
   name: z.string().min(1).optional(),
   image: z.string().url().nullish(),
-  role: z.enum(['contractor', 'subcontractor', 'supplier', 'other']).optional(),
 });
 type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+// Zod schema for changing password (can be defined in router or service)
+const changePasswordSchema = z.object({
+  oldPassword: z.string().min(1, "Old password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "New passwords don't match",
+  path: ["confirmPassword"], // path of error
+});
+type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+// Zod schema for updating login info (email/username) - for service layer type safety
+const updateLoginInfoServiceSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  username: z.string().min(3).max(50).optional(),
+  currentPassword: z.string().min(1),
+});
+type UpdateLoginInfoInput = z.infer<typeof updateLoginInfoServiceSchema>;
 
 /**
  * Service layer for authentication-related operations.
@@ -60,25 +79,28 @@ export class AuthService extends BaseService {
   }
 
   /**
-   * Verifies user credentials (email and password).
-   * @param email - User's email
+   * Verifies user credentials (email or username and password).
+   * @param emailOrUsername - User's email or username
    * @param password - User's plaintext password
    * @returns The user object (without password hash) if credentials are valid.
    * @throws TRPCError if user not found or password invalid.
    */
   async verifyUserCredentials(
-    email: string,
+    emailOrUsername: string,
     password: string
   ): Promise<Omit<typeof users.$inferSelect, 'hashedPassword'>> {
-    // 1. Find user by email (using eq with lowercased email)
+    // 1. Find user by email or username
     const potentialUser = await this.db.query.users.findFirst({
-      where: eq(users.email, email.toLowerCase()),
+      where: or(
+        eq(users.email, emailOrUsername.toLowerCase()),
+        eq(users.username, emailOrUsername)
+      ),
     });
 
     if (!potentialUser) {
       throw new TRPCError({
         code: 'NOT_FOUND', // Changed from UNAUTHORIZED
-        message: 'User with this email does not exist.', // More specific internal message
+        message: 'User with this email or username does not exist.', // More specific internal message
       });
     }
 
@@ -114,12 +136,12 @@ export class AuthService extends BaseService {
   async registerUser(
     input: RegisterUserInput
   ): Promise<Omit<typeof users.$inferSelect, 'hashedPassword'>> {
-    const { name, email, password } = input;
+    const { name, username, email, password } = input;
     const lowerCaseEmail = email.toLowerCase();
 
     // 1. Check if user already exists
     const existingUser = await this.db.query.users.findFirst({
-      where: eq(users.email, lowerCaseEmail),
+      where: or(eq(users.email, lowerCaseEmail), eq(users.username, username)),
       columns: { id: true }, // Only need to check for existence
     });
 
@@ -138,6 +160,7 @@ export class AuthService extends BaseService {
       .insert(users)
       .values({
         name,
+        username,
         email: lowerCaseEmail,
         hashedPassword, // Store the hashed password
       })
@@ -164,42 +187,158 @@ export class AuthService extends BaseService {
    * @throws TRPCError if user not found or update fails.
    */
   async updateUserProfile(input: UpdateProfileInput): Promise<typeof users.$inferSelect> {
-    const userId = this.getUserId(); // Get ID of authenticated user
-
-    const dataToUpdate: Partial<typeof users.$inferSelect> = {};
-
-    // Map input fields to database fields
+    const userId = this.getUserId();
+    const dataToUpdate: Partial<Omit<typeof users.$inferSelect, 'id' | 'email' | 'username' | 'hashedPassword' | 'emailVerified' | 'createdAt'> > = {};
     if (input.name) dataToUpdate.name = input.name;
-    if (input.image !== undefined) dataToUpdate.image = input.image;
+    if (input.image !== undefined) dataToUpdate.image = input.image; 
 
-    // Only proceed if there are fields to update
     if (Object.keys(dataToUpdate).length === 0) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: 'No valid fields provided for update.',
+        message: 'No valid fields provided for profile update.',
       });
     }
-
-    // Add updatedAt timestamp
     dataToUpdate.updatedAt = new Date();
-
-    // Update the user in the database
     const [updatedUser] = await this.db
       .update(users)
       .set(dataToUpdate)
       .where(eq(users.id, userId))
-      .returning(); // Return all columns
-
+      .returning();
     if (!updatedUser) {
-      // This might happen if the user was deleted between getting the ID and updating
       throw new TRPCError({
         code: 'NOT_FOUND',
-        message: 'User not found or update failed.',
+        message: 'User not found or profile update failed.',
+      });
+    }
+    return updatedUser;
+  }
+
+  async changePassword(input: ChangePasswordInput): Promise<{ success: boolean }> {
+    const userId = this.getUserId();
+    const { oldPassword, newPassword } = input;
+
+    const currentUser = await this.db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!currentUser || !currentUser.hashedPassword) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'User not found or password data is missing.',
       });
     }
 
-    // Return the updated user data (can omit hash if needed, but returning returns all)
-    return updatedUser;
+    const isOldPasswordCorrect = await compare(oldPassword, currentUser.hashedPassword);
+    if (!isOldPasswordCorrect) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Incorrect old password.',
+      });
+    }
+
+    const newHashedPassword = await hash(newPassword, 12);
+
+    await this.db
+      .update(users)
+      .set({
+        hashedPassword: newHashedPassword,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    return { success: true };
+  }
+
+  async updateLoginInfo(input: UpdateLoginInfoInput): Promise<{ success: boolean; message: string; user?: Omit<typeof users.$inferSelect, 'hashedPassword'> }> {
+    const userId = this.getUserId();
+    const { email, username, currentPassword } = input;
+    const lowerCaseEmail = email.toLowerCase();
+
+    // 1. Verify current password
+    const currentUser = await this.db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!currentUser || !currentUser.hashedPassword) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'User not found or password data is missing.',
+      });
+    }
+
+    const isPasswordCorrect = await compare(currentPassword, currentUser.hashedPassword);
+    if (!isPasswordCorrect) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Incorrect current password.',
+      });
+    }
+
+    // 2. Check for conflicts if email/username are being changed
+    const updates: Partial<typeof users.$inferInsert> = {};
+    let emailChanged = false;
+    let usernameChanged = false;
+
+    if (lowerCaseEmail !== currentUser.email) {
+      const existingEmailUser = await this.db.query.users.findFirst({
+        where: eq(users.email, lowerCaseEmail),
+        columns: { id: true },
+      });
+      if (existingEmailUser && existingEmailUser.id !== userId) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This email address is already in use by another account.',
+        });
+      }
+      updates.email = lowerCaseEmail;
+      updates.emailVerified = null; // Reset email verification status
+      emailChanged = true;
+    }
+
+    if (username && username !== currentUser.username) {
+      const existingUsernameUser = await this.db.query.users.findFirst({
+        where: eq(users.username, username),
+        columns: { id: true },
+      });
+      if (existingUsernameUser && existingUsernameUser.id !== userId) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This username is already in use by another account.',
+        });
+      }
+      updates.username = username;
+      usernameChanged = true;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return { success: true, message: 'No changes to login information were made.', user: currentUser };
+    }
+
+    updates.updatedAt = new Date();
+
+    // 3. Apply updates
+    const [updatedUserRecord] = await this.db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!updatedUserRecord) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to update login information in the database.',
+      });
+    }
+    
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { hashedPassword, ...userWithoutPassword } = updatedUserRecord;
+
+    let message = 'Login information updated successfully.';
+    if (emailChanged) {
+      message += ' Please verify your new email address.'; // Adapt if email verification email is sent
+    }
+
+    return { success: true, message, user: userWithoutPassword };
   }
 
   // Add other authentication-related methods here if needed

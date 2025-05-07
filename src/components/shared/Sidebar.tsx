@@ -15,6 +15,7 @@ import {
   Briefcase,
   Wrench,
   Folder,
+  User,
 } from 'lucide-react';
 import { routes } from '~/config/routes';
 import { useTranslation } from '~/hooks/useTranslation';
@@ -149,28 +150,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </Button>
       </div>
 
-      {/* User profile section */}
-      <div className="border-divider bg-default-50/40 dark:bg-default-50/5 border-b px-4 py-4">
-        <div className="flex items-center gap-3">
-          <Avatar
-            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-              session?.user?.name || t('common.user')
-            )}&background=random&color=fff`}
-            fallback={session?.user?.name?.[0] || t('common.user')[0]}
-            className="h-10 w-10"
-            size="sm"
-            isBordered
-            color="primary"
-          />
-          <div className="flex flex-col overflow-hidden">
-            <p className="text-foreground truncate text-sm font-medium">
-              {session?.user?.name || t('common.user')}
-            </p>
-            <p className="text-default-500 truncate text-xs">{session?.user?.email || ''}</p>
-          </div>
-        </div>
-      </div>
-
       {/* Main Navigation Items */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <Tabs
@@ -241,6 +220,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="flex items-center justify-between">
           {/* Quick action buttons - Consider making these Tabs or Buttons with href if applicable */}
           <div className="flex gap-2">
+            <Tooltip content={t('nav.account')}>
+              <Button
+                isIconOnly
+                variant="light"
+                size="sm"
+                aria-label={t('nav.account')}
+                onPress={() => router.push(routes.admin.account)}
+                className={pathname === routes.admin.account ? 'bg-default-200' : ''}
+              >
+                <User size={18} />
+              </Button>
+            </Tooltip>
             <Tooltip content={t('nav.settings')}>
               <Button
                 isIconOnly

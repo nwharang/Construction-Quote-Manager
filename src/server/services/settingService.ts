@@ -68,12 +68,6 @@ export class SettingsService extends BaseService {
         companyEmail: data.companyEmail,
         companyPhone: data.companyPhone,
         companyAddress: data.companyAddress,
-        emailNotifications: data.emailNotifications,
-        quoteNotifications: data.quoteNotifications,
-        taskNotifications: data.taskNotifications,
-        currency: data.currency ?? undefined,
-        locale: data.locale ?? undefined,
-        dateFormat: data.dateFormat ?? undefined,
       };
 
     // Remove properties that are explicitly undefined in the input

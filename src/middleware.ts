@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { match as matchLocale } from '@formatjs/intl-localematcher';
 import Negotiator from 'negotiator';
-import { DEFAULT_LOCALE, locales as appLocales } from './src/i18n/locales';
+import { DEFAULT_LOCALE, locales as appLocales } from './i18n/locales';
+import { LOCALE_COOKIE_KEY } from '~/config/constants';
 
 // Define supported locales for easy access
 const supportedLocales = Object.keys(appLocales);
@@ -18,9 +19,7 @@ function getLocaleFromHeaders(request: NextRequest): string {
   });
 
   // Get preferred language from headers
-  const languages = new Negotiator({ headers: negotiatorHeaders }).languages(
-    supportedLocales
-  );
+  const languages = new Negotiator({ headers: negotiatorHeaders }).languages(supportedLocales);
 
   return matchLocale(languages, supportedLocales, DEFAULT_LOCALE);
 }
@@ -31,13 +30,14 @@ function getLocaleFromHeaders(request: NextRequest): string {
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const nextJsDefaultLocale = 'vi'; // From next.config.mjs
 
   // Skip middleware for non-page resources
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/static') ||
-    pathname.includes('.') || // Matches any file with an extension
+    pathname.includes('.') ||
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
@@ -45,27 +45,39 @@ export function middleware(request: NextRequest) {
 
   // Check if path already has a locale
   const hasLocale = supportedLocales.some(
-    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+    (loc) => pathname.startsWith(`/${loc}/`) || pathname === `/${loc}`
   );
 
   if (hasLocale) {
     return NextResponse.next();
   }
 
-  // Get preferred locale from cookie or accept-language header
-  const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
-  const headersLocale = getLocaleFromHeaders(request);
-  const locale = cookieLocale && supportedLocales.includes(cookieLocale)
-    ? cookieLocale
-    : headersLocale;
+  // At this point, pathname has no locale prefix (e.g., /admin/dashboard)
 
-  // Create a URL with the locale prefix
+  // Get preferred locale from cookie or accept-language header
+  const cookieLocale = request.cookies.get(LOCALE_COOKIE_KEY)?.value;
+  const headersLocale = getLocaleFromHeaders(request); // Defaults to DEFAULT_LOCALE from i18n/locales ('vi')
+
+  let resolvedLocale =
+    cookieLocale && supportedLocales.includes(cookieLocale) ? cookieLocale : headersLocale;
+
+  // Ensure resolvedLocale is one of the supported locales, fallback to site default if not
+  if (!supportedLocales.includes(resolvedLocale)) {
+    resolvedLocale = nextJsDefaultLocale;
+  }
+
+  // If the resolved locale is the default locale, don't redirect to a prefixed path.
+  // Let Next.js handle serving the default locale content without a prefix.
+  if (resolvedLocale === nextJsDefaultLocale) {
+    return NextResponse.next();
+  }
+
+  // If the resolved locale is NOT the default, then redirect to the prefixed path.
   const url = new URL(
-    `/${locale}${pathname.startsWith('/') ? pathname : `/${pathname}`}`,
+    `/${resolvedLocale}${pathname.startsWith('/') ? pathname : `/${pathname}`}`,
     request.url
   );
   url.search = request.nextUrl.search;
-
   return NextResponse.redirect(url);
 }
 

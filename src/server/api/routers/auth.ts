@@ -15,6 +15,7 @@ const loginUserSchema = z.object({
 // Schema for user registration (assuming it's needed for other procedures)
 const registerInputSchema = z.object({
   name: z.string().min(1),
+  username: z.string().min(1),
   email: z.string().email('Invalid email format'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   // Add other fields like name if necessary
@@ -24,6 +25,24 @@ const registerInputSchema = z.object({
 const updateProfileRouterInputSchema = z.object({
   name: z.string().min(1).optional(),
   image: z.string().url().nullish(),
+});
+
+// Zod schema for changing password - to be used by the router
+const changePasswordRouterInputSchema = z.object({
+  oldPassword: z.string().min(1, "Old password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters long."),
+  confirmPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "New passwords do not match.",
+  path: ["confirmPassword"], // specifies which field the error is associated with
+});
+
+// Zod schema for updating login info (email/username)
+// Ensure this is exported for use in the frontend
+export const updateLoginInfoRouterInputSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  username: z.string().min(3, 'Username must be at least 3 characters').max(50, 'Username too long').optional(),
+  currentPassword: z.string().min(1, 'Current password is required'),
 });
 
 export const authRouter = createTRPCRouter({
@@ -53,6 +72,8 @@ export const authRouter = createTRPCRouter({
           id: true,
           name: true,
           email: true,
+          image: true,
+          username: true,
           // Exclude passwordHash etc.
         },
       });
@@ -94,6 +115,7 @@ export const authRouter = createTRPCRouter({
           id: user.id,
           name: user.name,
           email: user.email,
+          username: user.username,
         },
       };
     } catch (error) {
@@ -134,26 +156,51 @@ export const authRouter = createTRPCRouter({
   // Update user profile (authorized users only)
   updateProfile: protectedProcedure
     .input(updateProfileRouterInputSchema) // Use the defined input schema
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ ctx, input }) => {
+      const authService = new AuthService(db, ctx); // db needs to be available here
       try {
-        // Instantiate AuthService
-        const authService = new AuthService(db, ctx);
-
-        // Delegate update to the service
-        // The service method already gets the userId from context
         const updatedUser = await authService.updateUserProfile(input);
-
-        // Return success and the updated user data
-        return {
-          status: 'success',
-          user: updatedUser, // Service returns the updated user object
-        };
+        return updatedUser;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         // Catch specific errors from service if needed, otherwise keep generic
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to update profile',
+          cause: error,
+        });
+      }
+    }),
+
+  changePassword: protectedProcedure
+    .input(changePasswordRouterInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authService = new AuthService(db, ctx); // db needs to be available here
+      try {
+        return await authService.changePassword(input);
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        // Handle specific errors or rethrow a generic one
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to change password',
+          cause: error,
+        });
+      }
+    }),
+
+  updateLoginInfo: protectedProcedure
+    .input(updateLoginInfoRouterInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authService = new AuthService(db, ctx);
+      try {
+        const result = await authService.updateLoginInfo(input);
+        return result; // Should include success status and possibly updated user info
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update login information',
           cause: error,
         });
       }

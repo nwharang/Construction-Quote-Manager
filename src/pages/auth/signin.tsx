@@ -4,16 +4,7 @@ import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { routes } from '~/config/routes';
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Input,
-  Button,
-  Link,
-  CardFooter,
-  Alert,
-} from '@heroui/react';
+import { Card, CardBody, CardHeader, Input, Button, Link, CardFooter, Alert } from '@heroui/react';
 import { withAuthLayout } from '~/utils/withAuth';
 import { useTranslation } from '~/hooks/useTranslation';
 import { AlertTriangle } from 'lucide-react';
@@ -24,7 +15,7 @@ const SignIn: NextPage = () => {
   const router = useRouter();
   const { currentLocale } = useI18n();
   const [formData, setFormData] = useState({
-    email: '',
+    emailOrUsername: '',
     password: '',
   });
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +34,7 @@ const SignIn: NextPage = () => {
     e.preventDefault();
     setError(null);
 
-    if (!formData.email || !formData.password) {
+    if (!formData.emailOrUsername || !formData.password) {
       setError(t('auth.signIn.errorRequiredFields'));
       return;
     }
@@ -52,7 +43,7 @@ const SignIn: NextPage = () => {
 
     try {
       const result = await signIn('credentials', {
-        email: formData.email,
+        emailOrUsername: formData.emailOrUsername,
         password: formData.password,
         redirect: false,
       });
@@ -70,13 +61,15 @@ const SignIn: NextPage = () => {
         }
         setIsLoading(false);
       } else if (result?.ok) {
-        await router.push(routes.admin.dashboard, routes.admin.dashboard, { locale: currentLocale });
+        await router.push(routes.admin.dashboard, routes.admin.dashboard, {
+          locale: currentLocale,
+        });
       } else {
         setError(t('auth.signIn.errorUnexpected'));
         setIsLoading(false);
       }
     } catch (error) {
-      console.error("Sign in failed:", error);
+      console.error('Sign in failed:', error);
       setError(t('auth.signIn.errorUnexpected'));
       setIsLoading(false);
     }
@@ -91,21 +84,28 @@ const SignIn: NextPage = () => {
   return (
     <Card className="w-full max-w-md" data-testid="signin-form">
       <CardHeader className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold" data-testid="signin-title">{t('auth.signIn.title')}</h2>
+        <h2 className="text-2xl font-bold" data-testid="signin-title">
+          {t('auth.signIn.title')}
+        </h2>
         <p className="text-sm text-gray-500">{t('auth.signIn.subtitle')}</p>
       </CardHeader>
       <CardBody>
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4" data-testid="signin-error">
+            <Alert
+              color="danger"
+              icon={<AlertTriangle size={18} />}
+              className="mb-4"
+              data-testid="signin-error"
+            >
               {error}
             </Alert>
           )}
           <Input
-            label={t('auth.signIn.emailLabel')}
-            type="email"
-            name="email"
-            value={formData.email}
+            label={t('auth.signIn.emailOrUsernameLabel')}
+            type="text"
+            name="emailOrUsername"
+            value={formData.emailOrUsername}
             onChange={handleChange}
             isRequired
             disabled={isLoading}
@@ -121,10 +121,10 @@ const SignIn: NextPage = () => {
             disabled={isLoading}
             data-testid="password-input"
           />
-          <Button 
-            type="submit" 
-            color="primary" 
-            className="w-full" 
+          <Button
+            type="submit"
+            color="primary"
+            className="w-full"
             isLoading={isLoading}
             data-testid="signin-button"
           >
@@ -136,9 +136,9 @@ const SignIn: NextPage = () => {
         <div className="relative z-10">
           <p className="text-sm opacity-80">
             {t('auth.signIn.signUpPrompt')}{' '}
-            <a 
-              href="#" 
-              onClick={handleSignUpClick} 
+            <a
+              href="#"
+              onClick={handleSignUpClick}
               className="text-sm underline hover:opacity-100"
               data-testid="signup-link"
             >
