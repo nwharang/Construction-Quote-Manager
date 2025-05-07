@@ -158,7 +158,7 @@ const SignUp: NextPage = () => {
             value={formData.password}
             onChange={handleChange}
             isRequired
-            description={t('auth.signUp.passwordHint', { min: 8 })}
+            description={t('auth.signUp.passwordHint', { min: 6 })}
             disabled={isLoading}
             data-testid="password-input"
           />

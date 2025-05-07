@@ -17,7 +17,7 @@ const registerInputSchema = z.object({
   name: z.string().min(1),
   username: z.string().min(1),
   email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
   // Add other fields like name if necessary
 });
 
@@ -30,7 +30,7 @@ const updateProfileRouterInputSchema = z.object({
 // Zod schema for changing password - to be used by the router
 const changePasswordRouterInputSchema = z.object({
   oldPassword: z.string().min(1, "Old password is required"),
-  newPassword: z.string().min(8, "New password must be at least 8 characters long."),
+  newPassword: z.string().min(6, "New password must be at least 6 characters long."),
   confirmPassword: z.string(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "New passwords do not match.",
