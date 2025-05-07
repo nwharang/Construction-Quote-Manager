@@ -87,7 +87,7 @@ const SignUp: NextPage = () => {
         password: formData.password,
       });
     } catch (err) {
-      console.error("Sign up form error:", err);
+      console.error('Sign up form error:', err);
       setError(t('auth.signUp.errorUnexpected'));
       setIsLoading(false);
     }
@@ -102,13 +102,20 @@ const SignUp: NextPage = () => {
   return (
     <Card className="w-full max-w-md" data-testid="signup-form">
       <CardHeader className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold" data-testid="signup-title">{t('auth.signUp.title')}</h2>
+        <h2 className="text-2xl font-bold" data-testid="signup-title">
+          {t('auth.signUp.title')}
+        </h2>
         <p className="text-sm text-gray-500">{t('auth.signUp.subtitle')}</p>
       </CardHeader>
       <CardBody>
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <Alert color="danger" icon={<AlertTriangle size={18} />} className="mb-4" data-testid="signup-error">
+            <Alert
+              color="danger"
+              icon={<AlertTriangle size={18} />}
+              className="mb-4"
+              data-testid="signup-error"
+            >
               {error}
             </Alert>
           )}
@@ -154,7 +161,13 @@ const SignUp: NextPage = () => {
             data-testid="confirm-password-input"
           />
 
-          <Button type="submit" color="primary" className="w-full" isLoading={isLoading} data-testid="signup-button">
+          <Button
+            type="submit"
+            color="primary"
+            className="w-full"
+            isLoading={isLoading}
+            data-testid="signup-button"
+          >
             {t('auth.signUp.submitButton')}
           </Button>
         </form>
@@ -163,7 +176,12 @@ const SignUp: NextPage = () => {
         <div className="relative z-10">
           <p className="text-sm opacity-80">
             {t('auth.signUp.signInPrompt')}{' '}
-            <a href="#" onClick={handleSignInClick} className="text-sm underline hover:opacity-100" data-testid="signin-link">
+            <a
+              href="#"
+              onClick={handleSignInClick}
+              className="text-sm underline hover:opacity-100"
+              data-testid="signin-link"
+            >
               {t('auth.signUp.signInLink')}
             </a>
           </p>

@@ -1,4 +1,4 @@
-# Managing Quotes
+## Managing Quotes
 
 The core function of the application is creating and managing quotes.
 

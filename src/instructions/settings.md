@@ -1,4 +1,4 @@
-# Settings (`/admin/settings`)
+## Settings (`/admin/settings`)
 
 Configure application-wide settings and defaults here. Remember to click "Save Changes" at the bottom to persist any modifications.
 

@@ -7,7 +7,7 @@
 export const locales = ['en', 'vi'] as const;
 
 // Define the AppLocale union type based on the keys of the locales object
-export type AppLocale = typeof locales[number];
+export type AppLocale = (typeof locales)[number];
 
 // Define the type for the locale information object
 export interface LocaleInfo {
@@ -47,3 +47,8 @@ export function getValidLocale(locale: string | undefined): AppLocale {
   }
   return DEFAULT_LOCALE;
 }
+
+export const localeDetailsMap: Record<AppLocale, LocaleInfo> = {
+  en: { name: 'English', flag: '🇺🇸' },
+  vi: { name: 'Tiếng Việt', flag: '🇻🇳' },
+};

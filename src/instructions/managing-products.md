@@ -1,4 +1,4 @@
-# Managing Products
+## Managing Products
 
 Products represent the items you sell or use in your quotes.
 

@@ -1,4 +1,4 @@
-# Managing Categories
+## Managing Categories
 
 Categories help organize your products.
 

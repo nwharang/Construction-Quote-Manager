@@ -33,9 +33,7 @@ const InstructionDetailPage: NextPageWithLayout<InstructionDetailPageProps> = ({
       </Head>
       <div className="mx-auto size-full">
         <Breadcrumbs className="mb-4">
-          <BreadcrumbItem href={routes.admin.dashboard}>
-            {t('nav.dashboard')}
-          </BreadcrumbItem>
+          <BreadcrumbItem href={routes.admin.dashboard}>{t('nav.dashboard')}</BreadcrumbItem>
           <BreadcrumbItem href={routes.instruction.list}>
             {t('instructions.pageTitle')}
           </BreadcrumbItem>
@@ -100,7 +98,7 @@ export const getStaticProps: GetStaticProps<InstructionDetailPageProps, { slug: 
   try {
     content = fs.readFileSync(filePath, 'utf8');
     const firstLine = content.split('\n')[0];
-    if (firstLine?.startsWith('# ')) {
+    if (firstLine?.startsWith('## ')) {
       title = firstLine.substring(2).trim();
     }
   } catch (error) {

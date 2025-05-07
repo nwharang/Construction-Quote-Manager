@@ -153,16 +153,11 @@ export default function SettingsPage() {
   useEffect(() => {
     if (settingsQuery.data) {
       // Log the data received from the query *before* updating store/form
-      console.log(
-        '[SettingsPage] useEffect detected settingsQuery data change:',
-        settingsQuery.data
-      );
 
       // Update local form state first
       setFormState(processSettingsForForm(settingsQuery.data));
 
       // Update the Zustand store with the *complete* fetched data
-      console.log('[SettingsPage] Calling setStoreSettings with fetched data.');
       setStoreSettings(settingsQuery.data);
     }
     // Add setStoreSettings dependency
@@ -233,7 +228,9 @@ export default function SettingsPage() {
   return (
     <>
       <Head>
-        <title>{t('settings.pageTitle')} | {APP_NAME}</title>
+        <title>
+          {t('settings.pageTitle')} | {APP_NAME}
+        </title>
       </Head>
 
       <div className="mx-auto max-w-7xl p-4 md:p-6">

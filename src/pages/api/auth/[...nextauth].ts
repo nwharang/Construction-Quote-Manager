@@ -44,7 +44,6 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          console.log('Auth: Missing credentials');
           return null;
         }
 
@@ -67,7 +66,6 @@ export const authOptions: NextAuthOptions = {
         } catch (error) {
           // Catch errors from AuthService (e.g., TRPCError with code UNAUTHORIZED)
           if (error instanceof TRPCError && error.code === 'UNAUTHORIZED') {
-            console.log(`Auth: Authorization failed via AuthService: ${error.message}`);
           } else {
             // Log other unexpected errors
             console.error('Auth: Unexpected error during authorization:', error);

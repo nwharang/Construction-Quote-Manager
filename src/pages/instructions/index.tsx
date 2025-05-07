@@ -46,7 +46,7 @@ const InstructionsIndexPage: NextPageWithLayout<InstructionsIndexPageProps> = ({
                 key={item.slug}
                 href={`/instructions/${item.slug}`}
                 as={Link}
-                className="mb-2 data-[hover=true]:bg-default-100/80 dark:data-[hover=true]:bg-default-50/20 border border-gray-200 p-3 dark:border-gray-700"
+                className="data-[hover=true]:bg-default-100/80 dark:data-[hover=true]:bg-default-50/20 mb-2 border border-gray-200 p-3 dark:border-gray-700"
               >
                 <span className="text-primary text-base font-medium">{item.title}</span>
                 {item.description && (
@@ -72,7 +72,7 @@ export const getStaticProps = async (context: GetStaticPropsContext) => {
       .filter((filename) => filename.endsWith('.md'))
       .map((filename) => {
         const slug = filename.replace(/\.md$/, '');
-        const locale = context.locale || context.defaultLocale || 'en';
+        const locale = context.locale || context.defaultLocale || 'vi';
         const filePath = path.join(instructionsDir, locale, filename);
         let title = slug.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
         let description = '';

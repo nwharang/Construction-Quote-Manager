@@ -1,4 +1,4 @@
-# Managing Customers
+## Managing Customers
 
 Keep track of your clients.
 

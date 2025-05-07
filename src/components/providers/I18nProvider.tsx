@@ -10,13 +10,14 @@ import {
   locales,
   DEFAULT_LOCALE,
   isSupportedLocale,
+  localeDetailsMap,
 } from '~/i18n/locales';
 
 // --- Context Definition ---
 interface I18nContextType {
   changeLocale: (newLocale: AppLocale) => void;
   currentLocale: AppLocale;
-  availableLocales: LocalesMap;
+  availableLocales: typeof localeDetailsMap;
 }
 
 const I18nContext = createContext<I18nContextType | null>(null);
@@ -32,7 +33,6 @@ export function I18nProvider({ children }: I18nProviderProps) {
   const { data: session } = useSession();
 
   // Minimal render log if needed, removed the verbose one
-  // console.log(`[I18nProvider] Render. Store: ${settings?.locale}, Router: ${router.locale}`);
 
   const changeLocale = useCallback(
     (newLocale: AppLocale) => {
@@ -48,7 +48,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
         router
           .push(router.pathname, router.asPath, { locale: newLocale, scroll: false })
           .catch((error) => {
-             console.error(`[I18nProvider] router.push failed:`, error); // Keep error log
+            console.error(`[I18nProvider] router.push failed:`, error); // Keep error log
           });
       } // Removed else block with log
 
@@ -78,8 +78,14 @@ export function I18nProvider({ children }: I18nProviderProps) {
         }
 
         if (router.locale !== appLocale) {
-          router.replace(router.pathname, router.asPath, { locale: appLocale, scroll: false })
-            .catch(err => console.error('[I18nProvider Storage Sync Effect] Router sync from storage failed:', err)); // Keep error log
+          router
+            .replace(router.pathname, router.asPath, { locale: appLocale, scroll: false })
+            .catch((err) =>
+              console.error(
+                '[I18nProvider Storage Sync Effect] Router sync from storage failed:',
+                err
+              )
+            ); // Keep error log
         }
       }
     }
@@ -89,49 +95,49 @@ export function I18nProvider({ children }: I18nProviderProps) {
   useEffect(() => {
     const currentLocale = settings?.locale || DEFAULT_LOCALE;
     if (typeof document !== 'undefined') {
-       if (document.documentElement.lang !== currentLocale) {
-          document.documentElement.lang = currentLocale;
-       }
+      if (document.documentElement.lang !== currentLocale) {
+        document.documentElement.lang = currentLocale;
+      }
       document.documentElement.setAttribute('dir', 'ltr');
     }
   }, [settings?.locale]);
 
   // Defer context value calculation until settings are confirmed available
-  const value = useMemo(() => {
-      // Return a *default* context value if settings aren't ready
-      if (isLoading || !settings) {
-          return {
-            // Provide a dummy or no-op changeLocale if needed, or make it conditional
-            changeLocale: () => { console.warn("Attempted to change locale before I18n context fully loaded."); },
-            currentLocale: DEFAULT_LOCALE,
-            availableLocales: locales,
-          };
-      }
-      // Calculate the actual context value only when settings are loaded
+  const value = useMemo((): I18nContextType => {
+    // Return a *default* context value if settings aren't ready
+    if (isLoading || !settings) {
       return {
-          changeLocale,
-          currentLocale: (settings?.locale as AppLocale) ?? DEFAULT_LOCALE,
-          availableLocales: locales,
+        // Provide a dummy or no-op changeLocale if needed, or make it conditional
+        changeLocale: () => {
+          console.warn('Attempted to change locale before I18n context fully loaded.');
+        },
+        currentLocale: DEFAULT_LOCALE as AppLocale,
+        availableLocales: localeDetailsMap,
       };
+    }
+    // Calculate the actual context value only when settings are loaded
+    return {
+      changeLocale,
+      currentLocale: (settings?.locale as AppLocale) ?? DEFAULT_LOCALE,
+      availableLocales: localeDetailsMap,
+    };
   }, [settings, isLoading, changeLocale]); // Add isLoading and settings to dependencies
 
   // Render nothing or a loader if config is still loading OR settings aren't populated
   // We still delay children rendering, but the context *value* exists sooner
-  if (isLoading || !settings) { 
-    // console.log('[I18nProvider] Rendering null (isLoading or !settings)');
+  if (isLoading || !settings) {
     return null; // Or <Spinner />;
   }
 
   // Only render provider and children when config is loaded and settings are available
-  // console.log('[I18nProvider] Rendering Provider with value:', value);
   return (
     // Always render the provider now, but conditionally render children via the check above
     // The value will be default initially, then update
-    <I18nContext.Provider value={value as unknown as I18nContextType}>
+    <I18nContext.Provider value={value}>
       <Head>
         <meta httpEquiv="content-language" content={value.currentLocale} />
       </Head>
-      {children} 
+      {children}
     </I18nContext.Provider>
   );
 }

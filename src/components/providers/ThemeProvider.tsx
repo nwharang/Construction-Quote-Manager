@@ -18,7 +18,6 @@ function ThemeObserver() {
         settings.theme !== resolvedTheme &&
         (resolvedTheme === 'dark' || resolvedTheme === 'light')
       ) {
-        console.log('[ThemeObserver] Syncing resolved theme to store:', resolvedTheme);
         setSettings({ theme: resolvedTheme });
       }
     }
@@ -29,7 +28,6 @@ function ThemeObserver() {
     if (theme && settings && theme !== 'system') {
       // Only update if the theme has actually changed
       if (settings.theme !== theme) {
-        console.log('[ThemeObserver] Syncing selected theme to store:', theme);
         setSettings({ theme });
 
         // Dispatch an event that can be detected by other components
