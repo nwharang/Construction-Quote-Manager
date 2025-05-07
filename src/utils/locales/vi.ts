@@ -430,7 +430,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.print.footerNote': 'Ghi chú',
   'quotes.print.quoteInformation': 'Thông tin báo giá',
   'quotes.print.title': 'Báo giá',
-  'quotes.print.tasksAndMaterials': 'Công việc và vật liệu',
+  'quotes.print.tasksAndMaterials': 'Chi tiết báo giá',
   'quotes.print.description': 'Mô tả',
   'quotes.print.labor': 'Công',
   'quotes.print.materials': 'Vật liệu',
@@ -564,6 +564,12 @@ const viTranslations: Record<TranslationKey, string> = {
   'account.info.usernamePlaceholder': 'Nhập tên tài khoản',
   'account.info.currentPasswordLabel': 'Mật khẩu hiện tại',
   'account.info.currentPasswordPlaceholder': 'Nhập mật khẩu hiện tại',
+  'common.error.failedToLoadData': 'Không thể tải dữ liệu',
+  'common.error.generic': 'Đã xảy ra lỗi',
+  'common.error.notFound': 'Không tìm thấy',
+  'common.error.unauthorized': 'Không được phép',
+  'common.error.unknown': 'Đã xảy ra lỗi không xác định',
+  'common.export': 'Xuất dữ liệu',
 };
 
 export default viTranslations;

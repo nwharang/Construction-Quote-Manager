@@ -61,20 +61,10 @@ type SettingUpdateInput = {
 // This schema should align with what the backend expects for these fields.
 // For simplicity, we'll assume basic string validations. More specific ones can be added.
 const companySettingsSchema = z.object({
-  companyName: z
-    .string()
-    .min(1, 'Company name is required')
-    .max(255, 'Company name too long')
-    .nullable()
-    .optional(),
-  companyEmail: z
-    .string()
-    .email('Invalid email address')
-    .max(255, 'Email too long')
-    .nullable()
-    .optional(),
-  companyPhone: z.string().max(50, 'Phone number too long').nullable().optional(),
-  companyAddress: z.string().max(500, 'Address too long').nullable().optional(),
+  companyName: z.string().max(255, 'Company name too long').nullish(),
+  companyEmail: z.string().max(255, 'Email too long').nullish(),
+  companyPhone: z.string().max(50, 'Phone number too long').nullish(),
+  companyAddress: z.string().max(500, 'Address too long').nullish(),
 });
 
 // --- Helper Functions ---
@@ -202,8 +192,6 @@ export default function SettingsPage() {
     }
 
     if (formState === null && (settingsQuery.isLoading || settingsQuery.error)) {
-      // Still loading or error already handled (which initializes formState)
-      // Prevent updates until formState is initialized.
       return;
     }
 

@@ -35,7 +35,7 @@ export const settingsRouter = createTRPCRouter({
     .input(
       z.object({
         companyName: z.string().nullish(),
-        companyEmail: z.string().email('Invalid email address').nullish(),
+        companyEmail: z.string().nullish(),
         companyPhone: z.string().nullish(),
         companyAddress: z.string().nullish(),
       })
@@ -45,6 +45,16 @@ export const settingsRouter = createTRPCRouter({
         // 1. Get user ID from session
         const userId = ctx.session.user.id;
 
+        if (input.companyEmail) {
+          const email = z.string().email('Invalid email address').safeParse(input.companyEmail);
+          if (!email.success) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Invalid email address',
+              cause: email.error,
+            });
+          }
+        }
         // 2. Instantiate the service
         const service = new SettingsService(ctx.db, ctx);
 

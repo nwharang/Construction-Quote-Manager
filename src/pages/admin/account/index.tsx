@@ -16,7 +16,8 @@ import { ResponsiveButton } from '~/components/ui/ResponsiveButton';
 import { APP_NAME } from '~/config/constants';
 import type { NextPageWithLayout } from '~/types/next';
 import { TRPCError } from '@trpc/server';
-import { updateLoginInfoRouterInputSchema } from '~/server/api/routers/auth';
+import { useQueryClient } from '@tanstack/react-query';
+import type { updateLoginInfoRouterInputSchema } from '~/server/api/routers/auth';
 
 // Zod schema for the Profile form
 const profileFormSchema = z.object({
@@ -63,6 +64,7 @@ const AccountSettingsPage: NextPageWithLayout = () => {
   const { t } = useTranslation();
   const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const toast = useAppToast();
+  const queryClient = useQueryClient();
 
   // Fetch user profile data directly from the database
   const {
@@ -118,6 +120,8 @@ const AccountSettingsPage: NextPageWithLayout = () => {
       setProfileValue('image', updatedDbUser.image ?? '');
       // Then update the session
       await updateSession({ name: updatedDbUser.name, image: updatedDbUser.image });
+      // Invalidate the getProfile query using manual key structure
+      await queryClient.invalidateQueries({ queryKey: [['auth', 'getProfile']] });
     },
     onError: (error) => {
       toast.error(t('account.profile.updateError', { message: error.message })); // Add key later
@@ -191,6 +195,8 @@ const AccountSettingsPage: NextPageWithLayout = () => {
           username: data.user?.username ?? accountInfoMethods.getValues('username'),
           currentPassword: '',
         });
+        // Invalidate the getProfile query using manual key structure
+        await queryClient.invalidateQueries({ queryKey: [['auth', 'getProfile']] });
       } else {
         toast.error(data.message || t('account.info.updateError', { message: 'Unknown error' }));
       }
