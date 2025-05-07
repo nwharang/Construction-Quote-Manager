@@ -127,7 +127,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
   return (
     // Always render the provider now, but conditionally render children via the check above
     // The value will be default initially, then update
-    <I18nContext.Provider value={value}>
+    <I18nContext.Provider value={value as unknown as I18nContextType}>
       <Head>
         <meta httpEquiv="content-language" content={value.currentLocale} />
       </Head>
