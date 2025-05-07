@@ -5,12 +5,13 @@ import Head from 'next/head';
 import Link from 'next/link';
 import type { GetStaticProps, GetStaticPaths } from 'next';
 import ReactMarkdown from 'react-markdown';
-import { Card, CardBody, CardHeader, Breadcrumbs, BreadcrumbItem } from '@heroui/react';
+import { Card, CardBody, CardHeader, Breadcrumbs, BreadcrumbItem, Button } from '@heroui/react';
 import { withMainLayout } from '~/utils/withAuth';
 import { useTranslation } from '~/hooks/useTranslation';
 import type { NextPageWithLayout } from '~/types/next';
 import { APP_NAME } from '~/config/constants';
 import { routes } from '~/config/routes';
+import { ArrowLeft } from 'lucide-react';
 
 interface InstructionDetailPageProps {
   slug: string;
@@ -31,14 +32,13 @@ const InstructionDetailPage: NextPageWithLayout<InstructionDetailPageProps> = ({
       <Head>
         <title>{pageTitle}</title>
       </Head>
-      <div className="mx-auto size-full">
-        <Breadcrumbs className="mb-4">
-          <BreadcrumbItem href={routes.admin.dashboard}>{t('nav.dashboard')}</BreadcrumbItem>
-          <BreadcrumbItem href={routes.instruction.list}>
-            {t('instructions.pageTitle')}
-          </BreadcrumbItem>
-          <BreadcrumbItem isCurrent>{title}</BreadcrumbItem>
-        </Breadcrumbs>
+      <div className="mx-auto flex size-full flex-col gap-4">
+        <div className="flex justify-between">
+          <Button as={Link} href={routes.instruction.list} variant="light">
+            <ArrowLeft size={16} />
+            {t('common.back')}
+          </Button>
+        </div>
         <Card>
           <CardBody>
             <article className="prose prose-sm dark:prose-invert max-w-none p-3">

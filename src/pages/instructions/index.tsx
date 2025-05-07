@@ -50,7 +50,7 @@ const InstructionsIndexPage: NextPageWithLayout<InstructionsIndexPageProps> = ({
               >
                 <span className="text-primary text-base font-medium">{item.title}</span>
                 {item.description && (
-                  <p className="text-default-600 dark:text-default-400 mt-1 text-sm">
+                  <p className="indent-4 text-default-600 dark:text-default-400 mt-1 text-sm">
                     {item.description}
                   </p>
                 )}
@@ -66,30 +66,32 @@ const InstructionsIndexPage: NextPageWithLayout<InstructionsIndexPageProps> = ({
 export const getStaticProps = async (context: GetStaticPropsContext) => {
   const instructionsDir = path.join(process.cwd(), 'src/instructions');
   let topics: InstructionTopic[] = [];
+  const locale = context.locale || context.defaultLocale || 'en';
   try {
     const filenames = fs.readdirSync(instructionsDir);
     topics = filenames
       .filter((filename) => filename.endsWith('.md'))
       .map((filename) => {
         const slug = filename.replace(/\.md$/, '');
-        const locale = context.locale || context.defaultLocale || 'vi';
+
         const filePath = path.join(instructionsDir, locale, filename);
         let title = slug.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+
         let description = '';
         try {
           const fileContent = fs.readFileSync(filePath, 'utf8');
           const firstLine = fileContent.split('\n')[0];
-          if (firstLine?.startsWith('# ')) {
-            title = firstLine.substring(2).trim();
+          if (firstLine?.startsWith('## ')) {
+            title = firstLine.substring(3).trim();
           }
           const lines = fileContent.split('\n');
           let h1Found = false;
           for (const line of lines) {
-            if (line.startsWith('# ')) {
+            if (line.startsWith('## ')) {
               h1Found = true;
               continue;
             }
-            if (h1Found && line.trim().length > 0 && !line.startsWith('#')) {
+            if (h1Found && line.trim().length > 0 && !line.startsWith('##')) {
               description = line.trim();
               break;
             }
