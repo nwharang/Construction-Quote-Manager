@@ -4,5 +4,6 @@
  */
 
 // Application name and version
-export const APP_NAME = 'TTXD';
+export const APP_NAME = 'Easy Construction Quotes';
+export const APP_SHORT_NAME = 'ECQ';
 export const APP_VERSION = '0.0.1';

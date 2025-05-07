@@ -95,23 +95,25 @@ export function QuotesList() {
   // Extract quotes and pagination info from API response
   const quotes = useMemo(() => {
     if (!quotesData?.items) return [];
-    
+
     // Map API response to QuoteListItem type
-    return quotesData.items.map(item => ({
+    return quotesData.items.map((item) => ({
       id: item.id,
       sequentialId: item.sequentialId,
       title: item.title,
       customerId: item.customerId,
       customerName: item.customerName || item.customer?.name || null,
       status: item.status,
-      createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : String(item.createdAt),
-      updatedAt: item.updatedAt instanceof Date ? item.updatedAt.toISOString() : String(item.updatedAt),
+      createdAt:
+        item.createdAt instanceof Date ? item.createdAt.toISOString() : String(item.createdAt),
+      updatedAt:
+        item.updatedAt instanceof Date ? item.updatedAt.toISOString() : String(item.updatedAt),
       grandTotal: Number(item.grandTotal),
       markupPercentage: Number(item.markupPercentage),
       notes: item.notes,
     }));
   }, [quotesData]);
-  
+
   const totalPages = quotesData?.totalPages || 1;
 
   // --- Delete Mutation ---
@@ -202,31 +204,25 @@ export function QuotesList() {
             <div className="flex flex-col">
               <p className="text-foreground font-medium">{quote.title}</p>
               {quote.notes && (
-                <p className="text-default-500 max-w-[200px] truncate text-xs">
-                  {quote.notes}
-                </p>
+                <p className="text-default-500 max-w-[200px] truncate text-xs">{quote.notes}</p>
               )}
             </div>
           );
         case 'customerName':
           return quote.customerName ?? '-';
         case 'status': {
-          const statusInfo = QuoteStatusSettings[quote.status] || { color: 'default', label: quote.status };
+          const statusInfo = QuoteStatusSettings[quote.status] || {
+            color: 'default',
+            label: quote.status,
+          };
           return (
-            <Chip
-              color={statusInfo.color}
-              variant="flat"
-              size="sm"
-              className="capitalize"
-            >
+            <Chip color={statusInfo.color} variant="flat" size="sm" className="capitalize">
               {statusInfo.label}
             </Chip>
           );
         }
         case 'createdAt':
-          return quote.createdAt
-            ? formatDate(new Date(quote.createdAt), 'short')
-            : '-';
+          return quote.createdAt ? formatDate(new Date(quote.createdAt), 'short') : '-';
         case 'grandTotal':
           return formatCurrency(Number(quote.grandTotal));
         case 'actions':
@@ -285,20 +281,19 @@ export function QuotesList() {
         as="div" // Force it to render as a div instead of a button
       >
         {/* Card Header */}
-        <div 
-          className="flex flex-col cursor-pointer" 
-          onClick={() => handleView(quote)}
-        >
+        <div className="flex cursor-pointer flex-col" onClick={() => handleView(quote)}>
           <CardHeader className="flex flex-col items-start p-4 pb-3">
             <div className="flex w-full items-center justify-between">
               <h3 className="text-lg font-semibold">{quote.title}</h3>
-              <span className="text-foreground-500 text-sm font-mono">#{quote.sequentialId || ''}</span>
+              <span className="text-foreground-500 font-mono text-sm">
+                #{quote.sequentialId || ''}
+              </span>
             </div>
-            <p className="text-default-400 mt-1 text-[11px]">
-              <p className="text-sm text-default-500">
+            <div className="mt-1 text-[11px]">
+              <p className="text-default-500 text-sm">
                 {quote.createdAt ? formatDate(new Date(quote.createdAt), 'short') : '-'}
               </p>
-            </p>
+            </div>
           </CardHeader>
 
           <Divider className="opacity-50" />
@@ -314,7 +309,10 @@ export function QuotesList() {
                   <p className="text-default-400 text-xs">{t('quotes.list.status')}</p>
                   <div className="mt-1">
                     {(() => {
-                      const statusInfo = QuoteStatusSettings[quote.status] || { color: 'default', label: quote.status };
+                      const statusInfo = QuoteStatusSettings[quote.status] || {
+                        color: 'default',
+                        label: quote.status,
+                      };
                       return (
                         <Chip
                           color={statusInfo.color}
@@ -355,9 +353,7 @@ export function QuotesList() {
           </CardBody>
         </div>
 
-        <div
-          className="border-default-100 flex gap-2 border-t p-3"
-        >
+        <div className="border-default-100 flex gap-2 border-t p-3">
           <Button
             size="sm"
             color="primary"
@@ -428,7 +424,7 @@ export function QuotesList() {
         createButtonLabel={t('common.create')}
         searchPlaceholder={t('quotes.list.searchPlaceholder')}
       />
-      
+
       <Card className="w-full">
         <CardBody className="px-2 sm:px-4">
           {isLoading ? (
@@ -442,7 +438,7 @@ export function QuotesList() {
             </div>
           ) : (
             // Table View - responsive with horizontal scroll on small screens
-            <div className="-mx-2 sm:-mx-4 overflow-x-auto">
+            <div className="-mx-2 overflow-x-auto sm:-mx-4">
               <Table
                 aria-label="Quotes table"
                 isStriped={tableSettings.stripedRows}
@@ -458,10 +454,7 @@ export function QuotesList() {
                     <TableColumn key={column.uid}>{column.name}</TableColumn>
                   ))}
                 </TableHeader>
-                <TableBody
-                  items={quotes ?? []}
-                  emptyContent={t('common.noResults')}
-                >
+                <TableBody items={quotes ?? []} emptyContent={t('common.noResults')}>
                   {(item) => (
                     <TableRow key={item.id} className="hover:bg-default-50">
                       {visibleColumns.map((column) => (
@@ -476,7 +469,7 @@ export function QuotesList() {
 
           {/* Pagination - only show if we have more than one page */}
           {totalPages > 1 && (
-            <div className="mt-4 sm:mt-6 flex justify-center">
+            <div className="mt-4 flex justify-center sm:mt-6">
               <Pagination
                 page={page}
                 total={totalPages}
@@ -503,4 +496,4 @@ export function QuotesList() {
       </Card>
     </div>
   );
-} 
+}

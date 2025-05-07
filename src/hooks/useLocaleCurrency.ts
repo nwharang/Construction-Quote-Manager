@@ -12,10 +12,9 @@ export const useLocaleCurrency = () => {
   const getDefaultCurrencyForLocale = useCallback((locale: string): string => {
     switch (locale) {
       case 'vi':
-        return 'VND';
       case 'en':
       default:
-        return 'USD';
+        return 'VND';
     }
   }, []);
 

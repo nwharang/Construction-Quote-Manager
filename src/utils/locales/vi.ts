@@ -16,10 +16,8 @@ const viTranslations: Record<TranslationKey, string> = {
   'auth.signUp.emailLabel': 'Email',
   'auth.signUp.errorPasswordTooShort': 'Mật khẩu phải có ít nhất {{min}} ký tự.',
   'auth.signUp.errorPasswordsDoNotMatch': 'Mật khẩu không khớp.',
-  'auth.signUp.errorSignInFailed':
-    'Đăng ký thành công, nhưng không thể tự động đăng nhập. Vui lòng thử đăng nhập thủ công.',
-  'auth.signUp.errorUnexpected':
-    'Đã xảy ra lỗi không mong muốn trong quá trình đăng ký. Vui lòng thử lại.',
+  'auth.signUp.errorSignInFailed': 'Đăng ký thành công, nhưng không thể tự động đăng nhập. Vui lòng thử đăng nhập thủ công.',
+  'auth.signUp.errorUnexpected': 'Đã xảy ra lỗi không mong muốn trong quá trình đăng ký. Vui lòng thử lại.',
   'auth.signUp.nameLabel': 'Tên',
   'auth.signUp.passwordHint': 'Tối thiểu {{min}} ký tự',
   'auth.signUp.passwordLabel': 'Mật khẩu',
@@ -208,7 +206,8 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.view.laborCost': 'Chi phí Nhân công',
   'quotes.view.materials': 'Vật liệu',
   'quotes.view.actions': 'Hành động',
-  'quotes.summary.markupCalculated': 'Tính toán tăng giá',
+  'quotes.view.quoteDetails': 'Thông tin báo giá',
+  'quotes.summary.markupCalculated': 'Phụ phí:',
   'quotes.materialNameLabel': 'Tên Vật liệu',
   'quotes.materialDescriptionLabel': 'Mô tả Vật liệu',
   'quotes.materialQuantityLabel': 'Số lượng',
@@ -283,7 +282,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.print.showingPrintDate': 'Hiển thị Ngày In',
   'quotes.print.hidingPrintDate': 'Ẩn Ngày In',
   // Nhãn chữ ký mới
-  'quotes.print.signatureAuthorizedLabel': 'Đại diện ký tên',
+  'quotes.print.signatureAuthorizedLabel': 'Đại Diện Ký Tên',
   'quotes.print.signatureNamePrintedLabel': 'Ký và ghi rõ họ tên',
   // Ô nhập Tên Người Ký
   'quotes.print.signerNameLabel': 'Tên Người Ký',
@@ -309,6 +308,7 @@ const viTranslations: Record<TranslationKey, string> = {
   'nav.products': 'Sản phẩm',
   'nav.quotes': 'Báo giá',
   'nav.settings': 'Cài đặt',
+  'nav.instructions': 'Hướng dẫn',
   'print.document': 'In tài liệu',
   'print.printNow': 'In ngay',
   'productFields.category': 'Danh mục',
@@ -509,6 +509,10 @@ const viTranslations: Record<TranslationKey, string> = {
   'quotes.taskDrawer.lumpSumCostPlaceholder': '0.00',
   'quotes.taskDrawer.quantityPlaceholder': '1',
   'quotes.taskDrawer.unitPricePlaceholder': '0.00',
+  // Hướng dẫn
+  'instructions.pageTitle': 'Hướng dẫn & Trợ giúp',
+  'instructions.description': 'Tìm trợ giúp và hướng dẫn sử dụng ứng dụng bên dưới.',
+  'tasks.addTaskButton': 'Thêm công việc',
 };
 
 export default viTranslations;

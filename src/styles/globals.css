@@ -1,5 +1,6 @@
 @import 'tailwindcss';
-@config "../../tailwind.config.js";
+@config "../../tailwind.config.ts";
+@plugin "@tailwindcss/typography";
 
 /* Force hardware acceleration for smoother rendering */
 .select-container,

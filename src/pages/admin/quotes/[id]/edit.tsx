@@ -182,6 +182,7 @@ function EditQuotePageContent() {
                       task.materials?.map((material) => ({
                         id: material.id,
                         productId: material.productId,
+                        productName: material.productName ?? undefined,
                         quantity: material.quantity,
                         unitPrice: parseFloat(material.unitPrice),
                         notes: material.notes || null,

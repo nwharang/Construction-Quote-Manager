@@ -16,10 +16,8 @@ const enTranslations: Record<TranslationKey, string> = {
   'auth.signUp.emailLabel': 'Email',
   'auth.signUp.errorPasswordTooShort': 'Password must be at least {{min}} characters long.',
   'auth.signUp.errorPasswordsDoNotMatch': 'Passwords do not match.',
-  'auth.signUp.errorSignInFailed':
-    'Registration successful, but failed to sign you in automatically. Please try signing in manually.',
-  'auth.signUp.errorUnexpected':
-    'An unexpected error occurred during registration. Please try again.',
+  'auth.signUp.errorSignInFailed': 'Registration successful, but failed to sign you in automatically. Please try signing in manually.',
+  'auth.signUp.errorUnexpected': 'An unexpected error occurred during registration. Please try again.',
   'auth.signUp.nameLabel': 'Name',
   'auth.signUp.passwordHint': 'Minimum {{min}} characters',
   'auth.signUp.passwordLabel': 'Password',
@@ -84,6 +82,7 @@ const enTranslations: Record<TranslationKey, string> = {
   'nav.products': 'Products',
   'nav.quotes': 'Quotes',
   'nav.settings': 'Settings',
+  'nav.instructions': 'Instructions',
   'print.document': 'Print Document',
   'print.printNow': 'Print Now',
   'productFields.category': 'Category',
@@ -167,8 +166,7 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.print.subtotal': 'Subtotal',
   'quotes.print.markup': 'Markup',
   'quotes.print.grandTotal': 'Grand Total',
-  'quotes.print.footerNote':
-    'This document was generated on {date} and is for estimation purposes only.',
+  'quotes.print.footerNote': 'This document was generated on {date} and is for estimation purposes only.',
   'quotes.print.quoteInformation': 'Quote Information',
   'quotes.print.title': 'Title',
   'quotes.print.tasksAndMaterials': 'Tasks & Materials',
@@ -177,8 +175,7 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.print.materials': 'Materials',
   'quotes.print.summary': 'Summary',
   'quotes.print.notes': 'Notes',
-  'quotes.print.generatedMessage':
-    'This document was generated on {date} and is for estimation purposes only.',
+  'quotes.print.generatedMessage': 'This document was generated on {date} and is for estimation purposes only.',
   'quotes.taskDescriptionLabel': 'Task Description',
   'quotes.taskDescriptionPlaceholder': 'Enter task description...',
   'quotes.taskPriceLabel': 'Task Price',
@@ -352,6 +349,7 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.view.laborCost': 'Labor Cost',
   'quotes.view.materials': 'Materials',
   'quotes.view.actions': 'Actions',
+  'quotes.view.quoteDetails': 'Quote Details',
   'quotes.summary.markupCalculated': 'Markup Calculated',
   'quotes.materialNameLabel': 'Material Name',
   'quotes.materialDescriptionLabel': 'Material Description',
@@ -470,7 +468,6 @@ const enTranslations: Record<TranslationKey, string> = {
   'quotes.taskDrawer.noMaterials': 'No materials added yet.',
   'quotes.taskDrawer.deleteMaterialTooltip': 'Delete Material',
   // END Task Detail Drawer Keys
-
   // Product Placeholders
   'products.placeholders.name': 'Enter product name',
   'products.placeholders.description': 'Enter product description',
@@ -482,24 +479,26 @@ const enTranslations: Record<TranslationKey, string> = {
   'products.placeholders.location': 'Enter storage location',
   'products.placeholders.notes': 'Enter any relevant notes',
   // END Product Placeholders
-
   // Category Placeholders
   'categories.placeholders.name': 'Enter category name',
   'categories.placeholders.description': 'Enter category description',
   // END Category Placeholders
-
   // Task Detail Placeholders (additional)
   'quotes.taskDrawer.pricePlaceholder': '0.00',
   'quotes.taskDrawer.lumpSumCostPlaceholder': '0.00',
   'quotes.taskDrawer.quantityPlaceholder': '1',
   'quotes.taskDrawer.unitPricePlaceholder': '0.00',
   // END Task Detail Placeholders (additional)
-
   // Settings Placeholders
   'settings.placeholders.company.name': 'Your Company Name',
   'settings.placeholders.company.email': 'contact@yourcompany.com',
   'settings.placeholders.company.phone': '+1 (555) 123-4567',
   'settings.placeholders.company.address': '123 Main St, Anytown, USA',
+
+  // Instructions
+  'instructions.pageTitle': 'Instructions & Help',
+  'instructions.description': 'Find help and instructions for using the application below.',
+  'tasks.addTaskButton': 'Add Task',
 };
 
 export default enTranslations;

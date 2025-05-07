@@ -80,6 +80,7 @@ export interface TaskFields extends BaseEntityFields {
 export interface MaterialFields extends BaseEntityFields {
   taskId: string;
   productId: string | null;
+  productName: string | null;
   quantity: number;
   unitPrice: number;
   notes: string | null;

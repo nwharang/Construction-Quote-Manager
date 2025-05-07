@@ -46,7 +46,6 @@ export function Navigation({ onMenuClick }: NavigationProps) {
 
   // Check if path is active
   const isActive = (path: string) => router.pathname.startsWith(path);
-  const isProfileActive = isActive('/admin/profile');
   const isSettingsActive = isActive('/admin/settings');
 
   if (!session && status !== 'loading') {
@@ -83,29 +82,6 @@ export function Navigation({ onMenuClick }: NavigationProps) {
           <ThemeToggle />
         </NavbarItem>
 
-        {/* Notifications dropdown */}
-        {/* <NavbarItem>
-          <Dropdown placement="bottom-end">
-            <DropdownTrigger>
-              <Button
-                variant="light"
-                isIconOnly
-                aria-label="Notifications"
-                className="text-default-500"
-              >
-                <Badge content="3" color="danger" size="sm">
-                  <Bell size={20} />
-                </Badge>
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu aria-label="Notifications">
-              <DropdownItem key="notification-1">New quote request</DropdownItem>
-              <DropdownItem key="notification-2">Customer message</DropdownItem>
-              <DropdownItem key="view-all">View all notifications</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-        </NavbarItem> */}
-
         {/* User menu dropdown */}
         <NavbarItem>
           <Dropdown placement="bottom-end">
@@ -121,14 +97,6 @@ export function Navigation({ onMenuClick }: NavigationProps) {
               />
             </DropdownTrigger>
             <DropdownMenu aria-label={t('userMenu.title')}>
-              <DropdownItem
-                key="profile"
-                startContent={<Users size={16} />}
-                className={isProfileActive ? 'text-primary' : ''}
-                href="/admin/profile"
-              >
-                {t('userMenu.profile')}
-              </DropdownItem>
               <DropdownItem
                 key="settings"
                 startContent={<Settings size={16} />}

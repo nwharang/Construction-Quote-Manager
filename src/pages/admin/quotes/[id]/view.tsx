@@ -34,6 +34,7 @@ import {
   Package,
   RefreshCw,
   FileText,
+  User,
 } from 'lucide-react';
 import { useTranslation } from '~/hooks/useTranslation';
 import { api } from '~/utils/api';
@@ -296,7 +297,7 @@ function QuoteDetailContent() {
               variant="light"
               className="mb-4"
               startContent={<ArrowLeft size={16} />}
-              onClick={() => router.push(routes.admin.quotes.list)}
+              onPress={() => router.push(routes.admin.quotes.list)}
             >
               {t('quotes.view.backToQuotes')}
             </Button>
@@ -307,93 +308,89 @@ function QuoteDetailContent() {
               variant="flat"
               icon={<RefreshCw size={16} />}
               label={t('quotes.view.changeStatus')}
-              onClick={openStatusChangeModal}
+              onPress={openStatusChangeModal}
             />
             <ResponsiveButton
               color="primary"
               variant="flat"
               icon={<Printer size={16} />}
               label={t('common.print')}
-              onClick={handlePrint}
+              onPress={handlePrint}
             />
             <ResponsiveButton
               color="primary"
               variant="flat"
               icon={<Edit size={16} />}
               label={t('common.edit')}
-              onClick={handleEdit}
+              onPress={handleEdit}
             />
             <ResponsiveButton
               color="danger"
               variant="flat"
               icon={<Trash size={16} />}
               label={t('common.delete')}
-              onClick={() => setIsDeleteDialogOpen(true)}
+              onPress={() => setIsDeleteDialogOpen(true)}
             />
           </div>
         </div>
 
         {/* Quote Details Card */}
         <Card className="shadow-md transition-shadow duration-300 hover:shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+          <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-2xl font-bold">
                 {quote.title || `Quote #${quote.sequentialId || quote.id.substring(0, 8)}`}
               </h2>
               <div className="flex items-center gap-2">
-                <QuoteStatusBadge status={quote.status} size="md" />
-                <Tooltip content={statusDetails.description}>
-                  <div className="ml-2 flex items-center border-l pl-2 text-sm text-gray-600 dark:text-gray-300">
-                    {statusDetails.icon}
-                    <span>{quote.status}</span>
-                  </div>
-                </Tooltip>
+                <div className="ml-2 flex items-center border-l pl-2 text-sm text-gray-600 dark:text-gray-300">
+                  {statusDetails.icon}
+                  <span>{quote.status}</span>
+                </div>
               </div>
             </div>
           </CardHeader>
           <CardBody>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Customer Information */}
-              <Card className="border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                <CardBody>
-                  <h3 className="mb-3 flex items-center text-lg font-semibold">
-                    <svg
-                      className="mr-2 h-5 w-5 text-blue-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
+              <Card className="border border-gray-200 dark:border-gray-700">
+                <CardHeader>
+                  <h3 className="flex items-center text-lg font-semibold">
+                    <User size={20} className="mr-2 text-blue-500" />
                     {t('quotes.view.customerInfo')}
                   </h3>
+                </CardHeader>
+                <CardBody>
                   {quote.customer ? (
                     <dl className="space-y-3 text-sm">
                       {/* Name */}
                       <div className="grid grid-cols-3 gap-1">
-                        <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerNameLabel')}</dt>
+                        <dt className="font-medium text-gray-600 dark:text-gray-400">
+                          {t('quotes.view.customerNameLabel')}
+                        </dt>
                         <dd className="col-span-2 font-medium">{quote.customer.name || '-'}</dd>
                       </div>
                       {/* Email */}
                       <div className="grid grid-cols-3 gap-1">
-                         <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerEmailLabel')}</dt>
-                         <dd className="col-span-2">{quote.customer.email || '-'}</dd>
+                        <dt className="font-medium text-gray-600 dark:text-gray-400">
+                          {t('quotes.view.customerEmailLabel')}
+                        </dt>
+                        <dd className="col-span-2">{quote.customer.email || '-'}</dd>
                       </div>
                       {/* Phone */}
                       <div className="grid grid-cols-3 gap-1">
-                         <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerPhoneLabel')}</dt>
-                         <dd className="col-span-2">{quote.customer.phone || '-'}</dd>
+                        <dt className="font-medium text-gray-600 dark:text-gray-400">
+                          {t('quotes.view.customerPhoneLabel')}
+                        </dt>
+                        <dd className="col-span-2">{quote.customer.phone || '-'}</dd>
                       </div>
                       {/* Address */}
                       <div className="grid grid-cols-3 gap-1">
-                         <dt className="font-medium text-gray-600 dark:text-gray-400">{t('quotes.view.customerAddressLabel')}</dt>
-                         <dd className="col-span-2 whitespace-pre-line">{quote.customer.address || '-'}</dd>
+                        <dt className="font-medium text-gray-600 dark:text-gray-400">
+                          {t('quotes.view.customerAddressLabel')}
+                        </dt>
+                        <dd className="col-span-2 whitespace-pre-line">
+                          {quote.customer.address || '-'}
+                        </dd>
                       </div>
                     </dl>
                   ) : (
@@ -403,11 +400,11 @@ function QuoteDetailContent() {
               </Card>
 
               {/* Quote Information */}
-              <Card className="border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+              <Card className="border border-gray-200 dark:border-gray-700">
                 <CardHeader>
                   <h3 className="flex items-center text-lg font-semibold">
                     <FileText className="mr-2 text-green-500" size={20} />
-                    {t('quotes.view.quoteSummary')}
+                    {t('quotes.view.quoteDetails')}
                   </h3>
                 </CardHeader>
                 <CardBody>
@@ -429,29 +426,36 @@ function QuoteDetailContent() {
                       <span>{t('quotes.view.markup')}</span>
                       <span>{quote.markupPercentage * 100}%</span>
                     </div>
-
-                    {totals && (
-                      <div className="mt-4 border-t pt-4">
-                        <div className="flex justify-between py-1 text-gray-700 dark:text-gray-300">
-                          <span>{t('quotes.view.subtotal')}:</span>
-                          <span>{formatCurrency(totals.subtotal)}</span>
-                        </div>
-                        <div className="flex justify-between py-1 text-gray-700 dark:text-gray-300">
-                          <span>
-                            {t('quotes.summary.markupCalculated')} ({quote.markupPercentage}%)
-                          </span>
-                          <span>{formatCurrency(totals.markupAmount)}</span>
-                        </div>
-                        <div className="mt-2 flex justify-between py-1 text-lg font-bold">
-                          <span>{t('quotes.view.grandTotal')}</span>
-                          <span>{formatCurrency(totals.grandTotal)}</span>
-                        </div>
-                      </div>
-                    )}
                   </dl>
                 </CardBody>
               </Card>
             </div>
+            <Card className="mt-4 border border-gray-200 dark:border-gray-700">
+              <CardHeader>
+                <h3 className="flex items-center text-lg font-semibold">
+                  <FileText className="mr-2 text-green-500" size={20} />
+                  {t('quotes.view.quoteSummary')}
+                </h3>
+              </CardHeader>
+              <CardBody>
+                {totals && (
+                  <>
+                    <div className="flex justify-between pb-1 text-gray-700 dark:text-gray-300">
+                      <span>{t('quotes.view.subtotal')}</span>
+                      <span>{formatCurrency(totals.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 text-gray-700 dark:text-gray-300">
+                      <span>{t('quotes.summary.markupCalculated')}</span>
+                      <span>{formatCurrency(totals.markupAmount)}</span>
+                    </div>
+                    <div className="mt-2 flex justify-between py-1 text-lg font-bold">
+                      <span>{t('quotes.view.grandTotal')}</span>
+                      <span>{formatCurrency(totals.grandTotal)}</span>
+                    </div>
+                  </>
+                )}
+              </CardBody>
+            </Card>
 
             {/* Cost Breakdown */}
             {totals && (
@@ -476,16 +480,14 @@ function QuoteDetailContent() {
                     {t('quotes.view.costBreakdown')}
                   </h3>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <Card className="border border-blue-100 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20">
+                    <Card>
                       <CardBody>
-                        <h4 className="mb-1 text-sm text-blue-700 dark:text-blue-300">
-                          {t('quotes.view.labor')}
-                        </h4>
+                        <h4 className="mb-1 text-sm">{t('quotes.view.labor')}</h4>
                         <p className="text-lg font-bold">{formatCurrency(totals.laborTotal)}</p>
                         <div className="mt-2">
                           <div className="mb-1 flex justify-between text-xs">
                             <span>
-                              {Math.round(totals.laborPercentage)}%{' '}
+                              {Math.round(totals.laborPercentage)}
                               {t('quotes.view.percentOfTotal')}
                             </span>
                           </div>
@@ -499,16 +501,14 @@ function QuoteDetailContent() {
                       </CardBody>
                     </Card>
 
-                    <Card className="border border-green-100 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
+                    <Card>
                       <CardBody>
-                        <h4 className="mb-1 text-sm text-green-700 dark:text-green-300">
-                          {t('quotes.view.materials')}
-                        </h4>
+                        <h4 className="mb-1 text-sm">{t('quotes.view.materials')}</h4>
                         <p className="text-lg font-bold">{formatCurrency(totals.materialsTotal)}</p>
                         <div className="mt-2">
                           <div className="mb-1 flex justify-between text-xs">
                             <span>
-                              {Math.round(totals.materialsPercentage)}%{' '}
+                              {Math.round(totals.materialsPercentage)}
                               {t('quotes.view.percentOfTotal')}
                             </span>
                           </div>
@@ -522,16 +522,14 @@ function QuoteDetailContent() {
                       </CardBody>
                     </Card>
 
-                    <Card className="border border-amber-100 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                    <Card>
                       <CardBody>
-                        <h4 className="mb-1 text-sm text-amber-700 dark:text-amber-300">
-                          {t('quotes.summary.markupCalculated')}
-                        </h4>
+                        <h4 className="mb-1 text-sm">{t('quotes.summary.markupCalculated')}</h4>
                         <p className="text-lg font-bold">{formatCurrency(totals.markupAmount)}</p>
                         <div className="mt-2">
                           <div className="mb-1 flex justify-between text-xs">
                             <span>
-                              {Math.round(totals.markupPercentage)}%{' '}
+                              {Math.round(totals.markupPercentage)}
                               {t('quotes.view.percentOfTotal')}
                             </span>
                           </div>
@@ -571,7 +569,7 @@ function QuoteDetailContent() {
                     </svg>
                     {t('quotes.view.notes')}
                   </h3>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                  <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                     <p className="whitespace-pre-wrap">{quote.notes}</p>
                   </div>
                 </div>

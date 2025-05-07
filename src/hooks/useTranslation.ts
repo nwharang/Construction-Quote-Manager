@@ -77,93 +77,48 @@ export function useTranslation(): UseTranslationReturn {
   const formatCurrency = useCallback(
     (value: number | string): string => {
       const numValue = typeof value === 'string' ? parseFloat(value) : value;
+      // Determine the effective locale, defaulting to 'en' if necessary
       const effectiveLocale = settings?.locale || locale || 'en';
+
+      // --- FORCE CURRENCY TO VND ---
+      const effectiveCurrency = 'VND'; 
+      // --- END FORCE CURRENCY ---
       
-      // Determine the intended currency, defaulting based on locale
-      let effectiveCurrency = 
-        effectiveLocale === 'vi' && !settings?.currency 
-          ? 'VND' 
-          : settings?.currency || 'USD';
-
-      // *** ADD VALIDATION ***
-      // Ensure effectiveCurrency is a valid 3-letter code before using it.
-      // If it's something like 'en' or 'vi', fallback to a default.
-      const isValidCurrencyCode = /^[A-Z]{3}$/.test(effectiveCurrency);
-      if (!isValidCurrencyCode) {
-        console.warn(`[formatCurrency] Invalid currency code "${effectiveCurrency}" detected for locale "${effectiveLocale}". Falling back.`);
-        // Fallback logic: VND for Vietnamese locale, otherwise USD
-        effectiveCurrency = effectiveLocale === 'vi' ? 'VND' : 'USD';
-      }
-      // *** END VALIDATION ***
-
       if (isNaN(numValue)) return 'NaN';
 
       try {
-        // Create options based on the currency
+        // Create options specifically for VND
         const options: Intl.NumberFormatOptions = {
           style: 'currency',
-          currency: effectiveCurrency,
-          // Adjust fractional digits based on currency (many currencies like VND don't use decimal places)
-          minimumFractionDigits: ['VND', 'JPY', 'KRW'].includes(effectiveCurrency) ? 0 : 2,
-          maximumFractionDigits: ['VND', 'JPY', 'KRW'].includes(effectiveCurrency) ? 0 : 2,
-          // Ensure currencyDisplay respects the locale's preferences
-          currencyDisplay: 'symbol',
-          // Add useGrouping for proper thousand separators
+          currency: effectiveCurrency, // Always VND
+          minimumFractionDigits: 0, // VND uses 0 decimal places
+          maximumFractionDigits: 0, // VND uses 0 decimal places
+          currencyDisplay: 'symbol', // Use '₫' symbol
           useGrouping: true,
         };
 
-        // Special handling for VND in Vietnamese locale
-        if (effectiveCurrency === 'VND' && effectiveLocale === 'vi') {
-          // Use the native Intl formatter for Vietnamese Dong
-          return new Intl.NumberFormat('vi-VN', options).format(numValue);
-        }
-
+        // Format using the determined locale and VND options
         return new Intl.NumberFormat(effectiveLocale, options).format(numValue);
+        
       } catch (error) {
-        // More robust fallback that respects currency type
-        console.error(`Currency formatting error: ${error}`);
-        let symbol = '$';
-        let fractionDigits = 2;
+        // Simplified fallback specifically for VND formatting issues
+        console.error(`Currency formatting error for VND: ${error}`);
+        const symbol = '₫';
+        const fractionDigits = 0; 
         
-        // Simple mapping for fallback symbols and decimal places
-        if (effectiveCurrency === 'VND') {
-          symbol = '₫';
-          fractionDigits = 0; // VND typically doesn't use decimal places
-        } else if (effectiveCurrency === 'EUR') {
-          symbol = '€';
-        } else if (effectiveCurrency === 'GBP') {
-          symbol = '£';
-        } else if (effectiveCurrency === 'JPY' || effectiveCurrency === 'KRW') {
-          symbol = effectiveCurrency === 'JPY' ? '¥' : '₩';
-          fractionDigits = 0; // JPY and KRW don't use decimal places
-        }
-        
-        // Format with appropriate decimal places and thousand separators
         const formattedValue = numValue.toFixed(fractionDigits);
         
-        // Add thousand separators based on locale
-        // Vietnamese uses periods for thousand separators
-        const withSeparators = effectiveLocale === 'vi'
-          ? formattedValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-          : formattedValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        // Add thousand separators based on locale convention
+        const separator = effectiveLocale === 'vi' ? '.' : ','; // Vietnamese uses '.', others usually ','
+        const regex = new RegExp(`\B(?=(\d{3})+(?!\d))`, 'g');
+        const withSeparators = formattedValue.replace(regex, separator);
         
-        // Position the symbol according to locale conventions
-        // In Vietnamese the currency symbol comes after the amount
-        if (effectiveLocale === 'vi') {
-          // For Vietnamese, VND symbol after the number with a space
-          return effectiveCurrency === 'VND' 
-            ? `${withSeparators} ${symbol}`
-            : `${withSeparators} ${effectiveCurrency}`;
-        } else if (['fr', 'es', 'it'].includes(effectiveLocale)) {
-          // Other locales that place symbol after the number
-          return `${withSeparators} ${symbol}`;
-        } else {
-          // Default format with symbol before the number
-          return `${symbol}${withSeparators}`;
-        }
+        // Position the symbol after the number with a space, common for VND
+        return `${withSeparators} ${symbol}`;
       }
     },
-    [settings?.locale, locale, settings?.currency]
+    // Update dependencies: remove settings.currency as it's no longer used
+    [settings?.locale, locale] 
   );
 
   const formatDate = useCallback(

@@ -24,9 +24,9 @@ export const StatCards: React.FC<StatCardsProps> = ({
 }) => {
   // Helper function to format currency
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'VND',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -34,7 +34,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
 
   // Helper function to format numbers
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('en-US').format(value);
+    return new Intl.NumberFormat('vi-Vn').format(value);
   };
   
   // Helper function to format percentages

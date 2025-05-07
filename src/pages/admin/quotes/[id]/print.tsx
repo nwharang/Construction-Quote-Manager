@@ -45,6 +45,7 @@ interface Task {
 }
 
 const PrintQuotePage: NextPageWithLayout = () => {
+  // --- START: Moved all hooks to the top ---
   const router = useRouter();
   const { id: quoteId } = router.query;
   const { status } = useSession();
@@ -56,42 +57,7 @@ const PrintQuotePage: NextPageWithLayout = () => {
   const [showSeparatePrices, setShowSeparatePrices] = useState(false);
   const [showPrintDate, setShowPrintDate] = useState(false);
   const [signerName, setSignerName] = useState('');
-  // Get company info from config store
   const { settings } = useConfigStore();
-
-  useEffect(() => {
-    setMounted(true);
-    // Load settings from localStorage
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem(PRINT_SETTINGS_STORAGE_KEY);
-      if (savedSettings) {
-        try {
-          const parsedSettings: PrintSettings = JSON.parse(savedSettings);
-          setShowMarkupLineItem(parsedSettings.showMarkupLineItem);
-          setShowSignatureSection(parsedSettings.showSignatureSection);
-          setShowSeparatePrices(parsedSettings.showSeparatePrices);
-          setShowPrintDate(parsedSettings.showPrintDate);
-          setSignerName(parsedSettings.signerName || '');
-        } catch (error) {
-          console.error('Error parsing print settings from localStorage:', error);
-        }
-      }
-    }
-  }, []);
-
-  // Save settings to localStorage whenever they change
-  useEffect(() => {
-    if (mounted && typeof window !== 'undefined') {
-      const currentSettings: PrintSettings = {
-        showMarkupLineItem,
-        showSignatureSection,
-        showSeparatePrices,
-        showPrintDate,
-        signerName,
-      };
-      localStorage.setItem(PRINT_SETTINGS_STORAGE_KEY, JSON.stringify(currentSettings));
-    }
-  }, [mounted, showMarkupLineItem, showSignatureSection, showSeparatePrices, showPrintDate, signerName]);
 
   const { data: fetchedQuoteData, isLoading } = api.quote.getById.useQuery(
     { id: typeof quoteId === 'string' ? quoteId : '' },
@@ -106,13 +72,6 @@ const PrintQuotePage: NextPageWithLayout = () => {
     const parsed = typeof value === 'string' ? parseFloat(value) : value;
     return isNaN(parsed) ? 0 : parsed;
   }, []);
-
-  const getLaborTotal = useCallback(
-    (tasks: Task[] = []) => {
-      return tasks.reduce((total, task) => total + toNumber(task.price), 0);
-    },
-    [toNumber]
-  );
 
   const getMaterialsTotal = useCallback(
     (tasks: Task[] = []) => {
@@ -135,6 +94,13 @@ const PrintQuotePage: NextPageWithLayout = () => {
     [toNumber]
   );
 
+  const getLaborTotal = useCallback(
+    (tasks: Task[] = []) => {
+      return tasks.reduce((total, task) => total + toNumber(task.price), 0);
+    },
+    [toNumber]
+  );
+
   const formatPercent = useCallback(
     (value: number): string => {
       try {
@@ -147,9 +113,61 @@ const PrintQuotePage: NextPageWithLayout = () => {
         return `${value}%`;
       }
     },
-    [settings]
+    [settings?.locale] // Corrected dependency: settings is an object, access specific property
   );
 
+  useEffect(() => {
+    setMounted(true);
+    // Load settings from localStorage
+    if (typeof window !== 'undefined') {
+      const savedSettings = localStorage.getItem(PRINT_SETTINGS_STORAGE_KEY);
+      if (savedSettings) {
+        try {
+          const parsedSettings: PrintSettings = JSON.parse(savedSettings);
+          setShowMarkupLineItem(parsedSettings.showMarkupLineItem);
+          setShowSignatureSection(parsedSettings.showSignatureSection);
+          setShowSeparatePrices(parsedSettings.showSeparatePrices);
+          setShowPrintDate(parsedSettings.showPrintDate);
+          setSignerName(parsedSettings.signerName || '');
+        } catch (error) {
+          console.error('Error parsing print settings from localStorage:', error);
+        }
+      }
+    }
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    if (mounted && typeof window !== 'undefined') {
+      const currentSettings: PrintSettings = {
+        showMarkupLineItem,
+        showSignatureSection,
+        showSeparatePrices,
+        showPrintDate,
+        signerName,
+      };
+      localStorage.setItem(PRINT_SETTINGS_STORAGE_KEY, JSON.stringify(currentSettings));
+    }
+  }, [
+    mounted,
+    showMarkupLineItem,
+    showSignatureSection,
+    showSeparatePrices,
+    showPrintDate,
+    signerName,
+  ]);
+
+  // --- NEW useEffect for Auth Redirect ---
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    }
+  }, [status, router]);
+  // --- END NEW useEffect ---
+
+  // --- END: Moved all hooks to the top ---
+
+  // Conditional returns remain after all hooks are called
   // Loading state
   if (!mounted || status === 'loading' || isLoading) {
     return (
@@ -159,10 +177,10 @@ const PrintQuotePage: NextPageWithLayout = () => {
     );
   }
 
-  // Authentication check
+  // Authentication check (Remove router.push from here)
   if (status === 'unauthenticated') {
-    router.push('/auth/signin');
-    return null;
+    // router.push('/auth/signin'); // Removed side effect from render
+    return null; // Still return null to prevent rendering the page content
   }
 
   // Not found state
@@ -278,82 +296,80 @@ const PrintQuotePage: NextPageWithLayout = () => {
         <Settings size={24} />
       </Button>
 
-      {/* Print Options Panel - Fixed position, conditional rendering, hidden on print */}
-      {isSettingsPanelOpen && (
-        <div className="fixed top-28 right-4 z-10 w-64 rounded-lg border bg-white p-4 shadow-lg print:hidden">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-base font-semibold">{t('quotes.print.printOptionsTitle')}</h3>
-            <Button
-              isIconOnly
-              variant="light"
-              size="sm"
-              onPress={toggleSettingsPanel}
-              aria-label={t('common.close')}
-            >
-              <X size={18} />
-            </Button>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              isSelected={showMarkupLineItem}
-              onChange={handleToggleMarkupDisplay}
-              aria-label={t('quotes.print.showingMarkupDetails')}
-            />
-            <span className="text-sm">
-              {showMarkupLineItem
-                ? t('quotes.print.showingMarkupDetails')
-                : t('quotes.print.hidingMarkupDetails')}
-            </span>
-          </div>
-          <div className="mt-3 flex items-center space-x-2">
-            <Switch
-              isSelected={showSignatureSection}
-              onChange={handleToggleSignatureSection}
-              aria-label={t('quotes.print.toggleSignatureSection')}
-            />
-            <span className="text-sm">
-              {showSignatureSection
-                ? t('quotes.print.showingSignatureSection')
-                : t('quotes.print.hidingSignatureSection')}
-            </span>
-          </div>
-          <div className="mt-3 flex items-center space-x-2">
-            <Switch
-              isSelected={showSeparatePrices}
-              onChange={handleToggleSeparatePrices}
-              aria-label={t('quotes.print.toggleSeparatePrices')}
-            />
-            <span className="text-sm">
-              {showSeparatePrices
-                ? t('quotes.print.showingSeparatePrices')
-                : t('quotes.print.showingCombinedPrice')}
-            </span>
-          </div>
-          <div className="mt-3 flex items-center space-x-2">
-            <Switch
-              isSelected={showPrintDate}
-              onChange={handleTogglePrintDate}
-              aria-label={t('quotes.print.togglePrintDate')}
-            />
-            <span className="text-sm">
-              {showPrintDate
-                ? t('quotes.print.showingPrintDate')
-                : t('quotes.print.hidingPrintDate')}
-            </span>
-          </div>
-          <div className="mt-3">
-            <Input
-              label={t('quotes.print.signerNameLabel')}
-              placeholder={t('quotes.print.signerNamePlaceholder')}
-              value={signerName}
-              onChange={handleSignerNameChange}
-              fullWidth
-              size="sm"
-              variant="bordered"
-            />
-          </div>
+      {/* Print Options Panel - Fixed position, hidden on print, visibility controlled by className */}
+      <div
+        className={`fixed top-28 right-4 z-10 w-64 rounded-lg border bg-white p-4 shadow-lg transition-opacity duration-200 ease-in-out print:hidden ${isSettingsPanelOpen ? 'visible opacity-100' : 'invisible opacity-0'} `}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-base font-semibold">{t('quotes.print.printOptionsTitle')}</h3>
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            onPress={toggleSettingsPanel}
+            aria-label={t('common.close')}
+          >
+            <X size={18} />
+          </Button>
         </div>
-      )}
+        <div className="flex items-center space-x-2">
+          <Switch
+            isSelected={showMarkupLineItem}
+            onChange={handleToggleMarkupDisplay}
+            aria-label={t('quotes.print.showingMarkupDetails')}
+          />
+          <span className="text-sm">
+            {showMarkupLineItem
+              ? t('quotes.print.showingMarkupDetails')
+              : t('quotes.print.hidingMarkupDetails')}
+          </span>
+        </div>
+        <div className="mt-3 flex items-center space-x-2">
+          <Switch
+            isSelected={showSignatureSection}
+            onChange={handleToggleSignatureSection}
+            aria-label={t('quotes.print.toggleSignatureSection')}
+          />
+          <span className="text-sm">
+            {showSignatureSection
+              ? t('quotes.print.showingSignatureSection')
+              : t('quotes.print.hidingSignatureSection')}
+          </span>
+        </div>
+        <div className="mt-3 flex items-center space-x-2">
+          <Switch
+            isSelected={showSeparatePrices}
+            onChange={handleToggleSeparatePrices}
+            aria-label={t('quotes.print.toggleSeparatePrices')}
+          />
+          <span className="text-sm">
+            {showSeparatePrices
+              ? t('quotes.print.showingSeparatePrices')
+              : t('quotes.print.showingCombinedPrice')}
+          </span>
+        </div>
+        <div className="mt-3 flex items-center space-x-2">
+          <Switch
+            isSelected={showPrintDate}
+            onChange={handleTogglePrintDate}
+            aria-label={t('quotes.print.togglePrintDate')}
+          />
+          <span className="text-sm">
+            {showPrintDate ? t('quotes.print.showingPrintDate') : t('quotes.print.hidingPrintDate')}
+          </span>
+        </div>
+        <div className="mt-3">
+          <Input
+            label={t('quotes.print.signerNameLabel')}
+            placeholder={t('quotes.print.signerNamePlaceholder')}
+            value={signerName}
+            onChange={handleSignerNameChange}
+            fullWidth
+            size="sm"
+            variant="bordered"
+          />
+        </div>
+      </div>
 
       {quote && (
         <div className="print-page mx-auto max-w-full bg-white p-4 shadow sm:max-w-[8.5in] sm:p-6 print:max-w-none print:p-0 print:shadow-none">
@@ -458,6 +474,9 @@ const PrintQuotePage: NextPageWithLayout = () => {
                 <table className="w-full min-w-full table-fixed border-collapse">
                   <thead>
                     <tr className="border-b-2 border-gray-400 bg-gray-200 print:bg-gray-200">
+                      <th className="w-12 p-2 text-center text-sm font-semibold whitespace-normal text-gray-700 sm:p-3 sm:text-base">
+                        #
+                      </th>
                       <th className="p-2 text-left text-sm font-semibold whitespace-normal text-gray-700 sm:p-3 sm:text-base">
                         {t('quotes.print.description')}
                       </th>
@@ -481,7 +500,7 @@ const PrintQuotePage: NextPageWithLayout = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {quote.tasks.map((task) => {
+                    {quote.tasks.map((task, index) => {
                       const taskPriceRaw = toNumber(task.price);
                       const taskMaterialsTotalRaw =
                         task.materialType === 'LUMPSUM'
@@ -512,6 +531,9 @@ const PrintQuotePage: NextPageWithLayout = () => {
                           key={task.id}
                           className="border-b border-gray-200 hover:bg-gray-50 print:cursor-default print:border-gray-400 print:hover:bg-transparent"
                         >
+                          <td className="w-12 p-2 text-center text-sm text-gray-700 sm:p-3 sm:text-base">
+                            {index + 1}
+                          </td>
                           <td className="p-2 text-sm whitespace-normal text-gray-700 sm:p-3 sm:text-base">
                             {task.description}
                           </td>
@@ -586,19 +608,21 @@ const PrintQuotePage: NextPageWithLayout = () => {
           {/* Signature Section - Conditionally Rendered */}
           {showSignatureSection && (
             <div className="mt-4 print:border-gray-400">
-              <div className="grid grid-cols-1 gap-x-8 text-center md:grid-cols-3">
-                <div></div>
-                <div></div>
-                <div className="flex flex-col">
-                  <p className="text-base font-semibold">
+              <div className="flex pt-4">
+                <div className="flex-1"></div>
+                <div className="flex-1"></div>
+                <div className="flex flex-1 flex-col">
+                  <p className="text-sm">
                     {/* full date month year in current locale */}
                     {formatDateUtil(new Date(), 'full')}
                   </p>
-                  <p className="text-base font-semibold">
-                    {t('quotes.print.signatureAuthorizedLabel')}
+                  <p className="font-semibold mt-2">
+                    {/* Display signerName if provided, otherwise the default "Authorized Signature" label */}
+                    {signerName || t('quotes.print.signatureAuthorizedLabel')}
                   </p>
                   <p className="text-xs text-gray-600">
-                    ({signerName || t('quotes.print.signatureNamePrintedLabel')})
+                    {/* Always display the "Name (Printed)" label */}(
+                    {t('quotes.print.signatureNamePrintedLabel')})
                   </p>
                 </div>
               </div>

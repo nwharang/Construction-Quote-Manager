@@ -395,6 +395,7 @@ export type TranslationKey =
   | 'quotes.view.laborCost'
   | 'quotes.view.materials'
   | 'quotes.view.actions'
+  | 'quotes.view.quoteDetails'
   | 'quotes.createdAtLabel'
   | 'quotes.updatedAtLabel'
   | 'quotes.actionsLabel'
@@ -520,6 +521,10 @@ export type TranslationKey =
   // END Page Title Keys
   | 'errors.requiredFieldsMissing'
   | 'nav.customers'
+  | 'nav.instructions'
+  | 'instructions.pageTitle'
+  | 'instructions.description'
+  | 'tasks.addTaskButton'
   // Task Detail Drawer Keys
   | 'quotes.taskDrawer.editTitle'
   | 'quotes.taskDrawer.newTitle'

@@ -14,6 +14,12 @@ import { useConfigStore } from '~/store';
 import { useI18n } from '~/components/providers/I18nProvider';
 import type { AppLocale } from '~/i18n/locales';
 
+// Define the mapping from locale code to details here
+const localeDetailsMap: Record<AppLocale, { name: string; flag: string }> = {
+  en: { name: 'English', flag: '🇺🇸' },
+  vi: { name: 'Tiếng Việt', flag: '🇻🇳' },
+};
+
 interface LocaleSelectorProps {
   variant?: 'default' | 'mini';
   className?: string;
@@ -30,7 +36,7 @@ export const LocaleSelector: React.FC<LocaleSelectorProps> = ({
   const { settings } = useConfigStore();
   const { changeLocale } = useI18n();
 
-  const currentLocale = settings?.locale || 'en';
+  const currentLocale = settings?.locale || 'vi';
 
   const handleLocaleChange = useCallback(
     (locale: AppLocale) => {
@@ -58,7 +64,7 @@ export const LocaleSelector: React.FC<LocaleSelectorProps> = ({
           aria-label={t('settings.selectLanguage')}
           onAction={(key) => handleLocaleChange(key as AppLocale)}
         >
-          {Object.entries(locales).map(([key, { name, flag }]) => (
+          {Object.entries(localeDetailsMap).map(([key, { name, flag }]) => (
             <DropdownItem
               key={key}
               description={flag}
@@ -79,18 +85,18 @@ export const LocaleSelector: React.FC<LocaleSelectorProps> = ({
           variant="light"
           startContent={<Globe size={20} />}
           endContent={
-            <span className="text-lg">{locales[currentLocale as AppLocale]?.flag || '🌐'}</span>
+            <span className="text-lg">{localeDetailsMap[currentLocale as AppLocale]?.flag || '🌐'}</span>
           }
           className={className}
         >
-          {locales[currentLocale as AppLocale]?.name || t('settings.selectLanguage')}
+          {localeDetailsMap[currentLocale as AppLocale]?.name || t('settings.selectLanguage')}
         </Button>
       </DropdownTrigger>
       <DropdownMenu
         aria-label={t('settings.selectLanguage')}
         onAction={(key) => handleLocaleChange(key as AppLocale)}
       >
-        {Object.entries(locales).map(([key, { name, flag }]) => (
+        {Object.entries(localeDetailsMap).map(([key, { name, flag }]) => (
           <DropdownItem
             key={key}
             startContent={<span className="text-lg">{flag}</span>}

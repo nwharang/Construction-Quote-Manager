@@ -54,6 +54,7 @@ function NewQuotePageContent() {
         .map((material) => ({
           // Ensure only expected fields are sent
           productId: material.productId,
+          productName: material.productName,
           quantity: material.quantity,
           unitPrice: material.unitPrice,
           notes: material.notes,

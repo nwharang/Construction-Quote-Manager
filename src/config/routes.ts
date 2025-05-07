@@ -40,6 +40,10 @@ export const entities = {
     singular: 'Quote',
     plural: 'Quotes',
   },
+  instruction: {
+    singular: 'Instruction',
+    plural: 'Instructions',
+  },
 } as const;
 
 export const routes = {
@@ -122,6 +126,9 @@ export const routes = {
     },
     settings: '/admin/settings',
   },
+  instruction: {
+    list: '/instructions',
+  },
 } as const;
 
 /**
@@ -153,5 +160,10 @@ export const navigationMenu = [
     label: 'Customers',
     href: routes.admin.customers.list,
     icon: 'UserIcon',
+  },
+  {
+    label: 'Instructions',
+    href: routes.instruction.list,
+    icon: 'BookOpenIcon',
   },
 ] as const;

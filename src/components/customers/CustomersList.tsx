@@ -234,17 +234,14 @@ export function CustomersList() {
         as="div" // Force it to render as a div instead of a button
       >
         {/* Card Header */}
-        <div 
-          className="flex flex-col cursor-pointer" 
-          onClick={() => handleView(customer)}
-        >
+        <div className="flex cursor-pointer flex-col" onClick={() => handleView(customer)}>
           <CardHeader className="flex flex-col items-start p-4 pb-3">
             <h3 className="text-lg font-semibold">{customer.name}</h3>
-            <p className="text-default-400 mt-1 text-[11px]">
-              <p className="text-sm text-default-500">
+            <div className="mt-1 text-[11px]">
+              <p className="text-default-500 text-sm">
                 {customer.createdAt ? formatDate(customer.createdAt, 'short') : '-'}
               </p>
-            </p>
+            </div>
           </CardHeader>
 
           <Divider className="opacity-50" />
@@ -293,9 +290,7 @@ export function CustomersList() {
           </CardBody>
         </div>
 
-        <div
-          className="border-default-100 flex gap-2 border-t p-3"
-        >
+        <div className="border-default-100 flex gap-2 border-t p-3">
           <Button
             size="sm"
             color="primary"
@@ -366,7 +361,7 @@ export function CustomersList() {
         createButtonLabel={t('common.new')}
         searchPlaceholder={t('customers.list.searchPlaceholder')}
       />
-      
+
       <Card className="w-full">
         <CardBody className="px-2 sm:px-4">
           {isLoading ? (
@@ -380,7 +375,7 @@ export function CustomersList() {
             </div>
           ) : (
             // Table View - responsive with horizontal scroll on small screens
-            <div className="-mx-2 sm:-mx-4 overflow-x-auto">
+            <div className="-mx-2 overflow-x-auto sm:-mx-4">
               <Table
                 aria-label="Customers table"
                 isStriped={tableSettings.stripedRows}
@@ -414,7 +409,7 @@ export function CustomersList() {
 
           {/* Pagination */}
           {(customersData?.total ?? 0) > pageSize && (
-            <div className="mt-4 sm:mt-6 flex justify-center">
+            <div className="mt-4 flex justify-center sm:mt-6">
               <Pagination
                 page={page}
                 total={Math.ceil((customersData?.total ?? 0) / pageSize)}

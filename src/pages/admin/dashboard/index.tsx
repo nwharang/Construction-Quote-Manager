@@ -13,12 +13,6 @@ import {
   Plus,
   LayoutGrid,
   LayoutList,
-  TrendingUp,
-  Activity,
-  Calendar,
-  BarChart2,
-  Target,
-  Sparkles,
 } from 'lucide-react';
 import {
   Card,
@@ -27,7 +21,6 @@ import {
   Spinner,
   Button,
   Alert,
-  ButtonGroup,
   Table,
   TableHeader,
   TableColumn,
@@ -35,11 +28,8 @@ import {
   TableCell,
   TableRow,
   Chip,
-  Tabs,
-  Tab,
 } from '@heroui/react';
 import { api } from '~/utils/api';
-import { formatRelativeTime } from '~/utils/date';
 import { useToastStore } from '~/store';
 import { useCallback, useEffect, useState } from 'react';
 import type { TRPCClientErrorLike } from '@trpc/client';
@@ -48,7 +38,6 @@ import { withMainLayout } from '~/utils/withAuth';
 import { routes } from '~/config/routes';
 import { useTranslation } from '~/hooks/useTranslation';
 import { APP_NAME } from '~/config/constants';
-import { Breadcrumb } from '~/components/shared/Breadcrumb';
 import Head from 'next/head';
 import { useSession } from 'next-auth/react';
 
@@ -340,7 +329,9 @@ const DashboardPage: NextPage = () => {
   return (
     <>
       <Head>
-        <title>{t('dashboard.pageTitle')} | {APP_NAME}</title>
+        <title>
+          {t('dashboard.pageTitle')} | {APP_NAME}
+        </title>
         <meta name="description" content={t('dashboard.welcome')} />
       </Head>
 
@@ -359,7 +350,7 @@ const DashboardPage: NextPage = () => {
               {t('dashboard.overview.title')}
             </h2>
             <div className="flex items-center gap-2">
-              <span className="flex h-3 w-3 items-center justify-center">
+              <span className="relative flex h-3 w-3 items-center justify-center">
                 <span className="bg-primary-400 absolute inline-flex h-2 w-2 animate-ping rounded-full opacity-75"></span>
                 <span className="bg-primary-500 relative inline-flex h-2 w-2 rounded-full"></span>
               </span>
@@ -370,8 +361,8 @@ const DashboardPage: NextPage = () => {
           </div>
 
           {isStatsLoading ? (
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
+            <div className="grid grid-cols-1 gap-2 sm:gap-4 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
                 <Card
                   key={i}
                   className="h-[140px] border border-gray-100 shadow-sm sm:h-[160px] dark:border-gray-800"
@@ -388,7 +379,7 @@ const DashboardPage: NextPage = () => {
               {statsError.message || t('common.error')}
             </Alert>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2 sm:gap-4 md:grid-cols-3">
               <StatCard
                 title={t('dashboard.stats.totalCustomers')}
                 subtitle={t('dashboard.stats.totalCustomers.subtitle')}
@@ -412,7 +403,7 @@ const DashboardPage: NextPage = () => {
                 loading={isStatsLoading}
                 error={!!statsError}
               />
-              <StatCard
+              {/* <StatCard
                 title={t('dashboard.stats.productsUsed')}
                 subtitle={t('dashboard.stats.productsUsed.subtitle')}
                 value={hasGrowthStats(stats) ? stats.totalProducts : 0}
@@ -423,7 +414,7 @@ const DashboardPage: NextPage = () => {
                 timeframe={t('dashboard.stats.timeframe.lastQuarter')}
                 loading={isStatsLoading}
                 error={!!statsError}
-              />
+              /> */}
               <StatCard
                 title={t('dashboard.stats.revenue')}
                 subtitle={t('dashboard.stats.revenue.subtitle')}
@@ -480,7 +471,7 @@ const DashboardPage: NextPage = () => {
             </h2>
             <div className="flex items-center gap-2">
               {/* Replace Tabs with Buttons for View Mode Toggle */}
-              <div className="flex items-center rounded-md border border-divider p-0.5">
+              <div className="border-divider flex items-center rounded-md border p-0.5">
                 <Button
                   isIconOnly
                   size="sm"
@@ -576,7 +567,7 @@ const DashboardPage: NextPage = () => {
                           {recentQuotes.map((quote) => (
                             <TableRow
                               key={quote.id}
-                              className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                              className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50"
                               onClick={() => router.push(routes.admin.quotes.detail(quote.id))}
                             >
                               <TableCell>#{quote.sequentialId}</TableCell>
@@ -606,12 +597,11 @@ const DashboardPage: NextPage = () => {
                   {viewMode === 'grid' && (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {recentQuotes.map((quote) => (
-                        <Card
-                          key={quote.id}
-                          className="cursor-pointer transition-all duration-200 hover:shadow-md"
-                          onPress={() => router.push(routes.admin.quotes.detail(quote.id))}
-                        >
-                          <CardBody className="p-4">
+                        <Card key={quote.id} className="cursor-pointer transition-all duration-200">
+                          <CardBody
+                            className="p-4"
+                            onClick={() => router.push(routes.admin.quotes.detail(quote.id))}
+                          >
                             <div className="flex flex-col gap-3">
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-gray-500">#{quote.sequentialId}</span>
@@ -631,15 +621,6 @@ const DashboardPage: NextPage = () => {
                                 <span className="text-lg font-semibold text-gray-900 dark:text-gray-50">
                                   {formatCurrency(Number(quote.total))}
                                 </span>
-                                <Button
-                                  isIconOnly
-                                  size="sm"
-                                  variant="light"
-                                  onPress={() => router.push(routes.admin.quotes.detail(quote.id))}
-                                  aria-label={t('common.view')}
-                                >
-                                  <ArrowRight size={16} />
-                                </Button>
                               </div>
                             </div>
                           </CardBody>

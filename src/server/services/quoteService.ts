@@ -1,8 +1,16 @@
 import { TRPCError } from '@trpc/server';
 import { and, eq, sql, desc, asc, like, inArray, SQL } from 'drizzle-orm';
-import { quotes, tasks, materials, customers, type QuoteStatusType } from '../db/schema';
+import {
+  quotes,
+  tasks,
+  materials,
+  customers,
+  type QuoteStatusType,
+  products,
+  type MaterialTypeType,
+} from '../db/schema';
 import { PgColumn } from 'drizzle-orm/pg-core';
-import { type DB } from './index';
+import { type DB, type MaterialFields } from './index';
 import { BaseService } from './baseService';
 import type { Session } from 'next-auth';
 import { type PgTransaction } from 'drizzle-orm/pg-core';
@@ -145,6 +153,7 @@ export class QuoteService extends BaseService {
         price: number;
         materialType: 'lumpsum' | 'itemized';
         materials?: {
+          productName?: string;
           unitPrice: number;
           productId: string;
           quantity: number;
@@ -192,6 +201,33 @@ export class QuoteService extends BaseService {
           message: 'Failed to create quote',
         });
       }
+      const allProductIdsFromMaterials: string[] = [];
+      data.tasks?.forEach((x) => {
+        if (x.materials) {
+          x.materials.forEach((y) => {
+            if (y.productId) {
+              allProductIdsFromMaterials.push(y.productId);
+            }
+          });
+        }
+      });
+
+
+      const productDataMap: Map<string, string> = new Map();
+      if (allProductIdsFromMaterials.length > 0) {
+        const uniqueProductIds = [...new Set(allProductIdsFromMaterials)];
+        const fetchedProducts = await tx.query.products.findMany({
+          where: inArray(products.id, uniqueProductIds),
+          columns: { id: true, name: true },
+        });
+        fetchedProducts.forEach((p) => {
+          // Ensure p.name is not null/undefined before setting. If it can be null, handle accordingly.
+          if (p.name) {
+            // Assuming product names are expected to be non-null strings
+            productDataMap.set(p.id, p.name);
+          }
+        });
+      }
 
       // If tasks provided, insert them
       if (data.tasks && data.tasks.length > 0) {
@@ -221,6 +257,7 @@ export class QuoteService extends BaseService {
               taskData.materials.map((materialData) => ({
                 taskId: insertedTask.id,
                 productId: materialData.productId,
+                productName: productDataMap.get(materialData.productId),
                 quantity: materialData.quantity,
                 unitPrice: materialData.unitPrice.toString(),
                 notes: materialData.notes || undefined,
@@ -228,8 +265,6 @@ export class QuoteService extends BaseService {
             );
           }
         }
-        // DO NOT Recalculate quote totals inside the transaction
-        // await this.recalculateQuoteTotals({ quoteId: insertedQuote.id, tx });
       }
 
       return insertedQuote; // Return the basic inserted quote data
@@ -374,7 +409,7 @@ export class QuoteService extends BaseService {
         estimatedMaterialsCostLumpSum?: number | null;
         materials?: {
           id?: string;
-          name?: string;
+          productName?: string | null;
           description?: string | null;
           quantity?: number;
           unitPrice?: number;
@@ -408,20 +443,46 @@ export class QuoteService extends BaseService {
       }
 
       // 3. Handle Task Updates/Creations/Deletions
-      if (data.tasks !== undefined) { // Check if tasks array is provided, even if empty
+      if (data.tasks !== undefined) {
+        // Check if tasks array is provided, even if empty
         const incomingTasks = data.tasks;
         const quoteId = id;
 
-        // --- Task Handling Refactor ---
+        // --- START: Product Name Fetching Logic ---
+        const allProductIdsFromMaterials: string[] = [];
+        for (const taskData of incomingTasks) {
+          if (taskData.materialType === 'itemized' && taskData.materials) {
+            for (const mat of taskData.materials) {
+              if (mat.productId) {
+                allProductIdsFromMaterials.push(mat.productId);
+              }
+            }
+          }
+        }
 
-        // 1. Delete all existing tasks and their materials for this quote
-        // Get existing task IDs first to delete their materials
+        const productDataMap: Map<string, string> = new Map();
+        if (allProductIdsFromMaterials.length > 0) {
+          const uniqueProductIds = [...new Set(allProductIdsFromMaterials)];
+          const fetchedProducts = await tx.query.products.findMany({
+            where: inArray(products.id, uniqueProductIds),
+            columns: { id: true, name: true },
+          });
+          fetchedProducts.forEach((p) => {
+            // Ensure p.name is not null/undefined before setting. If it can be null, handle accordingly.
+            if (p.name) {
+              // Assuming product names are expected to be non-null strings
+              productDataMap.set(p.id, p.name);
+            }
+          });
+        }
+        // --- END: Product Name Fetching Logic ---
+
         const existingTaskIdsQuery = tx
           .select({ id: tasks.id })
           .from(tasks)
           .where(eq(tasks.quoteId, quoteId));
 
-        const existingTaskIds = (await existingTaskIdsQuery).map(t => t.id);
+        const existingTaskIds = (await existingTaskIdsQuery).map((t) => t.id);
 
         if (existingTaskIds.length > 0) {
           // Delete associated materials first
@@ -433,13 +494,12 @@ export class QuoteService extends BaseService {
         // 2. Prepare and Bulk Insert all incoming tasks
         const newTasksToInsert: (typeof tasks.$inferInsert)[] = [];
         const materialsToInsert: (typeof materials.$inferInsert)[] = [];
-        const taskMaterialMap: Record<number, { taskId: string; materials: any[] }> = {}; // Map task index to its materials
-
+        const taskMaterialMap: Record<number, { taskId: string; materials: any[] }> = {};
 
         for (const [index, taskData] of incomingTasks.entries()) {
-           // Generate a new UUID for each task *before* inserting
-           // Drizzle doesn't auto-generate UUIDs on bulk insert if the column allows null/undefined
-           // We need the ID immediately to link materials
+          // Generate a new UUID for each task *before* inserting
+          // Drizzle doesn't auto-generate UUIDs on bulk insert if the column allows null/undefined
+          // We need the ID immediately to link materials
           const newTaskId = crypto.randomUUID();
 
           newTasksToInsert.push({
@@ -449,67 +509,80 @@ export class QuoteService extends BaseService {
             price: taskData.price?.toString() ?? '0',
             estimatedMaterialsCostLumpSum:
               taskData.estimatedMaterialsCostLumpSum?.toString() ?? null,
-            materialType: taskData.materialType?.toUpperCase() as 'LUMPSUM' | 'ITEMIZED' ?? 'LUMPSUM',
+            materialType:
+              (taskData.materialType?.toUpperCase() as 'LUMPSUM' | 'ITEMIZED') ?? 'LUMPSUM',
             order: index,
             createdAt: new Date(),
             updatedAt: new Date(),
           });
 
           // Store materials temporarily, linked to the new task ID and original index
-           if (taskData.materialType === 'itemized' && taskData.materials) {
-             taskMaterialMap[index] = { taskId: newTaskId, materials: taskData.materials };
-           }
+          if (taskData.materialType === 'itemized' && taskData.materials) {
+            // --- START: Enrich materials with DB-fetched productName ---
+            const enrichedMaterials = taskData.materials.map((mat) => {
+              const newMat = { ...mat }; // Create a new object
+              if (newMat.productId) {
+                const dbProductName = productDataMap.get(newMat.productId);
+                newMat.productName = dbProductName ?? ''; // Use DB name or empty string
+              }
+              // If no productId, newMat.name remains as is from input (or default if not provided)
+              return newMat;
+            });
+            taskMaterialMap[index] = { taskId: newTaskId, materials: enrichedMaterials };
+            // --- END: Enrich materials ---
+          }
         }
 
         // Bulk insert tasks if any exist
         let insertedTaskIds: { id: string }[] = [];
         if (newTasksToInsert.length > 0) {
-          insertedTaskIds = await tx.insert(tasks).values(newTasksToInsert).returning({ id: tasks.id });
+          insertedTaskIds = await tx
+            .insert(tasks)
+            .values(newTasksToInsert)
+            .returning({ id: tasks.id });
           if (insertedTaskIds.length !== newTasksToInsert.length) {
-             console.error("Mismatch between tasks to insert and returned IDs");
-             // Consider throwing an error or more robust handling
-             throw new TRPCError({
-                code: 'INTERNAL_SERVER_ERROR',
-                message: 'Failed to insert all tasks correctly.',
-             });
+            console.error('Mismatch between tasks to insert and returned IDs');
+            // Consider throwing an error or more robust handling
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to insert all tasks correctly.',
+            });
           }
         }
-
 
         // --- Material Handling Refactor ---
         // All old materials were deleted with their tasks. Now, bulk insert new ones.
 
         for (const [originalIndex, taskInfo] of Object.entries(taskMaterialMap)) {
-            const { taskId, materials: taskMaterialsData } = taskInfo;
-            for (const materialData of taskMaterialsData) {
-                 // Skip materials without a productId
-                 if (!materialData.productId) {
-                   console.warn(
-                     `Skipping material '${materialData.name}' due to missing productId for task ${taskId}`
-                   );
-                   continue;
-                 }
-
-                 // Prepare material payload for bulk insert
-                 materialsToInsert.push({
-                     // id: undefined, // Let DB generate or use default if needed
-                     taskId: taskId, // Link to the newly inserted task
-                     productId: materialData.productId,
-                     quantity: materialData.quantity ?? 1,
-                     unitPrice: materialData.unitPrice?.toString() ?? '0',
-                     notes: materialData.notes || undefined,
-                     createdAt: new Date(),
-                     updatedAt: new Date(),
-                 });
+          const { taskId, materials: taskMaterialsData } = taskInfo;
+          for (const materialData of taskMaterialsData) {
+            // Skip materials without a productId
+            if (!materialData.productId) {
+              console.warn(
+                `Skipping material '${materialData.name}' due to missing productId for task ${taskId}`
+              );
+              continue;
             }
-        }
 
+            // Prepare material payload for bulk insert
+            materialsToInsert.push({
+              // id: undefined, // Let DB generate or use default if needed
+              taskId: taskId, // Link to the newly inserted task
+              productId: materialData.productId,
+              productName: materialData.productName,
+              quantity: materialData.quantity ?? 1,
+              unitPrice: materialData.unitPrice?.toString() ?? '0',
+              notes: materialData.notes || undefined,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+        }
 
         // Bulk insert materials if any exist
         if (materialsToInsert.length > 0) {
           await tx.insert(materials).values(materialsToInsert);
         }
-
       } // End of task handling block
 
       // --- Transaction Ends Here ---
@@ -522,15 +595,18 @@ export class QuoteService extends BaseService {
     // --- Recalculation Outside Transaction ---
     // Use the quote ID returned from the transaction
     if (transactionResult?.updatedQuoteId) {
-       try {
-          // Use the main db instance (this.db), not the transaction (tx)
-          await this.recalculateQuoteTotals({ quoteId: transactionResult.updatedQuoteId });
-        } catch (recalcError) {
-           // Log the recalculation error but don't necessarily fail the whole update
-           // The quote was updated, just the totals might be stale.
-           console.error(`Recalculation failed for quote ${transactionResult.updatedQuoteId} after update:`, recalcError);
-           // Depending on requirements, you might want to throw a specific error or handle this differently.
-        }
+      try {
+        // Use the main db instance (this.db), not the transaction (tx)
+        await this.recalculateQuoteTotals({ quoteId: transactionResult.updatedQuoteId });
+      } catch (recalcError) {
+        // Log the recalculation error but don't necessarily fail the whole update
+        // The quote was updated, just the totals might be stale.
+        console.error(
+          `Recalculation failed for quote ${transactionResult.updatedQuoteId} after update:`,
+          recalcError
+        );
+        // Depending on requirements, you might want to throw a specific error or handle this differently.
+      }
     }
 
     // 5. Fetch and return the updated quote ... (no change here)
@@ -585,6 +661,7 @@ export class QuoteService extends BaseService {
       estimatedMaterialsCostLumpSum?: number;
       materials?: {
         unitPrice: number;
+        productName?: string;
         productId: string;
         quantity: number;
         notes?: string;
@@ -631,6 +708,7 @@ export class QuoteService extends BaseService {
           taskData.materials.map((matInput) => ({
             taskId: task.id,
             productId: matInput.productId,
+            productName: matInput.productName,
             quantity: matInput.quantity,
             unitPrice: matInput.unitPrice.toString(),
             notes: matInput.notes || undefined,

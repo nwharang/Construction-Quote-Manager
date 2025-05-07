@@ -12,15 +12,15 @@ import {
   Settings,
   LogOut,
   Newspaper,
-  Bell,
-  BarChart3,
   Briefcase,
+  Wrench,
   Folder,
 } from 'lucide-react';
 import { routes } from '~/config/routes';
 import { useTranslation } from '~/hooks/useTranslation';
 import { useConfigStore } from '~/store';
 import { useAuthNavigation } from '~/utils/auth';
+import { APP_NAME, APP_SHORT_NAME } from '~/config/constants';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -70,20 +70,33 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     },
   ];
 
+  const instructionsNavItems = [
+    {
+      key: 'instructions',
+      label: t('nav.instructions'),
+      href: routes.instruction.list,
+      icon: <Newspaper size={18} />,
+    },
+  ];
   // Find the active key based on the current pathname (now accesses initialized mainNavItems)
   const getActiveKey = () => {
-    // Check for exact match first (e.g., /admin/dashboard)
+    // 1. Handle Instructions route explicitly
+    if (pathname.startsWith(routes.instruction.list)) {
+      return 'instructions'; // Assuming 'instructions' is the key for the Instructions tab
+    }
+
+    // 2. Check for exact match for other main routes
     let active = mainNavItems.find((item) => item.href === pathname)?.key;
     if (active) return active;
 
-    // If no exact match, check for starting path (e.g., /admin/quotes/xyz should match /admin/quotes)
-    // Sort items by href length descending to match more specific paths first
+    // 3. Check for starting path for other main routes (excluding dashboard)
     const sortedItems = [...mainNavItems].sort((a, b) => b.href.length - a.href.length);
     active = sortedItems.find(
-      (item) => pathname.startsWith(item.href) && item.href !== routes.admin.dashboard // Avoid matching dashboard for all /admin routes
+      (item) => pathname.startsWith(item.href) && item.href !== routes.admin.dashboard
     )?.key;
 
-    return active || 'dashboard'; // Default to dashboard if nothing matches
+    // 4. Default fallback
+    return active || 'dashboard'; // Default to dashboard if nothing else matches
   };
   const activeKey = getActiveKey();
 
@@ -119,10 +132,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div className="border-divider bg-background/80 flex h-16 items-center justify-between border-b p-4">
         <Link href="/admin/dashboard" className="flex items-center gap-2">
           <div className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-lg">
-            <Briefcase size={18} className="text-primary" />
+            <Wrench size={24} className="text-primary" />
           </div>
           <span className="text-foreground text-lg font-semibold">
-            {settings?.companyName || 'TTXD'}
+            {settings?.companyName || APP_SHORT_NAME}
           </span>
         </Link>
         <Button
@@ -172,7 +185,39 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             }
           }}
         >
-          {mainNavItems.map((tab) => (
+          <>
+            {mainNavItems.map((tab) => (
+              <Tab
+                key={tab.key}
+                href={tab.href}
+                as={Link}
+                className="justify-start"
+                title={
+                  <div className="flex w-full items-center gap-2.5">
+                    <span>{tab.icon}</span>
+                    <span className="text-default-700 group-data-[selected=true]:text-foreground">
+                      {tab.label}
+                    </span>
+                  </div>
+                }
+              />
+            ))}
+          </>
+        </Tabs>
+        <Divider className="my-4" />
+        <Tabs
+          fullWidth
+          variant="light"
+          aria-label="Main Navigation"
+          isVertical={true}
+          selectedKey={activeKey}
+          onSelectionChange={(key) => {
+            if (window.innerWidth < 768) {
+              onClose();
+            }
+          }}
+        >
+          {instructionsNavItems.map((tab) => (
             <Tab
               key={tab.key}
               href={tab.href}

@@ -15,6 +15,12 @@ import { useI18n } from '~/components/providers/I18nProvider';
 import { Globe } from 'lucide-react';
 import type { AppLocale } from '~/i18n/locales';
 
+// Define the mapping from locale code to details here
+const localeDetailsMap: Record<AppLocale, { name: string; flag: string }> = {
+  en: { name: 'English', flag: '🇺🇸' },
+  vi: { name: 'Tiếng Việt', flag: '🇻🇳' },
+};
+
 interface LocaleSwitchProps {
   /**
    * The variant of the component to display
@@ -80,15 +86,13 @@ export function LocaleSwitch({
   onLocaleChange,
   value,
 }: LocaleSwitchProps) {
-  const { t, locales } = useTranslation();
+  const { t } = useTranslation();
   const { currentLocale: contextLocale, changeLocale } = useI18n();
 
-  // Map locale codes to flag emojis (or use a proper flag icon library in a real app)
+  // Explicitly type the locales array for iteration
+  const availableLocales: AppLocale[] = ['en', 'vi'];
+
   const effectiveLocale = value !== undefined ? value : contextLocale;
-  const localeFlags: Record<string, string> = {
-    en: '🇺🇸',
-    vi: '🇻🇳',
-  };
 
   // Memoize the handler to avoid recreating it on each render
   const handleLocaleChange = useCallback(
@@ -108,11 +112,6 @@ export function LocaleSwitch({
     },
     [effectiveLocale, changeLocale, applyImmediately, onLocaleChange]
   );
-
-  // Add a check here: If locales is not ready, don't render anything
-  if (!locales) {
-    return null;
-  }
 
   // Render as dropdown (for navbar)
   if (variant === 'dropdown') {
@@ -142,16 +141,22 @@ export function LocaleSwitch({
             }
           }}
         >
-          {Object.entries(locales).map(([code, { name, flag }]) => (
-            <DropdownItem key={code} textValue={name}>
-              <div className="flex items-center">
-                <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
-                  {localeFlags[code]}
-                </span>
-                {name}
-              </div>
-            </DropdownItem>
-          ))}
+          {/* Iterate over the availableLocales array */}
+          {availableLocales.map((code) => {
+            const details = localeDetailsMap[code];
+            if (!details) return null; // Should not happen with correct types
+            const { name, flag } = details;
+            return (
+              <DropdownItem key={code} textValue={name}>
+                <div className="flex items-center">
+                  <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
+                    {flag}
+                  </span>
+                  {name}
+                </div>
+              </DropdownItem>
+            );
+          })}
         </DropdownMenu>
       </Dropdown>
     );
@@ -179,16 +184,22 @@ export function LocaleSwitch({
       className={className}
       aria-label={label || t('settings.selectLanguage')}
     >
-      {Object.entries(locales).map(([code, { name, flag }]) => (
-        <SelectItem key={code} textValue={name}>
-          <div className="flex items-center">
-            <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
-              {localeFlags[code]}
-            </span>
-            {name}
-          </div>
-        </SelectItem>
-      ))}
+      {/* Iterate over the availableLocales array */}
+      {availableLocales.map((code) => {
+        const details = localeDetailsMap[code];
+        if (!details) return null; // Should not happen with correct types
+        const { name, flag } = details;
+        return (
+          <SelectItem key={code} textValue={name}>
+            <div className="flex items-center">
+              <span className="mr-2 text-lg" role="img" aria-label={`${name} flag`}>
+                {flag}
+              </span>
+              {name}
+            </div>
+          </SelectItem>
+        );
+      })}
     </Select>
   );
 }
